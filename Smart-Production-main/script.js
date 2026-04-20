@@ -375,9 +375,16 @@ function restoreProductionTimerFromLiveState(status, countdown, expected, synced
 
 function applyLiveState(state) {
   const plan = parseInt(state.plan, 10) || 0;
-  const dailyPlan = parseInt(state.dailyPlan, 10) || plan;
-  const effectivePlan = dailyPlan || plan;
-  const cycleTimeMin = parseFloat(state.cycleTimeMin) || (parseFloat(document.getElementById("cycleTarget").value) || SETTINGS.defaultCycle);
+  const currentDailyPlan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || SETTINGS.defaultPlan;
+  const currentCycleTime = parseFloat(document.getElementById("cycleTarget").value) || SETTINGS.defaultCycle;
+  const parsedDailyPlan = parseInt(state.dailyPlan, 10);
+  const parsedCycleTime = parseFloat(state.cycleTimeMin);
+  const effectivePlan = Number.isFinite(parsedDailyPlan) && parsedDailyPlan > 0
+    ? parsedDailyPlan
+    : (plan > 0 ? plan : currentDailyPlan);
+  const cycleTimeMin = Number.isFinite(parsedCycleTime) && parsedCycleTime > 0
+    ? parsedCycleTime
+    : currentCycleTime;
   const actual = parseInt(state.actual, 10) || 0;
   const balance = parseInt(state.balance, 10) || 0;
   const status = state.status || "READY";
@@ -407,8 +414,8 @@ function applyLiveState(state) {
   }
 
   document.getElementById("plan").innerText = effectivePlan;
-  document.getElementById("dailyPlanTarget").value = effectivePlan;
-  document.getElementById("cycleTarget").value = cycleTimeMin;
+  document.getElementById("dailyPlanTarget").value = String(effectivePlan);
+  document.getElementById("cycleTarget").value = String(cycleTimeMin);
   const lotInput = document.getElementById("lotInput");
   if (lotInput) {
     lotInput.value = lotNo;
