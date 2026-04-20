@@ -376,6 +376,7 @@ function restoreProductionTimerFromLiveState(status, countdown, expected, synced
 function applyLiveState(state) {
   const plan = parseInt(state.plan, 10) || 0;
   const dailyPlan = parseInt(state.dailyPlan, 10) || plan;
+  const effectivePlan = dailyPlan || plan;
   const cycleTimeMin = parseFloat(state.cycleTimeMin) || (parseFloat(document.getElementById("cycleTarget").value) || SETTINGS.defaultCycle);
   const actual = parseInt(state.actual, 10) || 0;
   const balance = parseInt(state.balance, 10) || 0;
@@ -405,8 +406,8 @@ function applyLiveState(state) {
     effEl.className = "big-number status-green";
   }
 
-  document.getElementById("plan").innerText = plan;
-  document.getElementById("dailyPlanTarget").value = dailyPlan;
+  document.getElementById("plan").innerText = effectivePlan;
+  document.getElementById("dailyPlanTarget").value = effectivePlan;
   document.getElementById("cycleTarget").value = cycleTimeMin;
   const lotInput = document.getElementById("lotInput");
   if (lotInput) {
@@ -1453,6 +1454,10 @@ window.onload = async function() {
     loadLiveData();
     setInterval(loadLiveData, 3000);
   } else {
+    // Push baseline settings so monitor immediately matches main dashboard.
+    hasLocalSession = true;
+    updateLiveStateOnly();
+
     // Reload scan history from Sheet after refresh (main screen).
     loadLiveData();
     setInterval(loadLiveData, 3000);
