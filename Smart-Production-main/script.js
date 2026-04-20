@@ -374,17 +374,19 @@ function restoreProductionTimerFromLiveState(status, countdown, expected, synced
 }
 
 function applyLiveState(state) {
+  const resolvePositiveNumber = (primary, secondary, fallback) => {
+    const p = Number(primary);
+    if (Number.isFinite(p) && p > 0) return p;
+    const s = Number(secondary);
+    if (Number.isFinite(s) && s > 0) return s;
+    return fallback;
+  };
+
   const plan = parseInt(state.plan, 10) || 0;
   const currentDailyPlan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || SETTINGS.defaultPlan;
   const currentCycleTime = parseFloat(document.getElementById("cycleTarget").value) || SETTINGS.defaultCycle;
-  const parsedDailyPlan = parseInt(state.dailyPlan, 10);
-  const parsedCycleTime = parseFloat(state.cycleTimeMin);
-  const effectivePlan = Number.isFinite(parsedDailyPlan) && parsedDailyPlan > 0
-    ? parsedDailyPlan
-    : (plan > 0 ? plan : currentDailyPlan);
-  const cycleTimeMin = Number.isFinite(parsedCycleTime) && parsedCycleTime > 0
-    ? parsedCycleTime
-    : currentCycleTime;
+  const effectivePlan = resolvePositiveNumber(state.dailyPlan, plan, currentDailyPlan);
+  const cycleTimeMin = resolvePositiveNumber(state.cycleTimeMin, state.cycleTarget, currentCycleTime);
   const actual = parseInt(state.actual, 10) || 0;
   const balance = parseInt(state.balance, 10) || 0;
   const status = state.status || "READY";
