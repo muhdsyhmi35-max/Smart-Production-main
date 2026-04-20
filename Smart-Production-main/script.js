@@ -199,13 +199,29 @@ function calculateExpectedOutput() {
   return expected;
 }
 
+/** Seconds beyond cycle since last completed 4-scan (not yet booked into downtimeSeconds). */
+function getUnbookedDowntimeSec() {
+  if (!timer || isMonitor || !lastScanTime) return 0;
+
+  const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
+  const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+  if (plan > 0 && actualCount >= plan) return 0;
+
+  const elapsedSinceLastScanSec = Math.floor((Date.now() - lastScanTime.getTime()) / 1000);
+  return Math.max(0, elapsedSinceLastScanSec - cycleTimeSec);
+}
+
+function getTotalDowntimeSec() {
+  return Math.max(0, downtimeSeconds) + getUnbookedDowntimeSec();
+}
+
 function calculateAvailabilityPercent() {
   if (!firstScanAtMs) return 0;
 
   const plannedRunSec = Math.max(Math.floor((Date.now() - firstScanAtMs) / 1000), 0);
   if (plannedRunSec <= 0) return 0;
 
-  const boundedDowntime = Math.min(Math.max(downtimeSeconds, 0), plannedRunSec);
+  const boundedDowntime = Math.min(Math.max(getTotalDowntimeSec(), 0), plannedRunSec);
   const operatingSec = Math.max(plannedRunSec - boundedDowntime, 0);
 
   return Math.floor((operatingSec / plannedRunSec) * 100);
@@ -331,23 +347,19 @@ function restoreProductionTimerFromLiveState(status, countdown, expected, synced
   if (timer) return;
 
   const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
-  const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
   const nowMs = Date.now();
   let adjustedCountdown = parseInt(countdown, 10) || 0;
-  let missedDowntimeSec = 0;
   let elapsedInCycle = Math.max(cycleTimeSec - adjustedCountdown, 0);
 
   if (syncedLastScanAtMs) {
     const elapsedSinceLastScanSec = Math.max(Math.floor((nowMs - Number(syncedLastScanAtMs)) / 1000), 0);
     adjustedCountdown = Math.max(cycleTimeSec - elapsedSinceLastScanSec, 0);
-    missedDowntimeSec = Math.max(elapsedSinceLastScanSec - cycleTimeSec, 0);
     elapsedInCycle = Math.max(cycleTimeSec - adjustedCountdown, 0);
   } else {
     const syncedAtMs = Number(syncedUpdatedAt) || nowMs;
     const elapsedSinceSyncSec = Math.max(Math.floor((nowMs - syncedAtMs) / 1000), 0);
     const syncedCountdown = parseInt(countdown, 10) || 0;
     adjustedCountdown = Math.max(syncedCountdown - elapsedSinceSyncSec, 0);
-    missedDowntimeSec = Math.max(elapsedSinceSyncSec - syncedCountdown, 0);
     elapsedInCycle = Math.max(cycleTimeSec - adjustedCountdown, 0);
   }
   const elapsedForExpected = Math.max((parseInt(expected, 10) || 0) * cycleTimeSec, 0);
@@ -366,11 +378,8 @@ function restoreProductionTimerFromLiveState(status, countdown, expected, synced
     lastScanTime = syncedLastScanAtMs ? new Date(Number(syncedLastScanAtMs)) : reconstructedBaseTime;
   }
 
-  // Catch up downtime that happened while browser was closed/refreshed.
-  if (missedDowntimeSec > 0 && (plan === 0 || actualCount < plan)) {
-    downtimeSeconds += missedDowntimeSec;
-    isDowntime = true;
-  }
+  // Downtime is booked on each completed 4-scan (same as the scan table). Offline gap is
+  // included in the next scan's diff; booking it here would double-count.
 
   countdownValue = adjustedCountdown;
 
@@ -439,6 +448,7 @@ function applyLiveState(state) {
   const balance = parseInt(state.balance, 10) || 0;
   const status = state.status || "READY";
   const totalDowntime = parseInt(state.totalDowntime, 10) || 0;
+  const bookedDowntime = parseInt(state.bookedDowntime, 10);
   const countdown = parseInt(state.countdown, 10) || 0;
   const expected = parseInt(state.expected, 10) || 0;
   const delay = parseInt(state.delay, 10) || 0;
@@ -448,7 +458,7 @@ function applyLiveState(state) {
 
   // Keep local variables aligned so refresh doesn't revert values.
   actualCount = actual;
-  downtimeSeconds = totalDowntime;
+  downtimeSeconds = Number.isFinite(bookedDowntime) && bookedDowntime >= 0 ? bookedDowntime : totalDowntime;
   firstScanAtMs = state.firstScanAtMs ? Number(state.firstScanAtMs) : firstScanAtMs;
   primerScanned = syncedPrimerScanned;
 
@@ -612,14 +622,9 @@ function startProduction(shouldSync = true) {
 
     const diff = Math.floor((now - baseTime) / 1000);
     countdownValue = Math.max(cycleTimeSec - diff, 0);
-    const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
 
     if (countdownValue === 0) {
       isDowntime = true;
-      // Accumulate downtime every second while line is late (before target reached).
-      if (actualCount < plan || plan === 0) {
-        downtimeSeconds += 1;
-      }
     } else {
       isDowntime = false;
     }
@@ -783,17 +788,14 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
         const actualDowntime = diffSec - cycleTimeSec;
         const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
 
-        // ✅ ONLY BEFORE TARGET
-        if ((actualCount + 1) <= plan) {
+        if (plan === 0 || (actualCount + 1) <= plan) {
           downtimeEvent = format(actualDowntime);
+          downtimeSeconds += actualDowntime;
           isDowntime = true;
         } else {
           downtimeEvent = "";
           isDowntime = false;
         }
-
-        // ✅ TRIGGER STATUS
-        isDowntime = true;
       } else {
         // ✅ TAK DOWNTIME
         isDowntime = false;
@@ -913,7 +915,7 @@ function updateDisplay() {
   document.getElementById("plan").innerText = plan;
   document.getElementById("actual").innerText = actualCount;
   document.getElementById("countdown").innerText = format(countdownValue);
-  document.getElementById("downtime").innerText = format(downtimeSeconds);
+  document.getElementById("downtime").innerText = format(getTotalDowntimeSec());
 
   const balanceEl = document.getElementById("balance");
   if (balance < 0) { balanceEl.className = "big-number status-red"; }
@@ -948,7 +950,7 @@ function updateDisplay() {
 
   const downtimeCard = document.getElementById("downtimeCard");
   const downtimeText = document.getElementById("downtime");
-  if (isDowntime) {
+  if (isDowntime || getUnbookedDowntimeSec() > 0) {
     downtimeCard.classList.add("downtime-alert", "blink");
     downtimeText.classList.add("status-red", "blink");
   } else {
@@ -1303,7 +1305,7 @@ function updateLiveStateOnly() {
       balance: balance,
       status: status,
       countdown: countdownValue,
-      totalDowntime: downtimeSeconds,
+      totalDowntime: getTotalDowntimeSec(),
       expected: expected,
       delay: delay,
       efficiency: efficiency
@@ -1319,7 +1321,8 @@ function updateLiveStateOnly() {
     lotNo: lotNo,
     status: status,
     countdown: countdownValue,
-    totalDowntime: downtimeSeconds,
+    bookedDowntime: downtimeSeconds,
+    totalDowntime: getTotalDowntimeSec(),
     expected: expected,
     delay: delay,
     efficiency: efficiency,
@@ -1351,7 +1354,7 @@ function sendToSheet(chassis, model, engine, key, lot, status, downtimeEvent) {
       actual: actual,
       balance: balance,
       downtimeEvent: downtimeEvent,
-      totalDowntime: downtimeSeconds,
+      totalDowntime: getTotalDowntimeSec(),
       countdown: countdownValue
     })
   })
