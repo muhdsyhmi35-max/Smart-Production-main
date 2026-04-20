@@ -271,8 +271,14 @@ function publishSyncCommand(action) {
 function publishLiveStateToFirebase(state) {
   if (!firebaseLiveStateRef) return;
 
-  firebaseLiveStateRef.set({
+  // Use update (merge) so other writers (e.g. scheduled tick) cannot wipe fields
+  // like dailyPlan / cycleTimeMin between publishes.
+  firebaseLiveStateRef.update({
     ...state,
+    settings: {
+      dailyPlan: state.dailyPlan ?? state.plan,
+      cycleTimeMin: state.cycleTimeMin
+    },
     sender: syncClientId,
     updatedAt: firebase.database.ServerValue.TIMESTAMP
   }).catch(err => {
@@ -373,6 +379,32 @@ function restoreProductionTimerFromLiveState(status, countdown, expected, synced
   startProduction(false);
 }
 
+function parseFirebaseInt(val) {
+  if (val === undefined || val === null || val === "") return null;
+  const n = parseInt(String(val).trim(), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+function parseFirebaseFloat(val) {
+  if (val === undefined || val === null || val === "") return null;
+  const n = parseFloat(String(val).trim().replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Daily plan + cycle (minutes) as stored in Firebase (settings first, then top-level). */
+function readPlanAndCycleFromFirebase(state) {
+  const settings = state.settings || {};
+  const daily =
+    parseFirebaseInt(settings.dailyPlan) ??
+    parseFirebaseInt(state.dailyPlan) ??
+    parseFirebaseInt(state.plan);
+  const cycle =
+    parseFirebaseFloat(settings.cycleTimeMin) ??
+    parseFirebaseFloat(state.cycleTimeMin) ??
+    parseFirebaseFloat(state.cycleTarget);
+  return { daily, cycle };
+}
+
 function applyLiveState(state) {
   const resolvePositiveNumber = (primary, secondary, fallback) => {
     const p = Number(primary);
@@ -389,11 +421,16 @@ function applyLiveState(state) {
   let cycleTimeMin;
 
   if (isMonitor) {
-    // Monitor must read these values from Firebase state.
-    const firebasePlan = Number(state.dailyPlan ?? state.plan);
-    const firebaseCycle = Number(state.cycleTimeMin ?? state.cycleTarget);
-    effectivePlan = Number.isFinite(firebasePlan) && firebasePlan > 0 ? firebasePlan : currentDailyPlan;
-    cycleTimeMin = Number.isFinite(firebaseCycle) && firebaseCycle > 0 ? firebaseCycle : currentCycleTime;
+    // Monitor: boxes mirror Firebase only (no local defaults masking stale reads).
+    const { daily, cycle } = readPlanAndCycleFromFirebase(state);
+    effectivePlan = daily != null && daily > 0 ? daily : 0;
+    cycleTimeMin = cycle != null && cycle > 0 ? cycle : SETTINGS.defaultCycle;
+
+    const planInput = document.getElementById("dailyPlanTarget");
+    const cycleInput = document.getElementById("cycleTarget");
+    planInput.value = daily != null && daily > 0 ? String(daily) : "";
+    cycleInput.value = cycle != null && cycle > 0 ? String(cycle) : "";
+    document.getElementById("plan").innerText = daily != null && daily > 0 ? String(daily) : "-";
   } else {
     effectivePlan = resolvePositiveNumber(state.dailyPlan, plan, currentDailyPlan);
     cycleTimeMin = resolvePositiveNumber(state.cycleTimeMin, state.cycleTarget, currentCycleTime);
@@ -426,9 +463,11 @@ function applyLiveState(state) {
     effEl.className = "big-number status-green";
   }
 
-  document.getElementById("plan").innerText = effectivePlan;
-  document.getElementById("dailyPlanTarget").value = String(effectivePlan);
-  document.getElementById("cycleTarget").value = String(cycleTimeMin);
+  if (!isMonitor) {
+    document.getElementById("plan").innerText = effectivePlan;
+    document.getElementById("dailyPlanTarget").value = String(effectivePlan);
+    document.getElementById("cycleTarget").value = String(cycleTimeMin);
+  }
   const lotInput = document.getElementById("lotInput");
   if (lotInput) {
     lotInput.value = lotNo;
@@ -1465,6 +1504,9 @@ window.onload = async function() {
     document.getElementById("modelInput").style.display = "none";
     document.getElementById("engineInput").style.display = "none";
     document.getElementById("keyInput").style.display = "none";
+
+    document.getElementById("cycleTarget").readOnly = true;
+    document.getElementById("dailyPlanTarget").readOnly = true;
 
     // Dashboard cards/status: Firebase source of truth.
     loadMonitorStateFromFirebase();
