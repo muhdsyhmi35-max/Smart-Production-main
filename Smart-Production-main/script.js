@@ -385,8 +385,19 @@ function applyLiveState(state) {
   const plan = parseInt(state.plan, 10) || 0;
   const currentDailyPlan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || SETTINGS.defaultPlan;
   const currentCycleTime = parseFloat(document.getElementById("cycleTarget").value) || SETTINGS.defaultCycle;
-  const effectivePlan = resolvePositiveNumber(state.dailyPlan, plan, currentDailyPlan);
-  const cycleTimeMin = resolvePositiveNumber(state.cycleTimeMin, state.cycleTarget, currentCycleTime);
+  let effectivePlan;
+  let cycleTimeMin;
+
+  if (isMonitor) {
+    // Monitor must read these values from Firebase state.
+    const firebasePlan = Number(state.dailyPlan ?? state.plan);
+    const firebaseCycle = Number(state.cycleTimeMin ?? state.cycleTarget);
+    effectivePlan = Number.isFinite(firebasePlan) && firebasePlan > 0 ? firebasePlan : currentDailyPlan;
+    cycleTimeMin = Number.isFinite(firebaseCycle) && firebaseCycle > 0 ? firebaseCycle : currentCycleTime;
+  } else {
+    effectivePlan = resolvePositiveNumber(state.dailyPlan, plan, currentDailyPlan);
+    cycleTimeMin = resolvePositiveNumber(state.cycleTimeMin, state.cycleTarget, currentCycleTime);
+  }
   const actual = parseInt(state.actual, 10) || 0;
   const balance = parseInt(state.balance, 10) || 0;
   const status = state.status || "READY";
