@@ -488,6 +488,19 @@ function loadInitialLiveState() {
     .catch(err => console.log("Firebase initial live state error:", err));
 }
 
+function loadMonitorStateFromFirebase() {
+  if (!isMonitor) return;
+  if (!firebaseLiveStateRef) return;
+
+  firebaseLiveStateRef.once("value")
+    .then(snapshot => {
+      const liveState = snapshot.val();
+      if (!liveState) return;
+      applyLiveState(liveState);
+    })
+    .catch(err => console.log("Firebase monitor state error:", err));
+}
+
 function applyRemoteCommand(action) {
   isApplyingRemoteCommand = true;
 
@@ -1434,8 +1447,13 @@ window.onload = async function() {
     document.getElementById("engineInput").style.display = "none";
     document.getElementById("keyInput").style.display = "none";
 
+    // Dashboard cards/status: Firebase source of truth.
+    loadMonitorStateFromFirebase();
+    setInterval(loadMonitorStateFromFirebase, 2000);
+
+    // Scan table rows: Google Sheet source of truth.
     loadLiveData();
-    setInterval(loadLiveData, 1000);
+    setInterval(loadLiveData, 3000);
   } else {
     // Reload scan history from Sheet after refresh (main screen).
     loadLiveData();
