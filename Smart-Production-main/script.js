@@ -406,10 +406,8 @@ function applyLiveState(state) {
   }
 
   document.getElementById("plan").innerText = plan;
-  if (!isMonitor) {
-    document.getElementById("dailyPlanTarget").value = dailyPlan;
-    document.getElementById("cycleTarget").value = cycleTimeMin;
-  }
+  document.getElementById("dailyPlanTarget").value = dailyPlan;
+  document.getElementById("cycleTarget").value = cycleTimeMin;
   const lotInput = document.getElementById("lotInput");
   if (lotInput) {
     lotInput.value = lotNo;
