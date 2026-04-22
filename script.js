@@ -50,7 +50,6 @@ let scannedKey = new Set();
 let duplicateLock = false;
 let lastUpdateTime = 0;
 let lastTableData = "";
-let efficiencyPercent = 0;
 let firebaseDb = null;
 let firebaseCommandRef = null;
 let firebaseLiveStateRef = null;
@@ -200,17 +199,15 @@ function calculateExpectedOutput() {
 }
 
 function calculateAvailabilityPercent() {
-  let expected = calculateExpectedOutput();
-  const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
-  if (plan > 0) {
-    expected = Math.min(expected, plan);
-  }
-  if (expected <= 0) return 0;
-  return Math.floor((actualCount / expected) * 100);
-}
+  if (!firstScanAtMs) return 0;
 
-function refreshEfficiencyPercent() {
-  efficiencyPercent = calculateAvailabilityPercent();
+  const plannedRunSec = Math.max(Math.floor((Date.now() - firstScanAtMs) / 1000), 0);
+  if (plannedRunSec <= 0) return 0;
+
+  const boundedDowntime = Math.min(Math.max(downtimeSeconds, 0), plannedRunSec);
+  const operatingSec = Math.max(plannedRunSec - boundedDowntime, 0);
+
+  return Math.floor((operatingSec / plannedRunSec) * 100);
 }
 
 /* ===== STATUS ===== */
@@ -393,7 +390,6 @@ function applyLiveState(state) {
   actualCount = actual;
   downtimeSeconds = totalDowntime;
   firstScanAtMs = state.firstScanAtMs ? Number(state.firstScanAtMs) : firstScanAtMs;
-  efficiencyPercent = efficiency;
 
   const effEl = document.getElementById("efficiency");
   effEl.innerText = efficiency + "%";
@@ -584,7 +580,6 @@ function resetProduction(shouldSync = true) {
   countdownValue = 0;
   actualCount = 0;
   downtimeSeconds = 0;
-  efficiencyPercent = 0;
   lastScanTime = null;
   startTime = null;
   firstScanAtMs = null;
@@ -762,7 +757,6 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
 
     // One completed 4-scan cycle = one actual unit.
     actualCount++;
-    refreshEfficiencyPercent();
     hasLocalSession = true;
     countdownValue = cycleTimeSec;
     isDowntime = false;
@@ -822,7 +816,7 @@ function updateDisplay() {
 
   delayEl.innerText = delay > 0 ? ("+" + delay) : delay;
 
-  const efficiency = efficiencyPercent;
+  const efficiency = calculateAvailabilityPercent();
 
   const effEl = document.getElementById("efficiency");
   effEl.innerText = efficiency + "%";
@@ -1208,8 +1202,8 @@ function updateLiveStateOnly() {
   }
   let delay = actual - expected;
 
-  // Keep efficiency fixed between completed scan cycles.
-  const efficiency = efficiencyPercent;
+  // Efficiency card now represents Availability (%), not attainment.
+  const efficiency = calculateAvailabilityPercent();
 
   const balance = actual - plan;
   const status = document.getElementById("status").innerText.trim();
