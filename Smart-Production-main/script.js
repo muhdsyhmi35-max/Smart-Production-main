@@ -255,16 +255,7 @@ function getTotalDowntimeSec() {
 }
 
 function calculateAvailabilityPercent() {
-  if (!firstScanAtMs) return 0;
-
-  const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
-  if (cycleTimeSec <= 0) return 0;
-
-  // Use realtime expected (float) so efficiency updates every second, not per full cycle step.
-  const elapsedSec = Math.max(Math.floor((Date.now() - firstScanAtMs) / 1000), 0);
-  let expected = elapsedSec / cycleTimeSec;
-  expected = Math.max(expected, 1);
-
+  let expected = calculateExpectedOutput();
   const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
   if (plan > 0) {
     expected = Math.min(expected, plan);
