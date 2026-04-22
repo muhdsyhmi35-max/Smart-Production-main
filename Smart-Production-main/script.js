@@ -251,7 +251,7 @@ function calculateExpectedOutput() {
 }
 
 function getTotalDowntimeSec() {
-  return Math.max(0, downtimeSeconds);
+  return getBookedDowntimeSec();
 }
 
 function calculateAvailabilityPercent() {
@@ -866,11 +866,13 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
       statusCell.innerText = "DOWN TIME";
       statusCell.classList.add("status-red");
       downtimeCell.innerText = downtimeEvent;
+      downtimeCell.dataset.downtimeBookedSec = String(parseMmSsToSeconds(downtimeEvent));
       downtimeCell.classList.add("status-red");
     } else {
       statusCell.innerText = "SCANNED";
       statusCell.classList.add("status-green");
       downtimeCell.innerText = "";
+      downtimeCell.dataset.downtimeBookedSec = "0";
     }
 
     // One completed 4-scan cycle = one actual unit.
@@ -909,6 +911,8 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
 
 function updateDisplay() {
   if (isMonitor) return;
+  // Keep accumulated card aligned with sum of visible table downtime rows.
+  syncDowntimeSecondsFromTable();
   const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
   const balance = actualCount - plan;
   const displayBalance = balance > 0 ? ("+" + balance) : balance;
@@ -1485,12 +1489,16 @@ function loadLiveData() {
 
           if (statusText === "DOWN TIME") {
             const rawDowntime = row[7] || "";
-            downtimeCell.innerText = cleanDowntime(rawDowntime);
+            const cleaned = cleanDowntime(rawDowntime);
+            downtimeCell.innerText = cleaned;
+            downtimeCell.dataset.downtimeBookedSec = String(parseMmSsToSeconds(cleaned));
             downtimeCell.className = "status-red";
           } else {
             downtimeCell.innerText = "";
+            downtimeCell.dataset.downtimeBookedSec = "0";
           }
         });
+        syncDowntimeSecondsFromTable();
       }
     })
     .catch(err => console.log("Monitor load error:", err));
