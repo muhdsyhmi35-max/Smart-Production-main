@@ -139,6 +139,15 @@ function syncDowntimeSecondsFromTable() {
   }
 }
 
+function refreshDowntimeCardFromTable(fallbackSec = 0) {
+  const table = document.getElementById("scanTable");
+  const total = table && table.rows.length > 0
+    ? sumBookedDowntimeFromScanTable()
+    : Math.max(0, fallbackSec);
+  downtimeSeconds = total;
+  document.getElementById("downtime").innerText = format(total);
+}
+
 /* ===== DATE TIME ===== */
 
 function updateDateTime() {
@@ -525,7 +534,7 @@ function applyLiveState(state) {
   }
   document.getElementById("actual").innerText = actual;
   startLiveCountdownTicker(countdown, status, state.updatedAt);
-  document.getElementById("downtime").innerText = format(totalDowntime);
+  refreshDowntimeCardFromTable(totalDowntime);
   document.getElementById("expected").innerText = expected;
   if (state.lastScanAtMs) {
     lastScanTime = new Date(Number(state.lastScanAtMs));
@@ -957,7 +966,7 @@ function updateDisplay() {
   document.getElementById("plan").innerText = plan;
   document.getElementById("actual").innerText = actualCount;
   document.getElementById("countdown").innerText = format(countdownValue);
-  document.getElementById("downtime").innerText = format(downtimeSeconds);
+  refreshDowntimeCardFromTable(downtimeSeconds);
 
   const balanceEl = document.getElementById("balance");
   if (balance < 0) { balanceEl.className = "big-number status-red"; }
@@ -1499,6 +1508,7 @@ function loadLiveData() {
           }
         });
         syncDowntimeSecondsFromTable();
+        refreshDowntimeCardFromTable(downtimeSeconds);
       }
     })
     .catch(err => console.log("Monitor load error:", err));
