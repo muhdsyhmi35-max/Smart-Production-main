@@ -249,20 +249,8 @@ function calculateExpectedOutput() {
   return expected;
 }
 
-/** Seconds beyond cycle since last completed 4-scan (not yet in the table as a closed row). */
-function getUnbookedDowntimeSec() {
-  if (!timer || isMonitor || !lastScanTime) return 0;
-
-  const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
-  const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
-  if (plan > 0 && actualCount >= plan) return 0;
-
-  const elapsedSinceLastScanSec = Math.floor((Date.now() - lastScanTime.getTime()) / 1000);
-  return Math.max(0, elapsedSinceLastScanSec - cycleTimeSec);
-}
-
 function getTotalDowntimeSec() {
-  return getBookedDowntimeSec() + getUnbookedDowntimeSec();
+  return Math.max(0, downtimeSeconds);
 }
 
 function calculateAvailabilityPercent() {
@@ -827,17 +815,28 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
     const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
 
     const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+    let downtimeEvent = "";
 
-    let unitDowntimeSec = 0;
     if (lastScanTime) {
       const diffSec = Math.floor((now - lastScanTime) / 1000);
       if (diffSec > cycleTimeSec) {
-        unitDowntimeSec = diffSec - cycleTimeSec;
+        const actualDowntime = diffSec - cycleTimeSec;
+
+        // Count downtime only before target (or when plan is open-ended 0).
+        if (plan === 0 || (actualCount + 1) <= plan) {
+          downtimeEvent = format(actualDowntime);
+          downtimeSeconds += actualDowntime;
+          isDowntime = true;
+        } else {
+          downtimeEvent = "";
+          isDowntime = false;
+        }
+      } else {
+        isDowntime = false;
       }
+    } else {
+      isDowntime = false;
     }
-    const bookedSec =
-      unitDowntimeSec > 0 && (plan === 0 || (actualCount + 1) <= plan) ? unitDowntimeSec : 0;
-    isDowntime = bookedSec > 0;
 
     lastScanTime = now;
     if (!firstScanAtMs) {
@@ -857,20 +856,15 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
     const statusCell = row.insertCell(7);
     const downtimeCell = row.insertCell(8);
 
-    downtimeCell.innerText = format(unitDowntimeSec);
-    downtimeCell.dataset.downtimeBookedSec = String(bookedSec);
-
-    if (bookedSec > 0) {
+    if (downtimeEvent) {
       statusCell.innerText = "DOWN TIME";
       statusCell.classList.add("status-red");
+      downtimeCell.innerText = downtimeEvent;
       downtimeCell.classList.add("status-red");
-    } else if (unitDowntimeSec > 0) {
-      statusCell.innerText = "SCANNED";
-      statusCell.classList.add("status-green");
-      downtimeCell.classList.add("status-orange");
     } else {
       statusCell.innerText = "SCANNED";
       statusCell.classList.add("status-green");
+      downtimeCell.innerText = "";
     }
 
     // One completed 4-scan cycle = one actual unit.
@@ -879,7 +873,6 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
     countdownValue = cycleTimeSec;
     isDowntime = false;
 
-    syncDowntimeSecondsFromTable();
     updateDisplay();
 
     sendToSheet(
@@ -889,7 +882,7 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
       key,
       lot,
       statusCell.innerText,
-      format(unitDowntimeSec)
+      downtimeEvent
     );
 
     pendingChassis = "";
@@ -909,7 +902,6 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
 
 function updateDisplay() {
   if (isMonitor) return;
-  syncDowntimeSecondsFromTable();
   const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
   const balance = actualCount - plan;
   const displayBalance = balance > 0 ? ("+" + balance) : balance;
@@ -954,7 +946,7 @@ function updateDisplay() {
   document.getElementById("plan").innerText = plan;
   document.getElementById("actual").innerText = actualCount;
   document.getElementById("countdown").innerText = format(countdownValue);
-  document.getElementById("downtime").innerText = format(getTotalDowntimeSec());
+  document.getElementById("downtime").innerText = format(downtimeSeconds);
 
   const balanceEl = document.getElementById("balance");
   if (balance < 0) { balanceEl.className = "big-number status-red"; }
@@ -989,7 +981,7 @@ function updateDisplay() {
 
   const downtimeCard = document.getElementById("downtimeCard");
   const downtimeText = document.getElementById("downtime");
-  if (isDowntime || getUnbookedDowntimeSec() > 0) {
+  if (isDowntime) {
     downtimeCard.classList.add("downtime-alert", "blink");
     downtimeText.classList.add("status-red", "blink");
   } else {
@@ -1362,7 +1354,7 @@ function updateLiveStateOnly() {
     lotNo: lotNo,
     status: status,
     countdown: countdownValue,
-    bookedDowntime: getBookedDowntimeSec(),
+    bookedDowntime: downtimeSeconds,
     totalDowntime: getTotalDowntimeSec(),
     expected: expected,
     delay: delay,
@@ -1394,7 +1386,7 @@ function sendToSheet(chassis, model, engine, key, lot, status, downtimeEvent) {
       actual: actual,
       balance: balance,
       downtimeEvent: downtimeEvent,
-      totalDowntime: getTotalDowntimeSec(),
+      totalDowntime: downtimeSeconds,
       countdown: countdownValue
     })
   })
@@ -1485,21 +1477,14 @@ function loadLiveData() {
 
           const downtimeCell = newRow.insertCell(8);
 
-          const rawDowntime = row[7] != null && String(row[7]).trim() !== "" ? row[7] : "";
-          let downtimeDisplay = rawDowntime ? cleanDowntime(rawDowntime) : "";
-          if (!downtimeDisplay) downtimeDisplay = "00:00";
-          downtimeCell.innerText = downtimeDisplay;
-
-          const bookedSec = statusText === "DOWN TIME" ? parseMmSsToSeconds(downtimeDisplay) : 0;
-          downtimeCell.dataset.downtimeBookedSec = String(bookedSec);
-
           if (statusText === "DOWN TIME") {
+            const rawDowntime = row[7] || "";
+            downtimeCell.innerText = cleanDowntime(rawDowntime);
             downtimeCell.className = "status-red";
-          } else if (parseMmSsToSeconds(downtimeDisplay) > 0) {
-            downtimeCell.className = "status-orange";
+          } else {
+            downtimeCell.innerText = "";
           }
         });
-        syncDowntimeSecondsFromTable();
       }
     })
     .catch(err => console.log("Monitor load error:", err));
