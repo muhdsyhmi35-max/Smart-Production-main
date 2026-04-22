@@ -1497,6 +1497,9 @@ function loadLiveData() {
         syncDowntimeSecondsFromTable();
         refreshDowntimeCardFromTable(downtimeSeconds);
       }
+      // Always keep accumulated downtime card synced to rendered rows,
+      // even when table data payload is unchanged (e.g. timer stopped/target achieved).
+      refreshDowntimeCardFromTable(downtimeSeconds);
     })
     .catch(err => console.log("Monitor load error:", err));
 }

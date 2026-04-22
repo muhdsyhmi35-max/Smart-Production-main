@@ -87,6 +87,39 @@ function format(s) {
   return (m < 10 ? "0" + m : m) + ":" + (sec < 10 ? "0" + sec : sec);
 }
 
+function parseMmSsToSeconds(text) {
+  if (text == null || text === "") return 0;
+  const t = String(text).trim();
+  if (!t || t === "00:00" || t === "0:00") return 0;
+  const parts = t.split(":");
+  if (parts.length < 2) return 0;
+  const m = parseInt(parts[parts.length - 2], 10);
+  const s = parseInt(parts[parts.length - 1], 10);
+  if (!Number.isFinite(m) || !Number.isFinite(s)) return 0;
+  return Math.max(0, m * 60 + s);
+}
+
+function sumDowntimeFromVisibleRows() {
+  const table = document.getElementById("scanTable");
+  if (!table) return 0;
+
+  let total = 0;
+  Array.from(table.rows).forEach(tr => {
+    const statusCell = tr.cells[7];
+    const downtimeCell = tr.cells[8];
+    if (!statusCell || !downtimeCell) return;
+    if (statusCell.innerText.trim() !== "DOWN TIME") return;
+    total += parseMmSsToSeconds(downtimeCell.innerText || "");
+  });
+  return total;
+}
+
+function refreshDowntimeCardStrict() {
+  const total = sumDowntimeFromVisibleRows();
+  downtimeSeconds = total;
+  document.getElementById("downtime").innerText = format(total);
+}
+
 /* ===== DATE TIME ===== */
 
 function updateDateTime() {
@@ -833,7 +866,7 @@ function updateDisplay() {
   document.getElementById("plan").innerText = plan;
   document.getElementById("actual").innerText = actualCount;
   document.getElementById("countdown").innerText = format(countdownValue);
-  document.getElementById("downtime").innerText = format(downtimeSeconds);
+  refreshDowntimeCardStrict();
 
   const balanceEl = document.getElementById("balance");
   if (balance < 0) { balanceEl.className = "big-number status-red"; }
@@ -1376,6 +1409,7 @@ function loadLiveData() {
 
           if (statusText === "DOWN TIME") downtimeCell.className = "status-red";
         });
+        refreshDowntimeCardStrict();
       }
     })
     .catch(err => console.log("Monitor load error:", err));
