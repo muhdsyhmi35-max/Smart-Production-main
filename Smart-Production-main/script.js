@@ -50,6 +50,7 @@ let scannedKey = new Set();
 let duplicateLock = false;
 let lastUpdateTime = 0;
 let lastTableData = "";
+let efficiencyPercent = 0;
 let firebaseDb = null;
 let firebaseCommandRef = null;
 let firebaseLiveStateRef = null;
@@ -271,6 +272,10 @@ function calculateAvailabilityPercent() {
   if (expected <= 0) return 0;
 
   return Math.floor((actualCount / expected) * 100);
+}
+
+function refreshEfficiencyPercent() {
+  efficiencyPercent = calculateAvailabilityPercent();
 }
 
 /* ===== STATUS ===== */
@@ -505,6 +510,7 @@ function applyLiveState(state) {
   actualCount = actual;
   downtimeSeconds = Number.isFinite(bookedDowntime) && bookedDowntime >= 0 ? bookedDowntime : totalDowntime;
   firstScanAtMs = state.firstScanAtMs ? Number(state.firstScanAtMs) : firstScanAtMs;
+  efficiencyPercent = efficiency;
 
   const effEl = document.getElementById("efficiency");
   effEl.innerText = efficiency + "%";
@@ -706,6 +712,7 @@ function resetProduction(shouldSync = true) {
   lastScanTime = null;
   startTime = null;
   firstScanAtMs = null;
+  efficiencyPercent = 0;
   pendingChassis = "";
   pendingModel = "";
   pendingEngine = "";
@@ -877,6 +884,7 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
 
     // One completed 4-scan cycle = one actual unit.
     actualCount++;
+    refreshEfficiencyPercent();
     hasLocalSession = true;
     countdownValue = cycleTimeSec;
     isDowntime = false;
@@ -936,7 +944,7 @@ function updateDisplay() {
 
   delayEl.innerText = delay > 0 ? ("+" + delay) : delay;
 
-  const efficiency = calculateAvailabilityPercent();
+  const efficiency = efficiencyPercent;
 
   const effEl = document.getElementById("efficiency");
   effEl.innerText = efficiency + "%";
@@ -1324,7 +1332,7 @@ function updateLiveStateOnly() {
   }
   let delay = actual - expected;
 
-  const efficiency = calculateAvailabilityPercent();
+  const efficiency = efficiencyPercent;
 
   const balance = actual - plan;
   const status = document.getElementById("status").innerText.trim();
