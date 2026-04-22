@@ -126,9 +126,7 @@ function sumBookedDowntimeFromScanTable() {
 /** Booked downtime: from table rows when present, else in-memory (e.g. before Sheet reload). */
 function getBookedDowntimeSec() {
   const table = document.getElementById("scanTable");
-  if (!table || table.rows.length === 0) {
-    return Math.max(0, downtimeSeconds);
-  }
+  if (!table || table.rows.length === 0) return 0;
   return sumBookedDowntimeFromScanTable();
 }
 
@@ -143,7 +141,7 @@ function refreshDowntimeCardFromTable(fallbackSec = 0) {
   const table = document.getElementById("scanTable");
   const total = table && table.rows.length > 0
     ? sumBookedDowntimeFromScanTable()
-    : Math.max(0, fallbackSec);
+    : 0;
   downtimeSeconds = total;
   document.getElementById("downtime").innerText = format(total);
 }
