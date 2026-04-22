@@ -38,7 +38,6 @@ let downtimeSeconds = 0;
 let lastScanTime = null;
 let startTime = null;
 let firstScanAtMs = null;
-let primerScanned = false;
 let isDowntime = false;
 let pendingChassis = "";
 let pendingModel = "";
@@ -386,13 +385,11 @@ function applyLiveState(state) {
   const delay = parseInt(state.delay, 10) || 0;
   const efficiency = parseInt(state.efficiency, 10) || 0;
   const lotNo = state.lotNo || "";
-  const syncedPrimerScanned = Boolean(state.primerScanned);
 
   // Keep local variables aligned so refresh doesn't revert values.
   actualCount = actual;
   downtimeSeconds = totalDowntime;
   firstScanAtMs = state.firstScanAtMs ? Number(state.firstScanAtMs) : firstScanAtMs;
-  primerScanned = syncedPrimerScanned;
 
   const effEl = document.getElementById("efficiency");
   effEl.innerText = efficiency + "%";
@@ -586,7 +583,6 @@ function resetProduction(shouldSync = true) {
   lastScanTime = null;
   startTime = null;
   firstScanAtMs = null;
-  primerScanned = false;
   pendingChassis = "";
   pendingModel = "";
   pendingEngine = "";
@@ -759,12 +755,8 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
       statusCell.classList.add("status-green");
     }
 
-    if (!primerScanned) {
-      // First scan is a primer scan before actual work starts.
-      primerScanned = true;
-    } else {
-      actualCount++;
-    }
+    // One completed 4-scan cycle = one actual unit.
+    actualCount++;
     hasLocalSession = true;
     countdownValue = cycleTimeSec;
     isDowntime = false;
@@ -1253,8 +1245,7 @@ function updateLiveStateOnly() {
     delay: delay,
     efficiency: efficiency,
     firstScanAtMs: firstScanAtMs,
-    lastScanAtMs: lastScanTime ? lastScanTime.getTime() : null,
-    primerScanned: primerScanned
+    lastScanAtMs: lastScanTime ? lastScanTime.getTime() : null
   });
 }
 

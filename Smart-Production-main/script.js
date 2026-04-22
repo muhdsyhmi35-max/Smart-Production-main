@@ -241,7 +241,7 @@ function calculateExpectedOutput() {
   // Start expected from 1 once production is active.
   expected = Math.max(expected, 1);
 
-  // 🔥 START SHOW AFTER FIRST SCAN
+  //  START SHOW AFTER FIRST SCAN
   if (actualCount > 0 && expected === 0) {
     expected = 1;
   }
