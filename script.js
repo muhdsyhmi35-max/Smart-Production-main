@@ -199,15 +199,14 @@ function calculateExpectedOutput() {
 }
 
 function calculateAvailabilityPercent() {
-  if (!firstScanAtMs) return 0;
+  let expected = calculateExpectedOutput();
+  const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+  if (plan > 0) {
+    expected = Math.min(expected, plan);
+  }
+  if (expected <= 0) return 0;
 
-  const plannedRunSec = Math.max(Math.floor((Date.now() - firstScanAtMs) / 1000), 0);
-  if (plannedRunSec <= 0) return 0;
-
-  const boundedDowntime = Math.min(Math.max(downtimeSeconds, 0), plannedRunSec);
-  const operatingSec = Math.max(plannedRunSec - boundedDowntime, 0);
-
-  return Math.floor((operatingSec / plannedRunSec) * 100);
+  return Math.floor((actualCount / expected) * 100);
 }
 
 /* ===== STATUS ===== */
