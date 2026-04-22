@@ -101,7 +101,7 @@ function parseMmSsToSeconds(text) {
   return Math.max(0, m * 60 + s);
 }
 
-/** Sum per-scan booked downtime (seconds) from the scan table `data-downtime-booked-sec` cells. */
+/** Sum downtime directly from currently rendered table rows (Status = DOWN TIME). */
 function sumBookedDowntimeFromScanTable() {
   let total = 0;
   const table = document.getElementById("scanTable");
@@ -109,16 +109,9 @@ function sumBookedDowntimeFromScanTable() {
   Array.from(table.rows).forEach(tr => {
     const downtimeCell = tr.cells[8];
     const statusCell = tr.cells[7];
-    if (!downtimeCell) return;
-    const ds = downtimeCell.dataset.downtimeBookedSec;
-    if (ds !== undefined && ds !== "") {
-      const n = parseInt(ds, 10);
-      if (Number.isFinite(n) && n >= 0) total += n;
-      return;
-    }
-    if (statusCell && statusCell.innerText.trim() === "DOWN TIME") {
-      total += parseMmSsToSeconds(downtimeCell.innerText || "");
-    }
+    if (!downtimeCell || !statusCell) return;
+    if (statusCell.innerText.trim() !== "DOWN TIME") return;
+    total += parseMmSsToSeconds(downtimeCell.innerText || "");
   });
   return total;
 }
@@ -873,13 +866,11 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
       statusCell.innerText = "DOWN TIME";
       statusCell.classList.add("status-red");
       downtimeCell.innerText = downtimeEvent;
-      downtimeCell.dataset.downtimeBookedSec = String(parseMmSsToSeconds(downtimeEvent));
       downtimeCell.classList.add("status-red");
     } else {
       statusCell.innerText = "SCANNED";
       statusCell.classList.add("status-green");
       downtimeCell.innerText = "";
-      downtimeCell.dataset.downtimeBookedSec = "0";
     }
 
     // One completed 4-scan cycle = one actual unit.
@@ -1498,11 +1489,9 @@ function loadLiveData() {
             const rawDowntime = row[7] || "";
             const cleaned = cleanDowntime(rawDowntime);
             downtimeCell.innerText = cleaned;
-            downtimeCell.dataset.downtimeBookedSec = String(parseMmSsToSeconds(cleaned));
             downtimeCell.className = "status-red";
           } else {
             downtimeCell.innerText = "";
-            downtimeCell.dataset.downtimeBookedSec = "0";
           }
         });
         syncDowntimeSecondsFromTable();
