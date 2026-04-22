@@ -166,7 +166,46 @@ async function checkAccess() {
     return true;
   }
 
-  // One-device lock is disabled to allow multi-screen usage.
+  // Restore one-device lock using Apps Script lock endpoints.
+  let deviceId = localStorage.getItem("DEVICE_ID");
+  if (!deviceId) {
+    deviceId = "DEV-" + Math.random().toString(36).substring(2);
+    localStorage.setItem("DEVICE_ID", deviceId);
+  }
+
+  try {
+    const res = await fetch(API_URL + "?checkLock=true");
+    const data = await res.json();
+
+    if (data.lock) {
+      document.body.innerHTML = `
+        <h1 style="
+          color:red;
+          text-align:center;
+          margin-top:100px;
+          font-size:40px;
+        ">
+          SYSTEM ALREADY OPEN ON ANOTHER SCREEN
+        </h1>
+      `;
+      return false;
+    }
+
+    await fetch(API_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        lockRequest: true,
+        deviceId: deviceId
+      })
+    });
+  } catch (err) {
+    console.log("Lock error:", err);
+  }
+
   return true;
 }
 
