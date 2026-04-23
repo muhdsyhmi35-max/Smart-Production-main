@@ -209,19 +209,26 @@ th{
 
 .fullscreen-btn{
   position:absolute;
-  right:20px;
-  top:20px;
-  padding:5px 10px;
-  font-size:14px;
-  border:none;
-  border-radius:10px;
-  background:#2563eb;
-  color:white;
+  right:12px;
+  top:12px;
+  width:24px;
+  height:24px;
+  padding:0;
+  font-size:12px;
+  border:1px solid rgba(148,163,184,0.35);
+  border-radius:8px;
+  background:rgba(15,23,42,0.55);
+  color:#93c5fd;
+  opacity:0.8;
   cursor:pointer;
+  transition:opacity .2s ease, border-color .2s ease, background .2s ease, transform .2s ease;
 }
 
 .fullscreen-btn:hover{
-  background:#1d4ed8;
+  opacity:1;
+  border-color:rgba(147,197,253,0.55);
+  background:rgba(15,23,42,0.75);
+  transform:translateY(-1px);
 }
 
 .pulse{animation:pulse 1.5s infinite;}
