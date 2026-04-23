@@ -19,7 +19,7 @@
 body{
   margin:0;
   font-family:'Segoe UI',sans-serif;
-  background: radial-gradient(circle at top, #0b1220, #020617);
+  background:#000;
   color:var(--text);
 }
 
