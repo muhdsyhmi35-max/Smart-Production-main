@@ -91,12 +91,40 @@ function parseMmSsToSeconds(text) {
   if (text == null || text === "") return 0;
   const t = String(text).trim();
   if (!t || t === "00:00" || t === "0:00") return 0;
-  const parts = t.split(":");
-  if (parts.length < 2) return 0;
-  const m = parseInt(parts[parts.length - 2], 10);
-  const s = parseInt(parts[parts.length - 1], 10);
-  if (!Number.isFinite(m) || !Number.isFinite(s)) return 0;
-  return Math.max(0, m * 60 + s);
+
+  if (!isNaN(t)) {
+    const sec = parseInt(t, 10);
+    return Number.isFinite(sec) ? Math.max(sec, 0) : 0;
+  }
+
+  const isoLike = t.includes("1899") || t.includes("1900") || /^\d{4}-\d{2}-\d{2}T/.test(t);
+  if (isoLike) {
+    const d = new Date(t);
+    if (!isNaN(d.getTime())) {
+      const h = d.getUTCHours();
+      const m = d.getUTCMinutes();
+      const s = d.getUTCSeconds();
+      return Math.max((h * 3600) + (m * 60) + s, 0);
+    }
+  }
+
+  const parts = t.split(/[:.]/).map(v => parseInt(v, 10));
+  if (parts.some(v => !Number.isFinite(v))) return 0;
+
+  if (parts.length === 2) {
+    const [m, s] = parts;
+    return Math.max((m * 60) + s, 0);
+  }
+
+  if (parts.length >= 3) {
+    const [a, b, c] = parts;
+    if (a >= 60 && c === 0) {
+      return Math.max((a * 60) + b, 0);
+    }
+    return Math.max((a * 3600) + (b * 60) + c, 0);
+  }
+
+  return 0;
 }
 
 function sumDowntimeFromVisibleRows() {
@@ -1351,37 +1379,8 @@ function sendToSheet(chassis, model, engine, key, lot, status, downtimeEvent) {
 
 function cleanDowntime(raw) {
   if (!raw) return "";
-
-  // 🔥 CASE 1: Google date string (1899 issue)
-  if (typeof raw === "string" && raw.includes("1899")) {
-    const date = new Date(raw);
-
-    const m = date.getMinutes();
-    const s = date.getSeconds();
-
-    // 🔥 FIX: swap if wrong format (Google flips sometimes)
-    if (m > 0 && s === 0) {
-      return "00:" + String(m).padStart(2, "0");
-    }
-
-    return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
-  }
-
-  // Already correct
-  if (/^\d{2}:\d{2}$/.test(raw)) {
-    return raw;
-  }
-
-  // Number case
-  if (!isNaN(raw)) {
-    const sec = parseInt(raw, 10);
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-
-    return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
-  }
-
-  return raw;
+  const sec = parseMmSsToSeconds(raw);
+  return format(sec);
 }
 
 // Ambil data untuk MONITOR PC
