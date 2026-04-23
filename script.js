@@ -97,14 +97,16 @@ function parseMmSsToSeconds(text) {
     return Number.isFinite(sec) ? Math.max(sec, 0) : 0;
   }
 
-  const isoLike = t.includes("1899") || t.includes("1900") || /^\d{4}-\d{2}-\d{2}T/.test(t);
-  if (isoLike) {
+  const sheetDateLike = t.includes("1899") || t.includes("1900");
+  if (sheetDateLike) {
     const d = new Date(t);
     if (!isNaN(d.getTime())) {
-      const h = d.getUTCHours();
       const m = d.getUTCMinutes();
       const s = d.getUTCSeconds();
-      return Math.max((h * 3600) + (m * 60) + s, 0);
+      if (m === 0 && s === 0) {
+        return Math.max(d.getUTCHours() * 60, 0);
+      }
+      return Math.max((m * 60) + s, 0);
     }
   }
 

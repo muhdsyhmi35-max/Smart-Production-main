@@ -100,14 +100,19 @@ function parseMmSsToSeconds(text) {
     return Number.isFinite(sec) ? Math.max(sec, 0) : 0;
   }
 
-  const isoLike = t.includes("1899") || t.includes("1900") || /^\d{4}-\d{2}-\d{2}T/.test(t);
-  if (isoLike) {
+  // Google Sheets duration/date artifacts like 1899/1900 should be treated as MM:SS,
+  // not clock-time HH:MM:SS.
+  const sheetDateLike = t.includes("1899") || t.includes("1900");
+  if (sheetDateLike) {
     const d = new Date(t);
     if (!isNaN(d.getTime())) {
-      const h = d.getUTCHours();
       const m = d.getUTCMinutes();
       const s = d.getUTCSeconds();
-      return Math.max((h * 3600) + (m * 60) + s, 0);
+      // If seconds are zero and minutes are zero, fallback to hour as minutes.
+      if (m === 0 && s === 0) {
+        return Math.max(d.getUTCHours() * 60, 0);
+      }
+      return Math.max((m * 60) + s, 0);
     }
   }
 
@@ -1444,7 +1449,6 @@ function updateLiveStateOnly() {
 function sendToSheet(chassis, model, engine, key, lot, status, downtimeEvent) {
   const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
   const actual = actualCount;
-  const balance = actual - plan;
 
   fetch(API_URL, {
     method: "POST",
@@ -1461,10 +1465,8 @@ function sendToSheet(chassis, model, engine, key, lot, status, downtimeEvent) {
       status: status,
       plan: plan,
       actual: actual,
-      balance: balance,
-      downtimeEvent: downtimeEvent,
-      totalDowntime: downtimeSeconds,
-      countdown: countdownValue
+      // Keep scan row payload in strict sheet column order.
+      downtimeEvent: downtimeEvent
     })
   })
     .catch(err => console.log("Sheet error:", err));
@@ -1491,6 +1493,21 @@ function loadLiveData() {
       }
 
       const scanRows = data.scan.slice(1);
+      const scanHeader = (data.scan[0] || []).map(v => String(v || "").trim().toLowerCase());
+      const getIdx = (...candidates) => {
+        for (const c of candidates) {
+          const i = scanHeader.indexOf(c);
+          if (i >= 0) return i;
+        }
+        return -1;
+      };
+      const idxLot = getIdx("lot");
+      const idxModel = getIdx("model");
+      const idxChassis = getIdx("chassis");
+      const idxEngine = getIdx("engine", "engine no");
+      const idxKey = getIdx("key", "key no");
+      const idxStatus = getIdx("status");
+      const idxDowntime = getIdx("downtime", "downtimeevent");
       const table = document.getElementById("scanTable");
 
       // Convert to string for comparison
@@ -1510,14 +1527,14 @@ function loadLiveData() {
             hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true
           }).toLowerCase();
 
-          newRow.insertCell(2).innerText = row[1] || "-";
-          newRow.insertCell(3).innerText = row[2] || "-";
-          newRow.insertCell(4).innerText = row[3] || "-";
-          newRow.insertCell(5).innerText = row[4] || "-";
-          newRow.insertCell(6).innerText = row[5] || "-";
+          newRow.insertCell(2).innerText = idxLot >= 0 ? (row[idxLot] || "-") : "-";
+          newRow.insertCell(3).innerText = idxModel >= 0 ? (row[idxModel] || "-") : "-";
+          newRow.insertCell(4).innerText = idxChassis >= 0 ? (row[idxChassis] || "-") : "-";
+          newRow.insertCell(5).innerText = idxEngine >= 0 ? (row[idxEngine] || "-") : "-";
+          newRow.insertCell(6).innerText = idxKey >= 0 ? (row[idxKey] || "-") : "-";
 
           const statusCell = newRow.insertCell(7);
-          const statusText = row[6] || "";
+          const statusText = idxStatus >= 0 ? (row[idxStatus] || "") : "";
           statusCell.innerText = statusText;
 
           if (statusText === "SCANNED") statusCell.className = "status-green";
@@ -1526,7 +1543,7 @@ function loadLiveData() {
           const downtimeCell = newRow.insertCell(8);
 
           if (statusText === "DOWN TIME") {
-            const rawDowntime = row[7] || "";
+            const rawDowntime = idxDowntime >= 0 ? (row[idxDowntime] || "") : "";
             const cleaned = cleanDowntime(rawDowntime);
             downtimeCell.innerText = cleaned;
             downtimeCell.className = "status-red";
