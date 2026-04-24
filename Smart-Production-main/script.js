@@ -1522,7 +1522,8 @@ function loadLiveData() {
       const idxEngine = getIdx("engine", "engine no");
       const idxKey = getIdx("key", "key no");
       const idxStatus = getIdx("status");
-      const idxDowntime = getIdx("downtime", "downtimeevent");
+      // Prefer per-row event downtime first; generic "downtime" may be transformed by Sheet.
+      const idxDowntime = getIdx("downtimeevent", "downtime");
       const table = document.getElementById("scanTable");
 
       // Convert to string for comparison
