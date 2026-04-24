@@ -51,6 +51,7 @@ let duplicateLock = false;
 let lastUpdateTime = 0;
 let lastTableData = "";
 let efficiencyPercent = 0;
+let breakPauseStartMs = null;
 let firebaseDb = null;
 let firebaseCommandRef = null;
 let firebaseLiveStateRef = null;
@@ -100,19 +101,18 @@ function parseMmSsToSeconds(text) {
     return Number.isFinite(sec) ? Math.max(sec, 0) : 0;
   }
 
-  // Google Sheets duration/date artifacts like 1899/1900 should be treated as MM:SS,
-  // not clock-time HH:MM:SS.
+  // Google Sheets date artifacts like 1899/1900 can be serialized as ISO strings.
+  // Extract hh:mm:ss directly from the string to avoid timezone shifts.
   const sheetDateLike = t.includes("1899") || t.includes("1900");
   if (sheetDateLike) {
-    const d = new Date(t);
-    if (!isNaN(d.getTime())) {
-      const m = d.getUTCMinutes();
-      const s = d.getUTCSeconds();
-      // If seconds are zero and minutes are zero, fallback to hour as minutes.
-      if (m === 0 && s === 0) {
-        return Math.max(d.getUTCHours() * 60, 0);
+    const timeMatch = t.match(/T(\d{2}):(\d{2}):(\d{2})/);
+    if (timeMatch) {
+      const h = parseInt(timeMatch[1], 10);
+      const m = parseInt(timeMatch[2], 10);
+      const s = parseInt(timeMatch[3], 10);
+      if ([h, m, s].every(Number.isFinite)) {
+        return Math.max((h * 3600) + (m * 60) + s, 0);
       }
-      return Math.max((m * 60) + s, 0);
     }
   }
 
@@ -165,7 +165,7 @@ function syncDowntimeSecondsFromTable() {
   }
 }
 
-function refreshDowntimeCardFromTable(fallbackSec = 0) {
+function refreshDowntimeCardFromTable() {
   const table = document.getElementById("scanTable");
   const total = table && table.rows.length > 0
     ? sumBookedDowntimeFromScanTable()
@@ -599,7 +599,7 @@ function applyLiveState(state) {
   }
   document.getElementById("actual").innerText = actual;
   startLiveCountdownTicker(countdown, status, state.updatedAt);
-  refreshDowntimeCardFromTable(totalDowntime);
+  refreshDowntimeCardFromTable();
   document.getElementById("expected").innerText = expected;
   if (state.lastScanAtMs) {
     lastScanTime = new Date(Number(state.lastScanAtMs));
@@ -722,9 +722,22 @@ function startProduction(shouldSync = true) {
 
   timer = setInterval(() => {
     if (isBreakTime()) {
+      if (breakPauseStartMs == null) {
+        breakPauseStartMs = Date.now();
+      }
       setStatus("BREAK TIME", "status-orange");
       updateDisplay();
       return;
+    }
+
+    if (breakPauseStartMs != null) {
+      const breakPausedMs = Math.max(Date.now() - breakPauseStartMs, 0);
+      if (lastScanTime) {
+        lastScanTime = new Date(lastScanTime.getTime() + breakPausedMs);
+      } else if (startTime) {
+        startTime = new Date(startTime.getTime() + breakPausedMs);
+      }
+      breakPauseStartMs = null;
     }
 
     const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
@@ -758,6 +771,7 @@ function stopProduction(shouldSync = true) {
 
   clearInterval(timer);
   timer = null;
+  breakPauseStartMs = null;
   setStatus("PAUSED", "status-orange");
 }
 
@@ -778,6 +792,7 @@ function resetProduction(shouldSync = true) {
   startTime = null;
   firstScanAtMs = null;
   efficiencyPercent = 0;
+  breakPauseStartMs = null;
   pendingChassis = "";
   pendingModel = "";
   pendingEngine = "";
@@ -1029,7 +1044,7 @@ function updateDisplay() {
   document.getElementById("plan").innerText = plan;
   document.getElementById("actual").innerText = actualCount;
   document.getElementById("countdown").innerText = format(countdownValue);
-  refreshDowntimeCardFromTable(downtimeSeconds);
+  refreshDowntimeCardFromTable();
 
   const balanceEl = document.getElementById("balance");
   if (balance < 0) { balanceEl.className = "big-number status-red"; }
@@ -1552,11 +1567,11 @@ function loadLiveData() {
           }
         });
         syncDowntimeSecondsFromTable();
-        refreshDowntimeCardFromTable(downtimeSeconds);
+        refreshDowntimeCardFromTable();
       }
       // Always keep accumulated downtime card synced to rendered rows,
       // even when table data payload is unchanged (e.g. timer stopped/target achieved).
-      refreshDowntimeCardFromTable(downtimeSeconds);
+      refreshDowntimeCardFromTable();
     })
     .catch(err => console.log("Monitor load error:", err));
 }

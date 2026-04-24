@@ -50,6 +50,7 @@ let scannedKey = new Set();
 let duplicateLock = false;
 let lastUpdateTime = 0;
 let lastTableData = "";
+let breakPauseStartMs = null;
 let firebaseDb = null;
 let firebaseCommandRef = null;
 let firebaseLiveStateRef = null;
@@ -99,14 +100,14 @@ function parseMmSsToSeconds(text) {
 
   const sheetDateLike = t.includes("1899") || t.includes("1900");
   if (sheetDateLike) {
-    const d = new Date(t);
-    if (!isNaN(d.getTime())) {
-      const m = d.getUTCMinutes();
-      const s = d.getUTCSeconds();
-      if (m === 0 && s === 0) {
-        return Math.max(d.getUTCHours() * 60, 0);
+    const timeMatch = t.match(/T(\d{2}):(\d{2}):(\d{2})/);
+    if (timeMatch) {
+      const h = parseInt(timeMatch[1], 10);
+      const m = parseInt(timeMatch[2], 10);
+      const s = parseInt(timeMatch[3], 10);
+      if ([h, m, s].every(Number.isFinite)) {
+        return Math.max((h * 3600) + (m * 60) + s, 0);
       }
-      return Math.max((m * 60) + s, 0);
     }
   }
 
@@ -514,7 +515,7 @@ function applyLiveState(state) {
   }
   document.getElementById("actual").innerText = actual;
   startLiveCountdownTicker(countdown, status, state.updatedAt);
-  document.getElementById("downtime").innerText = format(totalDowntime);
+  refreshDowntimeCardStrict();
   document.getElementById("expected").innerText = expected;
   if (state.lastScanAtMs) {
     lastScanTime = new Date(Number(state.lastScanAtMs));
@@ -624,9 +625,22 @@ function startProduction(shouldSync = true) {
 
   timer = setInterval(() => {
     if (isBreakTime()) {
+      if (breakPauseStartMs == null) {
+        breakPauseStartMs = Date.now();
+      }
       setStatus("BREAK TIME", "status-orange");
       updateDisplay();
       return;
+    }
+
+    if (breakPauseStartMs != null) {
+      const breakPausedMs = Math.max(Date.now() - breakPauseStartMs, 0);
+      if (lastScanTime) {
+        lastScanTime = new Date(lastScanTime.getTime() + breakPausedMs);
+      } else if (startTime) {
+        startTime = new Date(startTime.getTime() + breakPausedMs);
+      }
+      breakPauseStartMs = null;
     }
 
     const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
@@ -665,6 +679,7 @@ function stopProduction(shouldSync = true) {
 
   clearInterval(timer);
   timer = null;
+  breakPauseStartMs = null;
   setStatus("PAUSED", "status-orange");
 }
 
@@ -684,6 +699,7 @@ function resetProduction(shouldSync = true) {
   lastScanTime = null;
   startTime = null;
   firstScanAtMs = null;
+  breakPauseStartMs = null;
   pendingChassis = "";
   pendingModel = "";
   pendingEngine = "";
