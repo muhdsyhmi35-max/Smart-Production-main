@@ -107,11 +107,11 @@ function parseMmSsToSeconds(text) {
   if (sheetDateLike) {
     const timeMatch = t.match(/T(\d{2}):(\d{2}):(\d{2})/);
     if (timeMatch) {
-      const h = parseInt(timeMatch[1], 10);
       const m = parseInt(timeMatch[2], 10);
       const s = parseInt(timeMatch[3], 10);
-      if ([h, m, s].every(Number.isFinite)) {
-        return Math.max((h * 3600) + (m * 60) + s, 0);
+      if ([m, s].every(Number.isFinite)) {
+        // Treat Sheet 1899/1900 artifacts as duration MM:SS (ignore hour timezone offsets).
+        return Math.max((m * 60) + s, 0);
       }
     }
   }
