@@ -1577,7 +1577,7 @@ function loadLiveData() {
       const idxEngine = getIdx("engine", "engine no");
       const idxKey = getIdx("key", "key no");
       const idxStatus = getIdx("status");
-      // Prefer per-row event downtime first; generic "downtime" may be transformed by Sheet.
+      // Keep index for optional fallback only; canonical per-row event value is row[7].
       const idxDowntime = getIdx("downtimeevent", "downtime");
       const table = document.getElementById("scanTable");
 
@@ -1614,11 +1614,10 @@ function loadLiveData() {
           const downtimeCell = newRow.insertCell(8);
 
           if (statusText === "DOWN TIME") {
-            // Header-mapped downtime column is the source of truth.
-            // Legacy fallback is only used when header is unavailable.
-            const rawDowntimeByHeader = idxDowntime >= 0 ? (row[idxDowntime] || "") : "";
+            // Match full.html behavior: per-row downtime event comes from scan row[7].
             const rawDowntimeLegacy = row[7] || "";
-            const rawDowntime = rawDowntimeByHeader || rawDowntimeLegacy;
+            const rawDowntimeByHeader = idxDowntime >= 0 ? (row[idxDowntime] || "") : "";
+            const rawDowntime = rawDowntimeLegacy || rawDowntimeByHeader;
             const cleaned = cleanDowntime(rawDowntime);
             downtimeCell.innerText = cleaned;
             downtimeCell.className = "status-red";

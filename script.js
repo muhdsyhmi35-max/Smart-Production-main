@@ -1457,7 +1457,7 @@ function loadLiveData() {
 
           // ✅ ONLY show downtime if status is DOWN TIME
           if (statusText === "DOWN TIME") {
-            // Root copy has fixed sheet layout where downtime event is at row[7].
+            // Match full.html behavior: downtime event from scan row[7].
             const rawDowntime = row[7] || "";
             downtimeCell.innerText = cleanDowntime(rawDowntime);
             downtimeCell.className = "status-red";
