@@ -52,7 +52,7 @@ let lastUpdateTime = 0;
 let lastTableData = "";
 let efficiencyPercent = 0;
 let breakPauseStartMs = null;
-const DEBUG_DOWNTIME = true;
+const DEBUG_DOWNTIME = false;
 let firebaseDb = null;
 let firebaseCommandRef = null;
 let firebaseLiveStateRef = null;
@@ -1543,9 +1543,34 @@ function sendToSheet(chassis, model, engine, key, lot, status, downtimeEvent) {
 }
 
 function cleanDowntime(raw) {
-  if (!raw) return "";
-  const sec = parseMmSsToSeconds(raw);
+  if (raw == null || raw === "") return "";
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return format(Math.max(0, Math.floor(raw)));
+  }
+  const sec = parseMmSsToSeconds(String(raw));
   return format(sec);
+}
+
+/** Prefer explicit downtime-event headers; avoid totals/accumulators. */
+function resolveDowntimeEventColumnIndex(scanHeader) {
+  const exact = [
+    "downtimeevent",
+    "downtime event",
+    "downtime_event",
+    "downtime (event)",
+    "downtime duration"
+  ];
+  for (const c of exact) {
+    const i = scanHeader.indexOf(c);
+    if (i >= 0) return i;
+  }
+  for (let i = 0; i < scanHeader.length; i++) {
+    const h = scanHeader[i];
+    if (!h || !h.includes("downtime")) continue;
+    if (/total|accum|sum|cumulative|running/i.test(h)) continue;
+    return i;
+  }
+  return -1;
 }
 
 // Ambil data untuk MONITOR PC
@@ -1563,7 +1588,12 @@ function loadLiveData() {
       }
 
       const scanRows = data.scan.slice(1);
-      const scanHeader = (data.scan[0] || []).map(v => String(v || "").trim().toLowerCase());
+      const scanHeader = (data.scan[0] || []).map(v =>
+        String(v || "")
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, " ")
+      );
       const getIdx = (...candidates) => {
         for (const c of candidates) {
           const i = scanHeader.indexOf(c);
@@ -1571,14 +1601,14 @@ function loadLiveData() {
         }
         return -1;
       };
-      const idxLot = getIdx("lot");
+      const idxLot = getIdx("lot", "lot no", "lotno");
       const idxModel = getIdx("model");
       const idxChassis = getIdx("chassis");
-      const idxEngine = getIdx("engine", "engine no");
-      const idxKey = getIdx("key", "key no");
-      const idxStatus = getIdx("status");
-      // Keep index for optional fallback only; canonical per-row event value is row[7].
-      const idxDowntime = getIdx("downtimeevent", "downtime");
+      const idxEngine = getIdx("engine", "engine no", "engine no.");
+      const idxKey = getIdx("key", "key no", "key no.");
+      const idxStatus = getIdx("status", "state");
+      const idxDowntime = resolveDowntimeEventColumnIndex(scanHeader);
+      const legacyLayout = idxStatus < 0;
       const table = document.getElementById("scanTable");
 
       // Convert to string for comparison
@@ -1598,14 +1628,34 @@ function loadLiveData() {
             hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true
           }).toLowerCase();
 
-          newRow.insertCell(2).innerText = idxLot >= 0 ? (row[idxLot] || "-") : "-";
-          newRow.insertCell(3).innerText = idxModel >= 0 ? (row[idxModel] || "-") : "-";
-          newRow.insertCell(4).innerText = idxChassis >= 0 ? (row[idxChassis] || "-") : "-";
-          newRow.insertCell(5).innerText = idxEngine >= 0 ? (row[idxEngine] || "-") : "-";
-          newRow.insertCell(6).innerText = idxKey >= 0 ? (row[idxKey] || "-") : "-";
+          newRow.insertCell(2).innerText = legacyLayout
+            ? (row[1] || "-")
+            : idxLot >= 0
+              ? (row[idxLot] || "-")
+              : "-";
+          newRow.insertCell(3).innerText = legacyLayout
+            ? (row[2] || "-")
+            : idxModel >= 0
+              ? (row[idxModel] || "-")
+              : "-";
+          newRow.insertCell(4).innerText = legacyLayout
+            ? (row[3] || "-")
+            : idxChassis >= 0
+              ? (row[idxChassis] || "-")
+              : "-";
+          newRow.insertCell(5).innerText = legacyLayout
+            ? (row[4] || "-")
+            : idxEngine >= 0
+              ? (row[idxEngine] || "-")
+              : "-";
+          newRow.insertCell(6).innerText = legacyLayout
+            ? (row[5] || "-")
+            : idxKey >= 0
+              ? (row[idxKey] || "-")
+              : "-";
 
           const statusCell = newRow.insertCell(7);
-          const statusText = idxStatus >= 0 ? (row[idxStatus] || "") : "";
+          const statusText = legacyLayout ? (row[6] || "") : idxStatus >= 0 ? (row[idxStatus] || "") : "";
           statusCell.innerText = statusText;
 
           if (statusText === "SCANNED") statusCell.className = "status-green";
@@ -1614,10 +1664,13 @@ function loadLiveData() {
           const downtimeCell = newRow.insertCell(8);
 
           if (statusText === "DOWN TIME") {
-            // Match full.html behavior: per-row downtime event comes from scan row[7].
-            const rawDowntimeLegacy = row[7] || "";
-            const rawDowntimeByHeader = idxDowntime >= 0 ? (row[idxDowntime] || "") : "";
-            const rawDowntime = rawDowntimeLegacy || rawDowntimeByHeader;
+            // Prefer header-mapped column when the sheet has extra fields (row length > 8).
+            let rawDowntime = "";
+            if (!legacyLayout && idxDowntime >= 0) {
+              const v = row[idxDowntime];
+              if (v != null && String(v).trim() !== "") rawDowntime = v;
+            }
+            if (rawDowntime === "") rawDowntime = row[7] || "";
             const cleaned = cleanDowntime(rawDowntime);
             downtimeCell.innerText = cleaned;
             downtimeCell.className = "status-red";

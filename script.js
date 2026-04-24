@@ -1397,9 +1397,34 @@ function sendToSheet(chassis, model, engine, key, lot, status, downtimeEvent) {
 }
 
 function cleanDowntime(raw) {
-  if (!raw) return "";
-  const sec = parseMmSsToSeconds(raw);
+  if (raw == null || raw === "") return "";
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return format(Math.max(0, Math.floor(raw)));
+  }
+  const sec = parseMmSsToSeconds(String(raw));
   return format(sec);
+}
+
+/** Prefer explicit downtime-event headers; avoid totals/accumulators. */
+function resolveDowntimeEventColumnIndex(scanHeader) {
+  const exact = [
+    "downtimeevent",
+    "downtime event",
+    "downtime_event",
+    "downtime (event)",
+    "downtime duration"
+  ];
+  for (const c of exact) {
+    const i = scanHeader.indexOf(c);
+    if (i >= 0) return i;
+  }
+  for (let i = 0; i < scanHeader.length; i++) {
+    const h = scanHeader[i];
+    if (!h || !h.includes("downtime")) continue;
+    if (/total|accum|sum|cumulative|running/i.test(h)) continue;
+    return i;
+  }
+  return -1;
 }
 
 // Ambil data untuk MONITOR PC
@@ -1417,6 +1442,27 @@ function loadLiveData() {
       }
 
       const scanRows = data.scan.slice(1);
+      const scanHeader = (data.scan[0] || []).map(v =>
+        String(v || "")
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, " ")
+      );
+      const getIdx = (...candidates) => {
+        for (const c of candidates) {
+          const i = scanHeader.indexOf(c);
+          if (i >= 0) return i;
+        }
+        return -1;
+      };
+      const idxLot = getIdx("lot", "lot no", "lotno");
+      const idxModel = getIdx("model");
+      const idxChassis = getIdx("chassis");
+      const idxEngine = getIdx("engine", "engine no", "engine no.");
+      const idxKey = getIdx("key", "key no", "key no.");
+      const idxStatus = getIdx("status", "state");
+      const idxDowntime = resolveDowntimeEventColumnIndex(scanHeader);
+      const legacyLayout = idxStatus < 0;
       const table = document.getElementById("scanTable");
 
       // Convert to string for comparison
@@ -1436,39 +1482,57 @@ function loadLiveData() {
             hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true
           }).toLowerCase();
 
-          newRow.insertCell(2).innerText = row[1] || "-";
-          newRow.insertCell(3).innerText = row[2] || "-";
-          newRow.insertCell(4).innerText = row[3] || "-";
-          newRow.insertCell(5).innerText = row[4] || "-";
-          newRow.insertCell(6).innerText = row[5] || "-";
+          newRow.insertCell(2).innerText = legacyLayout
+            ? (row[1] || "-")
+            : idxLot >= 0
+              ? (row[idxLot] || "-")
+              : "-";
+          newRow.insertCell(3).innerText = legacyLayout
+            ? (row[2] || "-")
+            : idxModel >= 0
+              ? (row[idxModel] || "-")
+              : "-";
+          newRow.insertCell(4).innerText = legacyLayout
+            ? (row[3] || "-")
+            : idxChassis >= 0
+              ? (row[idxChassis] || "-")
+              : "-";
+          newRow.insertCell(5).innerText = legacyLayout
+            ? (row[4] || "-")
+            : idxEngine >= 0
+              ? (row[idxEngine] || "-")
+              : "-";
+          newRow.insertCell(6).innerText = legacyLayout
+            ? (row[5] || "-")
+            : idxKey >= 0
+              ? (row[idxKey] || "-")
+              : "-";
 
           const statusCell = newRow.insertCell(7);
-          const statusText = row[6] || "";
+          const statusText = legacyLayout ? (row[6] || "") : idxStatus >= 0 ? (row[idxStatus] || "") : "";
           statusCell.innerText = statusText;
-
-          console.log("FULL ROW:", row);
-          console.log("DowntimeEvent (row[10]):", row[7]);
-          console.log("TotalDowntime (row[11]):", row[11]);
 
           if (statusText === "SCANNED") statusCell.className = "status-green";
           if (statusText === "DOWN TIME") statusCell.className = "status-red";
 
           const downtimeCell = newRow.insertCell(8);
 
-          // ✅ ONLY show downtime if status is DOWN TIME
           if (statusText === "DOWN TIME") {
-            // Match full.html behavior: downtime event from scan row[7].
-            const rawDowntime = row[7] || "";
+            let rawDowntime = "";
+            if (!legacyLayout && idxDowntime >= 0) {
+              const v = row[idxDowntime];
+              if (v != null && String(v).trim() !== "") rawDowntime = v;
+            }
+            if (rawDowntime === "") rawDowntime = row[7] || "";
             downtimeCell.innerText = cleanDowntime(rawDowntime);
             downtimeCell.className = "status-red";
           } else {
             downtimeCell.innerText = "";
           }
-
-          if (statusText === "DOWN TIME") downtimeCell.className = "status-red";
         });
         refreshDowntimeCardStrict();
       }
+      refreshDowntimeCardStrict();
     })
     .catch(err => console.log("Monitor load error:", err));
 }
