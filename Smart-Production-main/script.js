@@ -1614,11 +1614,11 @@ function loadLiveData() {
           const downtimeCell = newRow.insertCell(8);
 
           if (statusText === "DOWN TIME") {
-            // Prefer legacy scan row position (row[7]) because it is the per-scan downtime event.
-            // Some sheets also expose a generic "downtime" field that can be cumulative.
-            const rawDowntimeLegacy = row[7] || "";
+            // Header-mapped downtime column is the source of truth.
+            // Legacy fallback is only used when header is unavailable.
             const rawDowntimeByHeader = idxDowntime >= 0 ? (row[idxDowntime] || "") : "";
-            const rawDowntime = rawDowntimeLegacy || rawDowntimeByHeader;
+            const rawDowntimeLegacy = row[7] || "";
+            const rawDowntime = rawDowntimeByHeader || rawDowntimeLegacy;
             const cleaned = cleanDowntime(rawDowntime);
             downtimeCell.innerText = cleaned;
             downtimeCell.className = "status-red";

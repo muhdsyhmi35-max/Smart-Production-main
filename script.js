@@ -1457,9 +1457,8 @@ function loadLiveData() {
 
           // ✅ ONLY show downtime if status is DOWN TIME
           if (statusText === "DOWN TIME") {
-            // Prefer legacy scan row position (row[7]) for per-unit downtime event.
-            const rawDowntimeLegacy = row[7] || "";
-            const rawDowntime = rawDowntimeLegacy;
+            // Root copy has fixed sheet layout where downtime event is at row[7].
+            const rawDowntime = row[7] || "";
             downtimeCell.innerText = cleanDowntime(rawDowntime);
             downtimeCell.className = "status-red";
           } else {
