@@ -1559,7 +1559,11 @@ function loadLiveData() {
           const downtimeCell = newRow.insertCell(8);
 
           if (statusText === "DOWN TIME") {
-            const rawDowntime = idxDowntime >= 0 ? (row[idxDowntime] || "") : "";
+            // Prefer legacy scan row position (row[7]) because it is the per-scan downtime event.
+            // Some sheets also expose a generic "downtime" field that can be cumulative.
+            const rawDowntimeLegacy = row[7] || "";
+            const rawDowntimeByHeader = idxDowntime >= 0 ? (row[idxDowntime] || "") : "";
+            const rawDowntime = rawDowntimeLegacy || rawDowntimeByHeader;
             const cleaned = cleanDowntime(rawDowntime);
             downtimeCell.innerText = cleaned;
             downtimeCell.className = "status-red";
