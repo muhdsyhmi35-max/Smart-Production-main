@@ -52,6 +52,7 @@ let lastUpdateTime = 0;
 let lastTableData = "";
 let efficiencyPercent = 0;
 let breakPauseStartMs = null;
+const DEBUG_DOWNTIME = true;
 let firebaseDb = null;
 let firebaseCommandRef = null;
 let firebaseLiveStateRef = null;
@@ -174,6 +175,58 @@ function refreshDowntimeCardFromTable() {
     : 0;
   downtimeSeconds = total;
   document.getElementById("downtime").innerText = format(total);
+  renderDowntimeDebugPanel();
+}
+
+function renderDowntimeDebugPanel() {
+  if (!DEBUG_DOWNTIME) return;
+
+  const table = document.getElementById("scanTable");
+  if (!table) return;
+
+  let panel = document.getElementById("downtimeDebugPanel");
+  if (!panel) {
+    panel = document.createElement("pre");
+    panel.id = "downtimeDebugPanel";
+    panel.style.cssText = [
+      "position:fixed",
+      "right:10px",
+      "bottom:10px",
+      "max-width:520px",
+      "max-height:45vh",
+      "overflow:auto",
+      "z-index:99999",
+      "padding:10px",
+      "border-radius:8px",
+      "border:1px solid rgba(148,163,184,.4)",
+      "background:rgba(2,6,23,.92)",
+      "color:#cbd5e1",
+      "font:12px/1.4 Consolas, monospace",
+      "white-space:pre-wrap"
+    ].join(";");
+    document.body.appendChild(panel);
+  }
+
+  let running = 0;
+  const lines = [];
+  lines.push("Downtime Debug (DOWN TIME rows only)");
+
+  Array.from(table.rows).forEach((tr, idx) => {
+    const statusCell = tr.cells[7];
+    const downtimeCell = tr.cells[8];
+    const status = statusCell ? statusCell.innerText.trim() : "";
+    const raw = downtimeCell ? String(downtimeCell.innerText || "").trim() : "";
+    const cleaned = cleanDowntime(raw);
+    const sec = parseMmSsToSeconds(cleaned);
+    const included = status === "DOWN TIME";
+    if (included) running += sec;
+    lines.push(
+      `r${idx + 1} status=${status || "-"} raw="${raw}" clean="${cleaned}" sec=${sec} ${included ? "[+]" : "[-]"} total=${running}`
+    );
+  });
+
+  lines.push(`Card total: ${format(running)} (${running}s)`);
+  panel.textContent = lines.join("\n");
 }
 
 /* ===== DATE TIME ===== */
