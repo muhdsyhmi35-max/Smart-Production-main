@@ -139,7 +139,9 @@ function sumDowntimeFromVisibleRows() {
     const downtimeCell = tr.cells[8];
     if (!statusCell || !downtimeCell) return;
     if (statusCell.innerText.trim() !== "DOWN TIME") return;
-    total += parseMmSsToSeconds(downtimeCell.innerText || "");
+    const cleaned = cleanDowntime(downtimeCell.innerText || "");
+    downtimeCell.innerText = cleaned;
+    total += parseMmSsToSeconds(cleaned);
   });
   return total;
 }

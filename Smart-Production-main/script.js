@@ -146,7 +146,9 @@ function sumBookedDowntimeFromScanTable() {
     const statusCell = tr.cells[7];
     if (!downtimeCell || !statusCell) return;
     if (statusCell.innerText.trim() !== "DOWN TIME") return;
-    total += parseMmSsToSeconds(downtimeCell.innerText || "");
+    const cleaned = cleanDowntime(downtimeCell.innerText || "");
+    downtimeCell.innerText = cleaned;
+    total += parseMmSsToSeconds(cleaned);
   });
   return total;
 }
