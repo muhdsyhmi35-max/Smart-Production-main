@@ -1584,6 +1584,37 @@ function resolveDowntimeCandidateIndices(scanHeader) {
   return out;
 }
 
+function inferStatusColumnIndex(scanRows) {
+  if (!scanRows || scanRows.length === 0) return -1;
+  let bestIdx = -1;
+  let bestScore = 0;
+  const sample = scanRows.slice(0, Math.min(scanRows.length, 25));
+  sample.forEach(row => {
+    row.forEach((value, idx) => {
+      const t = String(value || "").trim().toUpperCase();
+      if (t === "SCANNED" || t === "DOWN TIME") {
+        const score = (t === "DOWN TIME") ? 2 : 1;
+        if (score > 0) {
+          const next = (bestIdx === idx ? bestScore : 0) + score;
+          if (next > bestScore) {
+            bestScore = next;
+            bestIdx = idx;
+          }
+        }
+      }
+    });
+  });
+  return bestScore > 0 ? bestIdx : -1;
+}
+
+function looksLikeDurationToken(raw) {
+  const t = String(raw || "").trim();
+  if (!t) return false;
+  if (/^\d{1,4}[:.]\d{1,2}([:.]\d{1,2})?$/.test(t)) return true;
+  if (/T\d{2}:\d{2}:\d{2}/.test(t) && (t.includes("1899") || t.includes("1900"))) return true;
+  return false;
+}
+
 function pickBestDowntimeValue(row, primaryIdx, candidateIdxs, legacyLayout) {
   if (legacyLayout) return row[7] || "";
 
@@ -1601,6 +1632,18 @@ function pickBestDowntimeValue(row, primaryIdx, candidateIdxs, legacyLayout) {
     seen.add(i);
     const raw = row[i];
     if (raw == null || String(raw).trim() === "") return;
+    const sec = parseMmSsToSeconds(String(raw));
+    if (sec > 0 && sec < bestSec) {
+      bestSec = sec;
+      bestRaw = raw;
+    }
+  });
+  if (bestRaw !== "") return bestRaw;
+
+  // Fallback for shifted/no-header responses: infer per-row duration-looking cells.
+  row.forEach(raw => {
+    if (raw == null || String(raw).trim() === "") return;
+    if (!looksLikeDurationToken(raw)) return;
     const sec = parseMmSsToSeconds(String(raw));
     if (sec > 0 && sec < bestSec) {
       bestSec = sec;
@@ -1653,10 +1696,11 @@ function loadLiveData() {
       const idxChassis = getIdx("chassis");
       const idxEngine = getIdx("engine", "engine no", "engine no.");
       const idxKey = getIdx("key", "key no", "key no.");
-      const idxStatus = getIdx("status", "state");
+      const idxStatusByHeader = getIdx("status", "state");
+      const idxStatus = idxStatusByHeader >= 0 ? idxStatusByHeader : inferStatusColumnIndex(scanRows);
       const idxDowntime = resolveDowntimeEventColumnIndex(scanHeader);
       const downtimeCandidateIdxs = resolveDowntimeCandidateIndices(scanHeader);
-      const legacyLayout = idxStatus < 0;
+      const legacyLayout = idxStatusByHeader < 0 && idxStatus < 0;
       const table = document.getElementById("scanTable");
 
       // Convert to string for comparison
