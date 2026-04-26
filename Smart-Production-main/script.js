@@ -974,7 +974,7 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
         // Count downtime only before target (or when plan is open-ended 0).
         if (plan === 0 || (actualCount + 1) <= plan) {
           downtimeEvent = format(actualDowntime);
-          downtimeSeconds += actualDowntime;
+          
           isDowntime = true;
         } else {
           downtimeEvent = "";
@@ -1765,8 +1765,7 @@ function loadLiveData() {
           const downtimeCell = newRow.insertCell(8);
 
           if (statusText === "DOWN TIME") {
-            const neighborDowntime = getDowntimeFromStatusNeighbor(row, idxStatus);
-            const rawDowntime = neighborDowntime || pickBestDowntimeValue(row, idxDowntime, downtimeCandidateIdxs, legacyLayout);
+            const rawDowntime = row[7] || "";
             const cleaned = cleanDowntime(rawDowntime);
             downtimeCell.innerText = cleaned;
             downtimeCell.className = "status-red";
