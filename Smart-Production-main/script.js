@@ -1587,17 +1587,18 @@ function resolveDowntimeCandidateIndices(scanHeader) {
 function pickBestDowntimeValue(row, primaryIdx, candidateIdxs, legacyLayout) {
   if (legacyLayout) return row[7] || "";
 
-  // 1) Strong primary mapping from header (downtime event first).
-  if (primaryIdx >= 0) {
-    const v = row[primaryIdx];
-    if (v != null && String(v).trim() !== "") return v;
-  }
+  const seen = new Set();
+  const idxsToCheck = [];
+  if (primaryIdx >= 0) idxsToCheck.push(primaryIdx);
+  candidateIdxs.forEach(i => idxsToCheck.push(i));
 
-  // 2) If multiple downtime columns exist, pick smallest non-zero value
-  //    to avoid selecting cumulative totals (e.g. 08:35 vs event 00:04).
+  // If multiple downtime columns exist, pick smallest non-zero value
+  // to avoid selecting cumulative totals (e.g. 11:35 vs event 00:07).
   let bestRaw = "";
   let bestSec = Number.POSITIVE_INFINITY;
-  candidateIdxs.forEach(i => {
+  idxsToCheck.forEach(i => {
+    if (i < 0 || seen.has(i)) return;
+    seen.add(i);
     const raw = row[i];
     if (raw == null || String(raw).trim() === "") return;
     const sec = parseMmSsToSeconds(String(raw));
@@ -1608,7 +1609,13 @@ function pickBestDowntimeValue(row, primaryIdx, candidateIdxs, legacyLayout) {
   });
   if (bestRaw !== "") return bestRaw;
 
-  // 3) Legacy fallback index for old sheet layouts.
+  // If only zero-like values exist (e.g. 00:00), still prefer explicit primary.
+  if (primaryIdx >= 0) {
+    const primaryRaw = row[primaryIdx];
+    if (primaryRaw != null && String(primaryRaw).trim() !== "") return primaryRaw;
+  }
+
+  // Legacy fallback index for old sheet layouts.
   return row[7] || "";
 }
 
