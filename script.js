@@ -1483,8 +1483,9 @@ function pickBestDowntimeValue(row, primaryIdx, candidateIdxs, legacyLayout) {
     if (primaryRaw != null && String(primaryRaw).trim() !== "") return primaryRaw;
   }
 
-  // Legacy fallback index for old sheet layouts.
-  return row[7] || "";
+  // In header-based layout, do not fallback to fixed legacy index.
+  // That index can point to aggregated values in wider sheet responses.
+  return "";
 }
 
 // Ambil data untuk MONITOR PC
