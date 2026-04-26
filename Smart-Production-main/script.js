@@ -1615,6 +1615,15 @@ function looksLikeDurationToken(raw) {
   return false;
 }
 
+function getDowntimeFromStatusNeighbor(row, statusIdx) {
+  if (statusIdx < 0) return "";
+  const neighborIdx = statusIdx + 1;
+  if (neighborIdx >= row.length) return "";
+  const raw = row[neighborIdx];
+  if (raw == null || String(raw).trim() === "") return "";
+  return looksLikeDurationToken(raw) ? raw : "";
+}
+
 function pickBestDowntimeValue(row, primaryIdx, candidateIdxs, legacyLayout) {
   if (legacyLayout) return row[7] || "";
 
@@ -1756,7 +1765,8 @@ function loadLiveData() {
           const downtimeCell = newRow.insertCell(8);
 
           if (statusText === "DOWN TIME") {
-            const rawDowntime = pickBestDowntimeValue(row, idxDowntime, downtimeCandidateIdxs, legacyLayout);
+            const neighborDowntime = getDowntimeFromStatusNeighbor(row, idxStatus);
+            const rawDowntime = neighborDowntime || pickBestDowntimeValue(row, idxDowntime, downtimeCandidateIdxs, legacyLayout);
             const cleaned = cleanDowntime(rawDowntime);
             downtimeCell.innerText = cleaned;
             downtimeCell.className = "status-red";
