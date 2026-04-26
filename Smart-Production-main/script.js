@@ -618,8 +618,6 @@ function applyLiveState(state) {
   const actual = parseInt(state.actual, 10) || 0;
   const balance = parseInt(state.balance, 10) || 0;
   const status = state.status || "READY";
-  const totalDowntime = parseInt(state.totalDowntime, 10) || 0;
-  const bookedDowntime = parseInt(state.bookedDowntime, 10);
   const countdown = parseInt(state.countdown, 10) || 0;
   const expected = parseInt(state.expected, 10) || 0;
   const delay = parseInt(state.delay, 10) || 0;
@@ -628,7 +626,7 @@ function applyLiveState(state) {
 
   // Keep local variables aligned so refresh doesn't revert values.
   actualCount = actual;
-  downtimeSeconds = Number.isFinite(bookedDowntime) && bookedDowntime >= 0 ? bookedDowntime : totalDowntime;
+  syncDowntimeSecondsFromTable();
   firstScanAtMs = state.firstScanAtMs ? Number(state.firstScanAtMs) : firstScanAtMs;
   efficiencyPercent = efficiency;
 
@@ -654,7 +652,8 @@ function applyLiveState(state) {
   }
   document.getElementById("actual").innerText = actual;
   startLiveCountdownTicker(countdown, status, state.updatedAt);
-  refreshDowntimeCardFromTable();
+  syncDowntimeSecondsFromTable();
+  document.getElementById("downtime").innerText = format(getBookedDowntimeSec());
   document.getElementById("expected").innerText = expected;
   if (state.lastScanAtMs) {
     lastScanTime = new Date(Number(state.lastScanAtMs));
@@ -1474,6 +1473,7 @@ function updateLiveStateOnly() {
   const balance = actual - plan;
   const status = document.getElementById("status").innerText.trim();
   const lotNo = document.getElementById("lotInput").value || "";
+  const bookedDowntime = getBookedDowntimeSec();
 
   fetch(API_URL, {
     method: "POST",
@@ -1490,7 +1490,7 @@ function updateLiveStateOnly() {
       balance: balance,
       status: status,
       countdown: countdownValue,
-      totalDowntime: getTotalDowntimeSec(),
+      totalDowntime: bookedDowntime,
       expected: expected,
       delay: delay,
       efficiency: efficiency
@@ -1506,8 +1506,8 @@ function updateLiveStateOnly() {
     lotNo: lotNo,
     status: status,
     countdown: countdownValue,
-    bookedDowntime: downtimeSeconds,
-    totalDowntime: getTotalDowntimeSec(),
+    bookedDowntime: bookedDowntime,
+    totalDowntime: bookedDowntime,
     expected: expected,
     delay: delay,
     efficiency: efficiency,
