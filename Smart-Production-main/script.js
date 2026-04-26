@@ -974,7 +974,7 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
         // Count downtime only before target (or when plan is open-ended 0).
         if (plan === 0 || (actualCount + 1) <= plan) {
           downtimeEvent = format(actualDowntime);
-          downtimeSeconds += actualDowntime;
+          
           isDowntime = true;
         } else {
           downtimeEvent = "";
