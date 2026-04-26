@@ -1573,6 +1573,45 @@ function resolveDowntimeEventColumnIndex(scanHeader) {
   return -1;
 }
 
+function resolveDowntimeCandidateIndices(scanHeader) {
+  const out = [];
+  for (let i = 0; i < scanHeader.length; i++) {
+    const h = scanHeader[i];
+    if (!h || !h.includes("downtime")) continue;
+    if (/total|accum|sum|cumulative|running/i.test(h)) continue;
+    out.push(i);
+  }
+  return out;
+}
+
+function pickBestDowntimeValue(row, primaryIdx, candidateIdxs, legacyLayout) {
+  if (legacyLayout) return row[7] || "";
+
+  // 1) Strong primary mapping from header (downtime event first).
+  if (primaryIdx >= 0) {
+    const v = row[primaryIdx];
+    if (v != null && String(v).trim() !== "") return v;
+  }
+
+  // 2) If multiple downtime columns exist, pick smallest non-zero value
+  //    to avoid selecting cumulative totals (e.g. 08:35 vs event 00:04).
+  let bestRaw = "";
+  let bestSec = Number.POSITIVE_INFINITY;
+  candidateIdxs.forEach(i => {
+    const raw = row[i];
+    if (raw == null || String(raw).trim() === "") return;
+    const sec = parseMmSsToSeconds(String(raw));
+    if (sec > 0 && sec < bestSec) {
+      bestSec = sec;
+      bestRaw = raw;
+    }
+  });
+  if (bestRaw !== "") return bestRaw;
+
+  // 3) Legacy fallback index for old sheet layouts.
+  return row[7] || "";
+}
+
 // Ambil data untuk MONITOR PC
 function loadLiveData() {
   fetch(API_URL, { cache: "no-store" })
@@ -1608,6 +1647,7 @@ function loadLiveData() {
       const idxKey = getIdx("key", "key no", "key no.");
       const idxStatus = getIdx("status", "state");
       const idxDowntime = resolveDowntimeEventColumnIndex(scanHeader);
+      const downtimeCandidateIdxs = resolveDowntimeCandidateIndices(scanHeader);
       const legacyLayout = idxStatus < 0;
       const table = document.getElementById("scanTable");
 
@@ -1664,13 +1704,7 @@ function loadLiveData() {
           const downtimeCell = newRow.insertCell(8);
 
           if (statusText === "DOWN TIME") {
-            // Prefer header-mapped column when the sheet has extra fields (row length > 8).
-            let rawDowntime = "";
-            if (!legacyLayout && idxDowntime >= 0) {
-              const v = row[idxDowntime];
-              if (v != null && String(v).trim() !== "") rawDowntime = v;
-            }
-            if (rawDowntime === "") rawDowntime = row[7] || "";
+            const rawDowntime = pickBestDowntimeValue(row, idxDowntime, downtimeCandidateIdxs, legacyLayout);
             const cleaned = cleanDowntime(rawDowntime);
             downtimeCell.innerText = cleaned;
             downtimeCell.className = "status-red";
