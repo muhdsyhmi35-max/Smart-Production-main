@@ -2,11 +2,111 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="refresh" content="0; url=./Smart-Production-main/index.html">
-<title>Redirecting...</title>
+<title>TF 2 Production Monitoring</title>
+<link rel="stylesheet" href="./style.css">
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
 </head>
+
 <body>
-<p>Opening production dashboard...</p>
-<p>If redirect does not work, open <a href="./Smart-Production-main/index.html">Smart-Production-main/index.html</a>.</p>
+
+<div class="header">
+    TF 2 PRODUCTION MONITORING SYSTEM
+    <button class="fullscreen-btn" onclick="toggleFullScreen()">⛶</button>
+</div>
+
+<div class="datetime">
+<div id="dateDisplay"></div>
+<div id="clock"></div>
+</div>
+
+<div class="controls">
+
+Cycle Time (min):
+<input type="number" id="cycleTarget" min="1">
+
+Daily Plan:
+<input type="number" id="dailyPlanTarget" min="Daily Plan">
+
+Lot:
+<input type="number" id="lotInput" placeholder="Lot No">
+
+<button class="start" onclick="startProduction()">Start</button>
+<button class="stop" onclick="stopProduction()">Stop</button>
+<button class="reset" onclick="resetProduction()">Reset</button>
+<button class="summary" onclick="openSummary()">Daily Summary</button>
+
+<button class="summary" id="ramadanToggle" onclick="toggleRamadan()">
+🌙 Ramadhan : OFF
+</button>
+
+</div>
+
+<div class="dashboard">
+
+<!-- 🔹 ROW 1 -->
+<div class="card"><h3>COUNTDOWN</h3><div class="big-number" id="countdown">00:00</div></div>
+<div class="card"><h3>ACTUAL OUTPUT</h3><div class="big-number status-green" id="actual">0</div></div>
+<div class="card"><h3>EXPECTED OUTPUT</h3><div class="big-number status-blue" id="expected">0</div></div>
+<div class="card"><h3>DELAY / AHEAD</h3><div class="big-number" id="delay">0</div></div>
+
+<!-- 🔹 ROW 2 -->
+<div class="card"><h3>DAILY PLAN</h3><div class="big-number" id="plan">0</div></div>
+<div class="card"><h3>BALANCE</h3><div class="big-number" id="balance">0</div></div>
+
+<!-- LINE STATUS -->
+<div class="card wide">
+<h3>LINE STATUS</h3>
+<div class="big-number" id="status">READY</div>
+</div>
+</div>
+  
+<div class="bottom-row">
+<!-- LEFT: SCAN -->
+<div class="card wide">
+<h3>SCAN INPUT</h3>
+
+<div class="scan-grid">
+<input type="text" id="chassisInput" class="scan-box" placeholder="Scan Chassis" autofocus>
+<input type="text" id="modelInput" class="scan-box" placeholder="Scan Model">
+<input type="text" id="engineInput" class="scan-box" placeholder="Scan Engine No">
+<input type="text" id="keyInput" class="scan-box" placeholder="Scan Key No">
+</div>
+
+</div>
+
+<!-- RIGHT: DOWNTIME -->
+<div class="card" id="downtimeCard">
+<h3>ACCUMULATED DOWNTIME</h3>
+<div class="big-number" id="downtime">00:00</div>
+</div>
+
+<div class="card">
+<h3>EFFICIENCY</h3>
+<div class="big-number" id="efficiency">0%</div> 
+</div>
+  
+</div>
+  
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Time</th>
+<th>Lot</th>
+<th>Model</th>
+<th>Chassis</th>
+<th>Engine No</th>
+<th>Key No</th>
+<th>Status</th>
+<th>Downtime</th>
+</tr>
+</thead>
+<tbody id="scanTable"></tbody>
+</table>
+
+<script src="./script.js"></script>
 </body>
 </html>
