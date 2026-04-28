@@ -65,7 +65,7 @@ body {
 
 #clock {
   color: #54ecff;
-  font-size: 58px;
+  font-size: 66px;
   font-weight: 300;
   line-height: 1;
   letter-spacing: 0.5px;
@@ -181,7 +181,7 @@ body {
 .metric-card h3 {
   margin: 0 0 10px;
   color: #4bb8ff;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 800;
   letter-spacing: 0.9px;
   text-transform: uppercase;
@@ -244,13 +244,13 @@ body {
 }
 
 .status-display #status {
-  font-size: 20px;
+  font-size: 28px;
   line-height: 1;
 }
 
 .status-subtext {
   color: #d7e4d3;
-  font-size: 12px;
+  font-size: 13px;
   margin-top: 4px;
 }
 
