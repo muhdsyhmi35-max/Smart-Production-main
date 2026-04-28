@@ -52,6 +52,7 @@ let lastUpdateTime = 0;
 let lastTableData = "";
 let efficiencyPercent = 0;
 let breakPauseStartMs = null;
+let pauseStartMs = null;
 const DEBUG_DOWNTIME = false;
 let firebaseDb = null;
 let firebaseCommandRef = null;
@@ -786,6 +787,18 @@ function startProduction(shouldSync = true) {
     startTime = new Date();
   }
 
+  // If resuming from PAUSED, shift base time forward by paused duration
+  // so countdown truly stops while paused.
+  if (pauseStartMs != null) {
+    const pausedMs = Math.max(Date.now() - pauseStartMs, 0);
+    if (lastScanTime) {
+      lastScanTime = new Date(lastScanTime.getTime() + pausedMs);
+    } else if (startTime) {
+      startTime = new Date(startTime.getTime() + pausedMs);
+    }
+    pauseStartMs = null;
+  }
+
   // If no scan yet, set initial countdown
   if (countdownValue === 0) {
     countdownValue = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
@@ -843,6 +856,8 @@ function stopProduction(shouldSync = true) {
   clearInterval(timer);
   timer = null;
   breakPauseStartMs = null;
+  // Remember pause moment; we will compensate on resume.
+  pauseStartMs = Date.now();
   setStatus("PAUSED", "status-orange");
 }
 
@@ -864,6 +879,7 @@ function resetProduction(shouldSync = true) {
   firstScanAtMs = null;
   efficiencyPercent = 0;
   breakPauseStartMs = null;
+  pauseStartMs = null;
   pendingChassis = "";
   pendingModel = "";
   pendingEngine = "";
