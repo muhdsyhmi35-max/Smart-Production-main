@@ -122,6 +122,9 @@ function parseMmSsToSeconds(text) {
         const klLegacyBase = (17 * 3600) + (4 * 60) + 35;
         const shifted = total - klLegacyBase;
         if (shifted >= 0 && shifted <= 12 * 3600) {
+          // Legacy payload encodes each elapsed second as +1 minute tick
+          // from the base (17:04:35). Convert back to real seconds.
+          if (shifted % 60 === 0) return Math.floor(shifted / 60);
           return shifted;
         }
 
