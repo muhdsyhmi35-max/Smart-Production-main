@@ -164,11 +164,11 @@ th{
   display:flex;
   align-items:center;
   gap:8px;
-  padding:6px 8px 6px 0;
+  padding:4px 8px 4px 0;
 }
 
 .control-label{
-  font-size:14px;
+  font-size:16px;
   font-weight:600;
   color:#cbd5e1;
   letter-spacing:.2px;
@@ -177,8 +177,8 @@ th{
 
 .controls input{
   padding:6px 10px;
-  width:72px;
-  height:30px;
+  width:66px;
+  height:28px;
   font-size:14px;
   font-weight:700;
   border-radius:8px;
@@ -201,8 +201,8 @@ th{
   align-items:center;
   gap:10px;
   flex-wrap:wrap;
-  /* Lift action buttons to align center with input boxes */
-  transform:translateY(-6px);
+  transform:none;
+  align-self:center;
 }
 
 .controls button{
