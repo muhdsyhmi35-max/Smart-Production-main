@@ -53,6 +53,7 @@ let lastTableData = "";
 let efficiencyPercent = 0;
 let breakPauseStartMs = null;
 let pauseStartMs = null;
+let lastTimerTickMs = null;
 const DEBUG_DOWNTIME = false;
 let firebaseDb = null;
 let firebaseCommandRef = null;
@@ -332,11 +333,8 @@ async function checkAccess() {
 
 /* ===== RAMADAN + BREAK ===== */
 
-function isBreakTime() {
-  const now = new Date();
-  const current = now.getHours() * 60 + now.getMinutes();
-  const day = now.getDay();
-
+function getBreakWindowsForDate(dateObj) {
+  const day = dateObj.getDay();
   let breaks = [];
 
   if (ramadanMode) {
@@ -351,6 +349,12 @@ function isBreakTime() {
     breaks = SETTINGS.breakTime.normal.weekday;
   }
 
+  return breaks;
+}
+
+function isBreakTimeAt(dateObj) {
+  const current = dateObj.getHours() * 60 + dateObj.getMinutes();
+  const breaks = getBreakWindowsForDate(dateObj);
   for (const b of breaks) {
     if (current >= b.start && current < b.end) {
       return true;
@@ -358,6 +362,34 @@ function isBreakTime() {
   }
 
   return false;
+}
+
+function isBreakTime() {
+  return isBreakTimeAt(new Date());
+}
+
+function getBreakOverlapMs(fromMs, toMs) {
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || toMs <= fromMs) return 0;
+  let total = 0;
+  const dayMs = 24 * 60 * 60 * 1000;
+  const cursor = new Date(fromMs);
+  cursor.setHours(0, 0, 0, 0);
+
+  for (let dayStart = cursor.getTime(); dayStart < toMs; dayStart += dayMs) {
+    const dayDate = new Date(dayStart);
+    const breaks = getBreakWindowsForDate(dayDate);
+    breaks.forEach(b => {
+      const breakStartMs = dayStart + (b.start * 60 * 1000);
+      const breakEndMs = dayStart + (b.end * 60 * 1000);
+      const overlapStart = Math.max(fromMs, breakStartMs);
+      const overlapEnd = Math.min(toMs, breakEndMs);
+      if (overlapEnd > overlapStart) {
+        total += (overlapEnd - overlapStart);
+      }
+    });
+  }
+
+  return total;
 }
 
 function calculateExpectedOutput() {
@@ -380,16 +412,8 @@ function calculateExpectedOutput() {
 
   const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
 
-  // 🚫 Tolak break time
-  let breakSeconds = 0;
-  const tempTime = new Date(firstScanAtMs);
-
-  while (tempTime < now) {
-    if (isBreakTime()) {
-      breakSeconds += 60;
-    }
-    tempTime.setMinutes(tempTime.getMinutes() + 1);
-  }
+  // Exclude scheduled break overlap from expected output timeline.
+  const breakSeconds = Math.floor(getBreakOverlapMs(firstScanAtMs, now.getTime()) / 1000);
 
   let netTime = elapsedSec - breakSeconds;
   if (netTime < 0) netTime = 0;
@@ -873,9 +897,22 @@ function startProduction(shouldSync = true) {
   }
 
   timer = setInterval(() => {
+    const nowMs = Date.now();
+    if (lastTimerTickMs != null) {
+      const breakGapMs = getBreakOverlapMs(lastTimerTickMs, nowMs);
+      if (breakGapMs > 0) {
+        if (lastScanTime) {
+          lastScanTime = new Date(lastScanTime.getTime() + breakGapMs);
+        } else if (startTime) {
+          startTime = new Date(startTime.getTime() + breakGapMs);
+        }
+      }
+    }
+    lastTimerTickMs = nowMs;
+
     if (isBreakTime()) {
       if (breakPauseStartMs == null) {
-        breakPauseStartMs = Date.now();
+        breakPauseStartMs = nowMs;
       }
       setStatus("BREAK TIME", "status-orange");
       updateDisplay();
@@ -883,7 +920,7 @@ function startProduction(shouldSync = true) {
     }
 
     if (breakPauseStartMs != null) {
-      const breakPausedMs = Math.max(Date.now() - breakPauseStartMs, 0);
+      const breakPausedMs = Math.max(nowMs - breakPauseStartMs, 0);
       if (lastScanTime) {
         lastScanTime = new Date(lastScanTime.getTime() + breakPausedMs);
       } else if (startTime) {
@@ -895,7 +932,7 @@ function startProduction(shouldSync = true) {
     const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
 
     // 🔥 USE REAL TIME (FIXED)
-    const now = new Date();
+    const now = new Date(nowMs);
 
     // use startTime if no scan yet
     const baseTime = lastScanTime || startTime;
@@ -923,6 +960,7 @@ function stopProduction(shouldSync = true) {
 
   clearInterval(timer);
   timer = null;
+  lastTimerTickMs = null;
   breakPauseStartMs = null;
   // Remember pause moment; we will compensate on resume.
   pauseStartMs = Date.now();
@@ -939,6 +977,7 @@ function resetProduction(shouldSync = true) {
 
   clearInterval(timer);
   timer = null;
+  lastTimerTickMs = null;
   countdownValue = 0;
   actualCount = 0;
   downtimeSeconds = 0;
