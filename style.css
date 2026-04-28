@@ -60,6 +60,7 @@ body{
 .controls{
   display:flex;
   justify-content:center;
+  align-items:center;
   gap:12px;
   flex-wrap:wrap;
   padding:14px 16px;
@@ -161,9 +162,9 @@ th{
 /* ================= CONTROLS SETTINGS ================= */
 .controls input{
   padding:6px 10px;
-  width:92px;
-  height:34px;
-  font-size:16px;
+  width:72px;
+  height:30px;
+  font-size:14px;
   font-weight:700;
   border-radius:11px;
   border:1px solid rgba(71,85,105,0.8);
@@ -183,6 +184,7 @@ th{
   cursor:pointer;
   box-shadow:0 6px 14px rgba(2,6,23,0.35), inset 0 1px 0 rgba(255,255,255,0.18);
   transition:transform .15s ease, filter .2s ease, box-shadow .2s ease;
+  transform:translateY(-6px);
 }
 
 .controls button:hover{transform:translateY(-1px);filter:brightness(1.05);}
