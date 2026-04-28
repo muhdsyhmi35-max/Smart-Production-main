@@ -60,7 +60,7 @@ body{
 .controls{
   display:flex;
   justify-content:center;
-  align-items:end;
+  align-items:center;
   gap:14px;
   flex-wrap:wrap;
   padding:12px 16px;
@@ -177,9 +177,9 @@ th{
 
 .controls input{
   padding:6px 10px;
-  width:82px;
-  height:34px;
-  font-size:16px;
+  width:72px;
+  height:30px;
+  font-size:14px;
   font-weight:700;
   border-radius:8px;
   border:1px solid rgba(71,85,105,0.95);
@@ -201,8 +201,8 @@ th{
   align-items:center;
   gap:10px;
   flex-wrap:wrap;
-  /* Lift action buttons slightly to align with input boxes */
-  transform:translateY(-3px);
+  /* Lift action buttons to align center with input boxes */
+  transform:translateY(-6px);
 }
 
 .controls button{
