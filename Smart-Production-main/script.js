@@ -97,9 +97,13 @@ function parseMmSsToSeconds(text) {
   if (!t || t === "00:00" || t === "0:00") return 0;
 
   // 66:46 / 66.46 / 66:46:00 / 66.46.00 / 1900-01-01T11:50:35.000Z / numeric seconds
-  if (!isNaN(t)) {
-    const sec = parseInt(t, 10);
-    return Number.isFinite(sec) ? Math.max(sec, 0) : 0;
+  // Google Sheets duration cells can arrive as day fractions (e.g. 0.003472222 for 00:05).
+  const numeric = Number(t);
+  if (Number.isFinite(numeric)) {
+    if (numeric > 0 && numeric < 1) {
+      return Math.max(Math.round(numeric * 86400), 0);
+    }
+    return Math.max(Math.round(numeric), 0);
   }
 
   // Google Sheets date artifacts like 1899/1900 can be serialized as ISO strings.
@@ -1544,10 +1548,7 @@ function sendToSheet(chassis, model, engine, key, lot, status, downtimeEvent) {
 
 function cleanDowntime(raw) {
   if (raw == null || raw === "") return "";
-  if (typeof raw === "number" && Number.isFinite(raw)) {
-    return format(Math.max(0, Math.floor(raw)));
-  }
-  const sec = parseMmSsToSeconds(String(raw));
+  const sec = parseMmSsToSeconds(raw);
   return format(sec);
 }
 
