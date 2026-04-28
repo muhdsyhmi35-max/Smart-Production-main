@@ -23,6 +23,18 @@ body{
   color:var(--text);
 }
 
+/* Hide scrollbars but keep scrolling functional */
+html, body{
+  scrollbar-width:none;      /* Firefox */
+  -ms-overflow-style:none;   /* IE/Edge legacy */
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar{
+  width:0;
+  height:0;
+}
+
 /* HEADER */
 .header{
   font-size:var(--header-size);
