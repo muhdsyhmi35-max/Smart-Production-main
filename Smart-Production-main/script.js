@@ -453,6 +453,14 @@ function refreshEfficiencyPercent() {
   efficiencyPercent = calculateAvailabilityPercent();
 }
 
+function computeEfficiencyFromCards() {
+  const expectedVal = parseInt(document.getElementById("expected").innerText, 10);
+  const actualVal = parseInt(document.getElementById("actual").innerText, 10);
+  if (!Number.isFinite(expectedVal) || expectedVal <= 0) return 0;
+  if (!Number.isFinite(actualVal) || actualVal < 0) return 0;
+  return Math.floor((actualVal / expectedVal) * 100);
+}
+
 /* ===== STATUS ===== */
 
 function setStatus(text, color) {
@@ -718,21 +726,7 @@ function applyLiveState(state) {
   actualCount = actual;
   syncDowntimeSecondsFromTable();
   firstScanAtMs = state.firstScanAtMs ? Number(state.firstScanAtMs) : firstScanAtMs;
-  const liveEfficiency = expected > 0
-    ? Math.floor((actual / expected) * 100)
-    : stateEfficiency;
-  efficiencyPercent = liveEfficiency;
-
   const effEl = document.getElementById("efficiency");
-  effEl.innerText = liveEfficiency + "%";
-
-  if (liveEfficiency < 90) {
-    effEl.className = "big-number status-red";
-  } else if (liveEfficiency < 100) {
-    effEl.className = "big-number status-orange";
-  } else {
-    effEl.className = "big-number status-green";
-  }
 
   if (!isMonitor) {
     document.getElementById("plan").innerText = effectivePlan;
@@ -744,6 +738,17 @@ function applyLiveState(state) {
     lotInput.value = lotNo;
   }
   document.getElementById("actual").innerText = actual;
+  document.getElementById("expected").innerText = expected;
+  const liveEfficiency = computeEfficiencyFromCards();
+  efficiencyPercent = Number.isFinite(liveEfficiency) ? liveEfficiency : stateEfficiency;
+  effEl.innerText = efficiencyPercent + "%";
+  if (efficiencyPercent < 90) {
+    effEl.className = "big-number status-red";
+  } else if (efficiencyPercent < 100) {
+    effEl.className = "big-number status-orange";
+  } else {
+    effEl.className = "big-number status-green";
+  }
   startLiveCountdownTicker(countdown, status, state.updatedAt);
   syncDowntimeSecondsFromTable();
   if (isMonitor && Number.isFinite(monitorDowntimeOverrideSec) && monitorDowntimeOverrideSec >= 0) {
@@ -751,7 +756,6 @@ function applyLiveState(state) {
   } else {
     document.getElementById("downtime").innerText = format(getBookedDowntimeSec());
   }
-  document.getElementById("expected").innerText = expected;
   if (state.lastScanAtMs) {
     lastScanTime = new Date(Number(state.lastScanAtMs));
   }
@@ -968,6 +972,8 @@ function stopProduction(shouldSync = true) {
   // Remember pause moment; we will compensate on resume.
   pauseStartMs = Date.now();
   setStatus("PAUSED", "status-orange");
+  updateDisplay();
+  updateLiveStateOnly();
 }
 
 /* RESET */
@@ -1203,6 +1209,15 @@ function updateDisplay() {
 
   // EXPECTED CALCULATION
   let expected = calculateExpectedOutput();
+  const statusText = document.getElementById("status").innerText.trim();
+  // When paused/stopped timer is not running, preserve previously displayed
+  // expected value instead of collapsing expected to actual (which forces 100%).
+  if (!timer && (statusText === "PAUSED" || statusText === "BREAK TIME")) {
+    const expectedShown = parseInt(document.getElementById("expected").innerText, 10);
+    if (Number.isFinite(expectedShown) && expectedShown > expected) {
+      expected = expectedShown;
+    }
+  }
 
   // ✅ FORCE CORRECT LOGIC AFTER TARGET
   if (actualCount >= plan && plan > 0) {
@@ -1223,9 +1238,11 @@ function updateDisplay() {
 
   delayEl.innerText = delay > 0 ? ("+" + delay) : delay;
 
-  const efficiency = expected > 0
-    ? Math.floor((actualCount / expected) * 100)
-    : 0;
+  // Display Expected/Actual first, then compute efficiency from cards
+  // so the efficiency value always matches what user sees.
+  document.getElementById("expected").innerText = expected;
+  document.getElementById("actual").innerText = actualCount;
+  const efficiency = computeEfficiencyFromCards();
   efficiencyPercent = efficiency;
 
   const effEl = document.getElementById("efficiency");
@@ -1240,9 +1257,7 @@ function updateDisplay() {
   }
 
   // Display Expected
-  document.getElementById("expected").innerText = expected;
   document.getElementById("plan").innerText = plan;
-  document.getElementById("actual").innerText = actualCount;
   document.getElementById("countdown").innerText = format(countdownValue);
   refreshDowntimeCardFromTable();
 
