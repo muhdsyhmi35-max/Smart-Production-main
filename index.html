@@ -23,16 +23,22 @@
 </div>
 
 <div class="controls">
-
-Cycle Time (min):
+<label class="control-field">
+<span class="control-label">Cycle Time (min)</span>
 <input type="number" id="cycleTarget" min="1">
+</label>
 
-Daily Plan:
+<label class="control-field">
+<span class="control-label">Daily Plan</span>
 <input type="number" id="dailyPlanTarget" min="1">
+</label>
 
-Lot:
+<label class="control-field">
+<span class="control-label">Lot</span>
 <input type="number" id="lotInput" placeholder="Lot No">
+</label>
 
+<div class="control-actions">
 <button class="start" onclick="startProduction()">Start</button>
 <button class="stop" onclick="stopProduction()">Stop</button>
 <button class="reset" onclick="resetProduction()">Reset</button>
@@ -41,6 +47,7 @@ Lot:
 <button class="summary" id="ramadanToggle" onclick="toggleRamadan()">
 🌙 Ramadhan : OFF
 </button>
+</div>
 
 </div>
 
