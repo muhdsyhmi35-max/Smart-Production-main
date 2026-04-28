@@ -11,101 +11,142 @@
 </head>
 
 <body>
+<div class="app-shell">
+  <header class="top-header">
+    <div class="header-title">TF 2 PRODUCTION MONITORING SYSTEM</div>
+    <button class="fullscreen-btn" onclick="toggleFullScreen()" aria-label="Toggle fullscreen">⛶</button>
+  </header>
 
-<div class="header">
-    TF 2 PRODUCTION MONITORING SYSTEM
-    <button class="fullscreen-btn" onclick="toggleFullScreen()">⛶</button>
+  <section class="datetime-panel">
+    <div id="dateDisplay"></div>
+    <div id="clock"></div>
+  </section>
+
+  <section class="toolbar card-panel">
+    <label class="control-field">
+      <span>Cycle Time (min):</span>
+      <input type="number" id="cycleTarget" min="1">
+    </label>
+
+    <label class="control-field">
+      <span>Daily Plan:</span>
+      <input type="number" id="dailyPlanTarget" min="1">
+    </label>
+
+    <label class="control-field lot-field">
+      <span>Lot:</span>
+      <input type="text" id="lotInput" placeholder="Lot No">
+    </label>
+
+    <button class="action-btn start" onclick="startProduction()">Start</button>
+    <button class="action-btn stop" onclick="stopProduction()">Stop</button>
+    <button class="action-btn reset" onclick="resetProduction()">Reset</button>
+    <button class="action-btn summary" onclick="openSummary()">Summary</button>
+    <button class="action-btn utility" id="ramadanToggle" onclick="toggleRamadan()">Ramadhan : OFF</button>
+  </section>
+
+  <main class="main-grid">
+    <section class="left-column">
+      <div class="panel-card scan-panel">
+        <div class="panel-title">Scan Input</div>
+        <div class="scan-stack">
+          <div class="scan-row">
+            <span class="scan-icon">1</span>
+            <input type="text" id="chassisInput" class="scan-box" placeholder="Scan Chassis" autofocus>
+          </div>
+          <div class="scan-row">
+            <span class="scan-icon">2</span>
+            <input type="text" id="modelInput" class="scan-box" placeholder="Scan Model">
+          </div>
+          <div class="scan-row">
+            <span class="scan-icon">3</span>
+            <input type="text" id="engineInput" class="scan-box" placeholder="Scan Engine No">
+          </div>
+          <div class="scan-row">
+            <span class="scan-icon">4</span>
+            <input type="text" id="keyInput" class="scan-box" placeholder="Scan Key No">
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-card status-panel">
+        <div class="panel-title">Line Status</div>
+        <div class="status-display">
+          <div class="big-number" id="status">READY</div>
+          <div class="status-subtext">Waiting to Start</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="metrics-column">
+      <div class="metric-card countdown-card">
+        <h3>Countdown</h3>
+        <div class="big-number" id="countdown">00:00</div>
+      </div>
+
+      <div class="metric-row two-col">
+        <div class="metric-card actual-card">
+          <h3>Actual</h3>
+          <div class="big-number status-green" id="actual">0</div>
+        </div>
+        <div class="metric-card expected-card">
+          <h3>Expected</h3>
+          <div class="big-number status-blue" id="expected">0</div>
+        </div>
+      </div>
+
+      <div class="metric-row two-col">
+        <div class="metric-card">
+          <h3>Plan</h3>
+          <div class="big-number" id="plan">0</div>
+        </div>
+        <div class="metric-card">
+          <h3>Balance</h3>
+          <div class="big-number" id="balance">0</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="right-column">
+      <div class="metric-card right-card">
+        <h3>Delay</h3>
+        <div class="big-number" id="delay">0</div>
+      </div>
+
+      <div class="metric-card right-card downtime-card" id="downtimeCard">
+        <h3>Downtime</h3>
+        <div class="big-number" id="downtime">00:00</div>
+      </div>
+
+      <div class="metric-card right-card efficiency-card">
+        <h3>Efficiency</h3>
+        <div class="big-number" id="efficiency">0%</div>
+      </div>
+    </section>
+  </main>
+
+  <section class="history-section panel-card">
+    <div class="panel-title">Production History</div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Lot</th>
+            <th>Model</th>
+            <th>Chassis</th>
+            <th>Engine No</th>
+            <th>Key No</th>
+            <th>Status</th>
+            <th>Downtime</th>
+          </tr>
+        </thead>
+        <tbody id="scanTable"></tbody>
+      </table>
+    </div>
+  </section>
 </div>
-
-<div class="datetime">
-<div id="dateDisplay"></div>
-<div id="clock"></div>
-</div>
-
-<div class="controls">
-
-Cycle Time (min):
-<input type="number" id="cycleTarget" min="1">
-
-Daily Plan:
-<input type="number" id="dailyPlanTarget" min="1">
-
-Lot:
-<input type="number" id="lotInput" placeholder="Lot No">
-
-<button class="start" onclick="startProduction()">Start</button>
-<button class="stop" onclick="stopProduction()">Stop</button>
-<button class="reset" onclick="resetProduction()">Reset</button>
-<button class="summary" onclick="openSummary()">Daily Summary</button>
-
-<button class="summary" id="ramadanToggle" onclick="toggleRamadan()">
-🌙 Ramadhan : OFF
-</button>
-
-</div>
-
-<div class="dashboard">
-
-<!-- 🔹 ROW 1 -->
-<div class="card"><h3>COUNTDOWN</h3><div class="big-number" id="countdown">00:00</div></div>
-<div class="card"><h3>ACTUAL OUTPUT</h3><div class="big-number status-green" id="actual">0</div></div>
-<div class="card"><h3>EXPECTED OUTPUT</h3><div class="big-number status-blue" id="expected">0</div></div>
-<div class="card"><h3>DELAY / AHEAD</h3><div class="big-number" id="delay">0</div></div>
-
-<!-- 🔹 ROW 2 -->
-<div class="card"><h3>DAILY PLAN</h3><div class="big-number" id="plan">0</div></div>
-<div class="card"><h3>BALANCE</h3><div class="big-number" id="balance">0</div></div>
-
-<!-- LINE STATUS -->
-<div class="card wide">
-<h3>LINE STATUS</h3>
-<div class="big-number" id="status">READY</div>
-</div>
-</div>
-  
-<div class="bottom-row">
-<!-- LEFT: SCAN -->
-<div class="card wide">
-<h3>SCAN INPUT</h3>
-
-<div class="scan-grid">
-<input type="text" id="chassisInput" class="scan-box" placeholder="Scan Chassis" autofocus>
-<input type="text" id="modelInput" class="scan-box" placeholder="Scan Model">
-<input type="text" id="engineInput" class="scan-box" placeholder="Scan Engine No">
-<input type="text" id="keyInput" class="scan-box" placeholder="Scan Key No">
-</div>
-
-</div>
-
-<!-- RIGHT: DOWNTIME -->
-<div class="card" id="downtimeCard">
-<h3>ACCUMULATED DOWNTIME</h3>
-<div class="big-number" id="downtime">00:00</div>
-</div>
-
-<div class="card">
-<h3>EFFICIENCY</h3>
-<div class="big-number" id="efficiency">0%</div> 
-</div>
-  
-</div>
-  
-<table>
-<thead>
-<tr>
-<th>Date</th>
-<th>Time</th>
-<th>Lot</th>
-<th>Model</th>
-<th>Chassis</th>
-<th>Engine No</th>
-<th>Key No</th>
-<th>Status</th>
-<th>Downtime</th>
-</tr>
-</thead>
-<tbody id="scanTable"></tbody>
-</table>
 
 <script src="./script.js"></script>
 </body>
