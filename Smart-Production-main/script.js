@@ -707,7 +707,7 @@ function applyLiveState(state) {
   const countdown = parseInt(state.countdown, 10) || 0;
   const expected = parseInt(state.expected, 10) || 0;
   const delay = parseInt(state.delay, 10) || 0;
-  const efficiency = parseInt(state.efficiency, 10) || 0;
+  const stateEfficiency = parseInt(state.efficiency, 10) || 0;
   const lotNo = state.lotNo || "";
   const fbTotalDowntime = Number(state.totalDowntime);
   if (isMonitor && Number.isFinite(fbTotalDowntime) && fbTotalDowntime >= 0) {
@@ -718,14 +718,17 @@ function applyLiveState(state) {
   actualCount = actual;
   syncDowntimeSecondsFromTable();
   firstScanAtMs = state.firstScanAtMs ? Number(state.firstScanAtMs) : firstScanAtMs;
-  efficiencyPercent = efficiency;
+  const liveEfficiency = expected > 0
+    ? Math.floor((actual / expected) * 100)
+    : stateEfficiency;
+  efficiencyPercent = liveEfficiency;
 
   const effEl = document.getElementById("efficiency");
-  effEl.innerText = efficiency + "%";
+  effEl.innerText = liveEfficiency + "%";
 
-  if (efficiency < 90) {
+  if (liveEfficiency < 90) {
     effEl.className = "big-number status-red";
-  } else if (efficiency < 100) {
+  } else if (liveEfficiency < 100) {
     effEl.className = "big-number status-orange";
   } else {
     effEl.className = "big-number status-green";
@@ -1220,7 +1223,10 @@ function updateDisplay() {
 
   delayEl.innerText = delay > 0 ? ("+" + delay) : delay;
 
-  const efficiency = efficiencyPercent;
+  const efficiency = expected > 0
+    ? Math.floor((actualCount / expected) * 100)
+    : 0;
+  efficiencyPercent = efficiency;
 
   const effEl = document.getElementById("efficiency");
   effEl.innerText = efficiency + "%";
