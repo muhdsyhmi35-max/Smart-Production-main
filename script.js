@@ -1848,21 +1848,17 @@ window.onload = async function() {
     document.getElementById("cycleTarget").readOnly = true;
     document.getElementById("dailyPlanTarget").readOnly = true;
 
-    // Dashboard cards/status: Firebase source of truth.
+    // Dashboard cards/status: Firebase realtime listener source of truth
+    // (attached in initFirebaseSync). Avoid duplicate polling reads.
     loadMonitorStateFromFirebase();
-    setInterval(loadMonitorStateFromFirebase, 2000);
 
     // Scan table rows: Google Sheet source of truth.
     loadLiveData();
     setInterval(loadLiveData, 3000);
   } else {
-    // Push baseline settings so monitor immediately matches main dashboard.
-    hasLocalSession = true;
-    updateLiveStateOnly();
-
     // Reload scan history from Sheet after refresh (main screen).
     loadLiveData();
     setInterval(loadLiveData, 3000);
-    setInterval(updateLiveStateOnly, 1000);
+    setInterval(updateLiveStateOnly, 2000);
   }
 };
