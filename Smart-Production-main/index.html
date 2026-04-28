@@ -38,10 +38,10 @@
       <input type="text" id="lotInput" placeholder="Lot No">
     </label>
 
-    <button class="action-btn start" onclick="startProduction()">Start</button>
-    <button class="action-btn stop" onclick="stopProduction()">Stop</button>
-    <button class="action-btn reset" onclick="resetProduction()">Reset</button>
-    <button class="action-btn summary" onclick="openSummary()">Summary</button>
+    <button class="action-btn start" onclick="startProduction()"><span class="btn-icon">▶</span><span>Start</span></button>
+    <button class="action-btn stop" onclick="stopProduction()"><span class="btn-icon">■</span><span>Stop</span></button>
+    <button class="action-btn reset" onclick="resetProduction()"><span class="btn-icon">↻</span><span>Reset</span></button>
+    <button class="action-btn summary" onclick="openSummary()"><span class="btn-icon">▥</span><span>Summary</span></button>
     <button class="action-btn utility" id="ramadanToggle" onclick="toggleRamadan()">Ramadhan : OFF</button>
   </section>
 
@@ -51,19 +51,19 @@
         <div class="panel-title">Scan Input</div>
         <div class="scan-stack">
           <div class="scan-row">
-            <span class="scan-icon">1</span>
+            <span class="scan-icon">🚘</span>
             <input type="text" id="chassisInput" class="scan-box" placeholder="Scan Chassis" autofocus>
           </div>
           <div class="scan-row">
-            <span class="scan-icon">2</span>
+            <span class="scan-icon">🚗</span>
             <input type="text" id="modelInput" class="scan-box" placeholder="Scan Model">
           </div>
           <div class="scan-row">
-            <span class="scan-icon">3</span>
+            <span class="scan-icon">⚙</span>
             <input type="text" id="engineInput" class="scan-box" placeholder="Scan Engine No">
           </div>
           <div class="scan-row">
-            <span class="scan-icon">4</span>
+            <span class="scan-icon">🔑</span>
             <input type="text" id="keyInput" class="scan-box" placeholder="Scan Key No">
           </div>
         </div>

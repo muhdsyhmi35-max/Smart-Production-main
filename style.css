@@ -28,64 +28,64 @@ body {
 }
 
 .app-shell {
-  width: min(1600px, calc(100vw - 24px));
-  margin: 10px auto;
-  padding: 10px 12px 14px;
-  border: 1px solid rgba(90, 137, 190, 0.32);
-  border-radius: 14px;
+  width: min(1570px, calc(100vw - 18px));
+  margin: 6px auto;
+  padding: 8px 10px 12px;
+  border: 1px solid rgba(90, 137, 190, 0.36);
+  border-radius: 10px;
   background: linear-gradient(180deg, rgba(5, 11, 22, 0.96), rgba(3, 8, 18, 0.98));
   box-shadow: inset 0 0 0 1px rgba(137, 181, 231, 0.08), 0 20px 44px rgba(0, 0, 0, 0.45);
 }
 
 .top-header {
   position: relative;
-  padding: 2px 42px 12px;
+  padding: 0 42px 10px;
   border-bottom: 1px solid rgba(89, 130, 183, 0.2);
 }
 
 .header-title {
   text-align: center;
   color: #7ef0ff;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 800;
-  letter-spacing: 1px;
-  text-shadow: 0 0 16px rgba(66, 216, 255, 0.18);
+  letter-spacing: 1.2px;
+  text-shadow: 0 0 14px rgba(66, 216, 255, 0.14);
 }
 
 .datetime-panel {
   text-align: center;
-  padding: 4px 0 10px;
+  padding: 4px 0 8px;
 }
 
 #dateDisplay {
   color: #d2dae8;
-  font-size: 14px;
-  margin-bottom: 4px;
+  font-size: 13px;
+  margin-bottom: 2px;
 }
 
 #clock {
   color: #54ecff;
-  font-size: 52px;
+  font-size: 58px;
   font-weight: 300;
   line-height: 1;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
 }
 
 .card-panel,
 .panel-card,
 .metric-card {
   background: linear-gradient(180deg, rgba(7, 17, 31, 0.96), rgba(5, 13, 24, 0.96));
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: inset 0 0 0 1px rgba(155, 205, 255, 0.04), 0 10px 20px rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(72, 117, 172, 0.42);
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px rgba(155, 205, 255, 0.035), 0 8px 14px rgba(0, 0, 0, 0.18);
 }
 
 .toolbar {
   display: grid;
   grid-template-columns: 1.05fr 1.05fr 1.2fr repeat(5, minmax(90px, 1fr));
-  gap: 12px;
-  padding: 10px 12px;
-  margin-bottom: 12px;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
   align-items: end;
 }
 
@@ -99,20 +99,20 @@ body {
 .control-field span {
   flex: 0 0 auto;
   color: #d7e0ec;
-  font-size: 14px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
 .control-field input {
   width: 100%;
   min-width: 0;
-  height: 36px;
-  padding: 6px 12px;
+  height: 28px;
+  padding: 4px 10px;
   border-radius: 4px;
   border: 1px solid rgba(120, 147, 182, 0.45);
   background: rgba(13, 23, 38, 0.95);
   color: #f2f7ff;
-  font-size: 18px;
+  font-size: 16px;
   text-align: center;
   outline: none;
 }
@@ -122,14 +122,23 @@ body {
 }
 
 .action-btn {
-  height: 36px;
+  height: 30px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 4px;
   color: #fff;
-  font-size: 15px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   transition: transform 0.15s ease, filter 0.2s ease;
+}
+
+.btn-icon {
+  font-size: 12px;
+  line-height: 1;
 }
 
 .action-btn:hover {
@@ -143,50 +152,50 @@ body {
 .action-btn.summary { background: linear-gradient(180deg, #315ec8, #20408d); }
 .action-btn.utility {
   background: linear-gradient(180deg, #33455e, #1a2535);
-  font-size: 13px;
+  font-size: 11px;
 }
 
 .main-grid {
   display: grid;
   grid-template-columns: 1.2fr 2.25fr 1fr;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .left-column,
 .metrics-column,
 .right-column {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .left-column {
-  grid-template-rows: minmax(250px, auto) minmax(98px, auto);
+  grid-template-rows: minmax(218px, auto) minmax(120px, auto);
 }
 
 .panel-card {
-  padding: 12px;
+  padding: 10px;
 }
 
 .panel-title,
 .metric-card h3 {
   margin: 0 0 10px;
   color: #4bb8ff;
-  font-size: 15px;
+  font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.9px;
   text-transform: uppercase;
 }
 
 .scan-stack {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .scan-row {
   display: grid;
   grid-template-columns: 34px 1fr;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
 
@@ -195,23 +204,23 @@ body {
   place-items: center;
   width: 34px;
   height: 34px;
-  border: 1px solid rgba(93, 147, 200, 0.45);
+  border: 1px solid rgba(93, 147, 200, 0.35);
   border-radius: 6px;
-  color: #7acbff;
-  font-size: 14px;
-  font-weight: 700;
+  color: #d9e7ff;
+  font-size: 16px;
+  font-weight: 400;
   background: linear-gradient(180deg, rgba(14, 31, 53, 0.9), rgba(8, 20, 35, 0.95));
 }
 
 .scan-box {
   width: 100%;
-  height: 38px;
-  padding: 6px 14px;
-  border-radius: 7px;
+  height: 34px;
+  padding: 6px 12px;
+  border-radius: 4px;
   border: 1px solid rgba(97, 130, 161, 0.42);
   background: linear-gradient(180deg, rgba(14, 28, 45, 0.95), rgba(8, 18, 31, 0.96));
   color: #f0f6ff;
-  font-size: 15px;
+  font-size: 13px;
   text-align: left;
   outline: none;
 }
@@ -230,18 +239,18 @@ body {
   display: grid;
   place-items: center;
   border: 1px solid rgba(74, 166, 92, 0.42);
-  border-radius: 8px;
+  border-radius: 6px;
   background: linear-gradient(180deg, rgba(12, 32, 18, 0.86), rgba(8, 20, 13, 0.96));
 }
 
 .status-display #status {
-  font-size: 28px;
+  font-size: 20px;
   line-height: 1;
 }
 
 .status-subtext {
   color: #d7e4d3;
-  font-size: 14px;
+  font-size: 12px;
   margin-top: 4px;
 }
 
@@ -252,27 +261,27 @@ body {
 .metric-row.two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 8px;
 }
 
 .metric-card {
-  padding: 14px 16px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  min-height: 96px;
+  min-height: 108px;
   text-align: center;
 }
 
 .countdown-card {
-  min-height: 192px;
+  min-height: 170px;
 }
 
 .countdown-card #countdown {
-  font-size: 92px;
+  font-size: 78px;
   color: #48ecff;
-  text-shadow: 0 0 16px rgba(72, 236, 255, 0.14);
+  text-shadow: 0 0 14px rgba(72, 236, 255, 0.12);
 }
 
 .right-column {
@@ -280,13 +289,23 @@ body {
 }
 
 .right-card {
-  min-height: 120px;
+  min-height: 110px;
 }
 
 .big-number {
-  font-size: 56px;
+  font-size: 48px;
   font-weight: 800;
   line-height: 1;
+}
+
+#delay,
+#efficiency,
+#actual,
+#expected,
+#plan,
+#balance,
+#downtime {
+  font-size: 42px;
 }
 
 .status-green { color: var(--green); }
@@ -313,13 +332,13 @@ body {
 }
 
 .history-section {
-  padding: 12px;
+  padding: 10px;
 }
 
 .table-wrapper {
   overflow-x: auto;
   border: 1px solid var(--border-soft);
-  border-radius: 8px;
+  border-radius: 6px;
   background: rgba(6, 13, 24, 0.9);
 }
 
@@ -331,9 +350,9 @@ table {
 
 th,
 td {
-  padding: 10px 8px;
+  padding: 8px 8px;
   text-align: center;
-  font-size: 13px;
+  font-size: 12px;
   border-bottom: 1px solid rgba(82, 116, 152, 0.15);
 }
 
@@ -342,7 +361,7 @@ th {
   background: rgba(12, 24, 42, 0.95);
   font-weight: 700;
   text-transform: uppercase;
-  font-size: 12px;
+  font-size: 11px;
   letter-spacing: 0.5px;
 }
 
@@ -358,11 +377,11 @@ tbody tr:nth-child(odd) {
   position: absolute;
   right: 0;
   top: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
+  width: 30px;
+  height: 30px;
+  border-radius: 4px;
   border: 1px solid rgba(104, 148, 204, 0.45);
-  background: linear-gradient(180deg, #1b39a9, #132774);
+  background: linear-gradient(180deg, #2349d6, #1b3399);
   color: #dff6ff;
   cursor: pointer;
 }
