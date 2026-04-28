@@ -201,6 +201,8 @@ th{
   align-items:center;
   gap:10px;
   flex-wrap:wrap;
+  /* Lift action buttons slightly to align with input boxes */
+  transform:translateY(-3px);
 }
 
 .controls button{
