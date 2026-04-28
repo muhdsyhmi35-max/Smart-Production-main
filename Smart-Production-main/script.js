@@ -112,10 +112,20 @@ function parseMmSsToSeconds(text) {
   if (sheetDateLike) {
     const timeMatch = t.match(/T(\d{2}):(\d{2}):(\d{2})/);
     if (timeMatch) {
+      const h = parseInt(timeMatch[1], 10);
       const m = parseInt(timeMatch[2], 10);
       const s = parseInt(timeMatch[3], 10);
-      if ([m, s].every(Number.isFinite)) {
-        // Treat Sheet 1899/1900 artifacts as duration MM:SS (ignore hour timezone offsets).
+      if ([h, m, s].every(Number.isFinite)) {
+        // Some locales serialize duration 00:03 as 1899-12-29T17:07:35.000Z.
+        // Decode by removing the legacy KL base offset (17:04:35) when detected.
+        const total = (h * 3600) + (m * 60) + s;
+        const klLegacyBase = (17 * 3600) + (4 * 60) + 35;
+        const shifted = total - klLegacyBase;
+        if (shifted >= 0 && shifted <= 12 * 3600) {
+          return shifted;
+        }
+
+        // Fallback: keep MM:SS behavior for other sheet artifacts.
         return Math.max((m * 60) + s, 0);
       }
     }
