@@ -35,6 +35,18 @@ body::-webkit-scrollbar{
   height:0;
 }
 
+/* Also hide scrollbars on any nested scroll containers */
+*{
+  scrollbar-width:none;
+  -ms-overflow-style:none;
+}
+
+*::-webkit-scrollbar{
+  width:0;
+  height:0;
+  display:none;
+}
+
 /* HEADER */
 .header{
   font-size:var(--header-size);
