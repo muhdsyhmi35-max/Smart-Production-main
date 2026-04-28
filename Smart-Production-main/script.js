@@ -60,6 +60,7 @@ let firebaseLiveStateRef = null;
 let isApplyingRemoteCommand = false;
 let hasLocalSession = false;
 let liveCountdownInterval = null;
+let monitorDowntimeOverrideSec = null;
 const syncClientId = localStorage.getItem("SYNC_CLIENT_ID") || ("SYNC-" + Math.random().toString(36).slice(2));
 localStorage.setItem("SYNC_CLIENT_ID", syncClientId);
 
@@ -187,6 +188,15 @@ function syncDowntimeSecondsFromTable() {
 }
 
 function refreshDowntimeCardFromTable() {
+  // Monitor: use Firebase downtime so it matches main PC instantly
+  // (Sheet scan table can lag a few seconds behind).
+  if (isMonitor && Number.isFinite(monitorDowntimeOverrideSec) && monitorDowntimeOverrideSec >= 0) {
+    downtimeSeconds = monitorDowntimeOverrideSec;
+    document.getElementById("downtime").innerText = format(monitorDowntimeOverrideSec);
+    renderDowntimeDebugPanel();
+    return;
+  }
+
   const table = document.getElementById("scanTable");
   const total = table && table.rows.length > 0
     ? sumBookedDowntimeFromScanTable()
@@ -641,6 +651,10 @@ function applyLiveState(state) {
   const delay = parseInt(state.delay, 10) || 0;
   const efficiency = parseInt(state.efficiency, 10) || 0;
   const lotNo = state.lotNo || "";
+  const fbTotalDowntime = Number(state.totalDowntime);
+  if (isMonitor && Number.isFinite(fbTotalDowntime) && fbTotalDowntime >= 0) {
+    monitorDowntimeOverrideSec = fbTotalDowntime;
+  }
 
   // Keep local variables aligned so refresh doesn't revert values.
   actualCount = actual;
@@ -671,7 +685,11 @@ function applyLiveState(state) {
   document.getElementById("actual").innerText = actual;
   startLiveCountdownTicker(countdown, status, state.updatedAt);
   syncDowntimeSecondsFromTable();
-  document.getElementById("downtime").innerText = format(getBookedDowntimeSec());
+  if (isMonitor && Number.isFinite(monitorDowntimeOverrideSec) && monitorDowntimeOverrideSec >= 0) {
+    document.getElementById("downtime").innerText = format(monitorDowntimeOverrideSec);
+  } else {
+    document.getElementById("downtime").innerText = format(getBookedDowntimeSec());
+  }
   document.getElementById("expected").innerText = expected;
   if (state.lastScanAtMs) {
     lastScanTime = new Date(Number(state.lastScanAtMs));
