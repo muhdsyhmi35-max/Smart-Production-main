@@ -61,6 +61,9 @@ let isApplyingRemoteCommand = false;
 let hasLocalSession = false;
 let liveCountdownInterval = null;
 let monitorDowntimeOverrideSec = null;
+let initialLiveStateLoaded = false;
+const firebaseSessionStartedAt = Date.now();
+const LOCAL_LIVE_STATE_KEY = "TF2_LIVE_STATE_SNAPSHOT";
 const syncClientId = localStorage.getItem("SYNC_CLIENT_ID") || ("SYNC-" + Math.random().toString(36).slice(2));
 localStorage.setItem("SYNC_CLIENT_ID", syncClientId);
 
@@ -457,6 +460,10 @@ function initFirebaseSync() {
     const command = snapshot.val();
     if (!command || !command.action) return;
     if (command.sender === syncClientId) return;
+    const sentAt = Number(command.sentAt) || 0;
+    // Ignore historical commands when a page first attaches. Replaying an old
+    // stop/reset on reopen can wipe a valid running session before restore.
+    if (sentAt > 0 && sentAt < firebaseSessionStartedAt) return;
     applyRemoteCommand(command.action);
   });
 
@@ -499,6 +506,29 @@ function publishLiveStateToFirebase(state) {
   }).catch(err => {
     console.log("Firebase live state publish error:", err);
   });
+}
+
+function saveLocalLiveStateSnapshot(state) {
+  try {
+    localStorage.setItem(LOCAL_LIVE_STATE_KEY, JSON.stringify({
+      ...state,
+      updatedAt: Date.now()
+    }));
+  } catch (err) {
+    console.log("Local live state save error:", err);
+  }
+}
+
+function readLocalLiveStateSnapshot() {
+  try {
+    const raw = localStorage.getItem(LOCAL_LIVE_STATE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch (err) {
+    console.log("Local live state read error:", err);
+    return null;
+  }
 }
 
 function stopLiveCountdownTicker() {
@@ -575,6 +605,10 @@ function restoreProductionTimerFromLiveState(status, countdown, expected, synced
 
   if (actualCount > 0) {
     lastScanTime = syncedLastScanAtMs ? new Date(Number(syncedLastScanAtMs)) : reconstructedBaseTime;
+  } else {
+    // If production was started manually (no completed scan yet), base the countdown
+    // on reconstructed start time so refresh does not "reset" the timer.
+    startTime = reconstructedBaseTime;
   }
 
   // Downtime is booked on each completed 4-scan (same as the scan table). Offline gap is
@@ -754,9 +788,25 @@ function loadInitialLiveState() {
 
   firebaseLiveStateRef.once("value")
     .then(snapshot => {
-      const liveState = snapshot.val();
+      const firebaseState = snapshot.val();
+      const localState = readLocalLiveStateSnapshot();
+      let liveState = firebaseState;
+
+      const firebaseUpdatedAt = Number(firebaseState && firebaseState.updatedAt) || 0;
+      const localUpdatedAt = Number(localState && localState.updatedAt) || 0;
+
+      // Refresh on the same PC should prefer the fresher local snapshot if Firebase
+      // was temporarily overwritten with READY/0 during reload.
+      if (localState && localUpdatedAt > firebaseUpdatedAt) {
+        liveState = {
+          ...(firebaseState || {}),
+          ...localState
+        };
+      }
+
       if (!liveState) return;
       applyLiveState(liveState);
+      initialLiveStateLoaded = true;
     })
     .catch(err => console.log("Firebase initial live state error:", err));
 }
@@ -1525,6 +1575,25 @@ function updateLiveStateOnly() {
   const status = document.getElementById("status").innerText.trim();
   const lotNo = document.getElementById("lotInput").value || "";
   const bookedDowntime = getBookedDowntimeSec();
+  const liveStatePayload = {
+    plan: plan,
+    dailyPlan: plan,
+    cycleTimeMin: cycleTimeMin,
+    actual: actual,
+    balance: balance,
+    lotNo: lotNo,
+    status: status,
+    countdown: countdownValue,
+    bookedDowntime: bookedDowntime,
+    totalDowntime: bookedDowntime,
+    expected: expected,
+    delay: delay,
+    efficiency: efficiency,
+    firstScanAtMs: firstScanAtMs,
+    lastScanAtMs: lastScanTime ? lastScanTime.getTime() : null
+  };
+
+  saveLocalLiveStateSnapshot(liveStatePayload);
 
   fetch(API_URL, {
     method: "POST",
@@ -1548,23 +1617,7 @@ function updateLiveStateOnly() {
     })
   });
 
-  publishLiveStateToFirebase({
-    plan: plan,
-    dailyPlan: plan,
-    cycleTimeMin: cycleTimeMin,
-    actual: actual,
-    balance: balance,
-    lotNo: lotNo,
-    status: status,
-    countdown: countdownValue,
-    bookedDowntime: bookedDowntime,
-    totalDowntime: bookedDowntime,
-    expected: expected,
-    delay: delay,
-    efficiency: efficiency,
-    firstScanAtMs: firstScanAtMs,
-    lastScanAtMs: lastScanTime ? lastScanTime.getTime() : null
-  });
+  publishLiveStateToFirebase(liveStatePayload);
 }
 
 function sendToSheet(chassis, model, engine, key, lot, status, downtimeEvent) {
@@ -1851,13 +1904,20 @@ window.onload = async function() {
     loadLiveData();
     setInterval(loadLiveData, 3000);
   } else {
-    // Push baseline settings so monitor immediately matches main dashboard.
-    hasLocalSession = true;
-    updateLiveStateOnly();
+    // IMPORTANT:
+    // On refresh, do not immediately publish "READY + countdown 0" to Firebase,
+    // otherwise it can overwrite an in-progress RUNNING state before we finish
+    // reading and applying the existing live state.
+    //
+    // We only start publishing after user interaction (inputs / scans) sets
+    // hasLocalSession = true, OR after live state has been loaded.
 
     // Reload scan history from Sheet after refresh (main screen).
     loadLiveData();
     setInterval(loadLiveData, 3000);
-    setInterval(updateLiveStateOnly, 1000);
+    setInterval(() => {
+      if (!initialLiveStateLoaded && !hasLocalSession) return;
+      updateLiveStateOnly();
+    }, 1000);
   }
 };
