@@ -1494,6 +1494,7 @@ function toggleHistoryPanel(forceOpen) {
 function toggleMenuDropdown(forceOpen) {
   const menu = document.getElementById("menuDropdown");
   if (!menu) return;
+  updateViewToggleMenuItem();
   if (typeof forceOpen === "boolean") {
     menu.classList.toggle("open", forceOpen);
     return;
@@ -1519,7 +1520,8 @@ function toggleRamadanFromMenu() {
 }
 
 function updateViewToggleMenuItem() {
-  const item = document.getElementById("viewToggleMenuItem");
+  const item = document.getElementById("viewToggleMenuItem")
+    || document.querySelector("#menuDropdown .menu-item");
   if (!item) return;
   item.innerText = document.body.classList.contains("summary-mode")
     ? "Main Page"
