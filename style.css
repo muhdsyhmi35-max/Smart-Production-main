@@ -453,13 +453,22 @@ body.summary-mode #historyPanel{
   display:none !important;
 }
 
+body.summary-mode{
+  overflow:hidden;
+}
+
 .summary-page{
   display:none;
-  margin:14px 20px 18px;
+  position:fixed;
+  top:70px;
+  left:20px;
+  right:20px;
+  bottom:16px;
   border:1px solid rgba(71,85,105,.55);
   border-radius:8px;
   background:rgba(8,13,25,.96);
   padding:14px;
+  overflow:hidden;
 }
 
 .summary-page.open{
@@ -502,9 +511,18 @@ body.summary-mode #historyPanel{
 }
 
 .summary-table-wrap{
-  max-height:52vh;
+  max-height:calc(100% - 170px);
   overflow:auto;
   margin-top:2px;
+}
+
+.summary-page table{
+  border-collapse:collapse;
+}
+
+.summary-page th,
+.summary-page td{
+  border:1px solid rgba(71,85,105,.55);
 }
 
 .summary-status-scanned{
