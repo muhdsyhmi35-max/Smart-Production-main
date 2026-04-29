@@ -472,6 +472,12 @@ tr:nth-child(even){background:#0b1220;}
   border-left:0;
   border-right:0;
   border-bottom:0;
+  border-collapse:collapse;
+}
+
+.history-panel th,
+.history-panel td{
+  border:1px solid rgba(71,85,105,.55);
 }
 
 body.summary-mode .datetime,
@@ -547,6 +553,7 @@ body.summary-mode{
 
 .summary-page table{
   border-collapse:collapse;
+  margin:0 !important;
 }
 
 .summary-page th,
