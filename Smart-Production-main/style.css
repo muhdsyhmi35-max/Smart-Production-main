@@ -486,7 +486,27 @@ tr:nth-child(even){background:#0b1220;}
   display:block;
 }
 
+body.history-mode #historyPanel.open{
+  display:flex;
+  flex-direction:column;
+  top:clamp(96px, 14vh, 150px);
+  left:20px;
+  right:20px;
+  bottom:16px;
+  width:auto;
+  max-height:none;
+  box-shadow:none;
+  z-index:10018;
+}
+
+body.history-mode #historyPanel.open .history-table-wrap{
+  flex:1 1 auto;
+  min-height:0;
+  max-height:none;
+}
+
 .history-panel-title{
+  flex:0 0 auto;
   padding:10px 14px;
   font-weight:700;
   color:#93c5fd;
@@ -523,6 +543,17 @@ body.summary-mode #historyPanel{
 }
 
 body.summary-mode{
+  overflow:hidden;
+}
+
+body.history-mode .datetime,
+body.history-mode .controls,
+body.history-mode .dashboard,
+body.history-mode .bottom-row{
+  display:none !important;
+}
+
+body.history-mode{
   overflow:hidden;
 }
 

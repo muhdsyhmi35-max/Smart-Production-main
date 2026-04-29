@@ -167,8 +167,8 @@ function sumBookedDowntimeFromScanTable() {
   const table = document.getElementById("scanTable");
   if (!table) return 0;
   Array.from(table.rows).forEach(tr => {
-    const downtimeCell = tr.cells[8];
-    const statusCell = tr.cells[7];
+    const downtimeCell = tr.cells[9];
+    const statusCell = tr.cells[8];
     if (!downtimeCell || !statusCell) return;
     if (statusCell.innerText.trim() !== "DOWN TIME") return;
     const cleaned = cleanDowntime(downtimeCell.innerText || "");
@@ -190,6 +190,15 @@ function syncDowntimeSecondsFromTable() {
   if (table && table.rows.length > 0) {
     downtimeSeconds = sumBookedDowntimeFromScanTable();
   }
+}
+
+function renumberScanTable() {
+  const table = document.getElementById("scanTable");
+  if (!table) return;
+  Array.from(table.rows).forEach((tr, i) => {
+    const noCell = tr.cells[1];
+    if (noCell) noCell.innerText = String(i + 1);
+  });
 }
 
 function refreshDowntimeCardFromTable() {
@@ -236,8 +245,8 @@ function renderDowntimeDebugPanel() {
   lines.push("Downtime Debug (DOWN TIME rows only)");
 
   Array.from(table.rows).forEach((tr, idx) => {
-    const statusCell = tr.cells[7];
-    const downtimeCell = tr.cells[8];
+    const statusCell = tr.cells[8];
+    const downtimeCell = tr.cells[9];
     const status = statusCell ? statusCell.innerText.trim() : "";
     const raw = downtimeCell ? String(downtimeCell.innerText || "").trim() : "";
     const cleaned = cleanDowntime(raw);
@@ -1041,15 +1050,16 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
     const row = document.getElementById("scanTable").insertRow(0);
 
     row.insertCell(0).innerText = now.toLocaleDateString();
-    row.insertCell(1).innerText = now.toLocaleTimeString();
-    row.insertCell(2).innerText = lot;
-    row.insertCell(3).innerText = model;
-    row.insertCell(4).innerText = chassis;
-    row.insertCell(5).innerText = engine;
-    row.insertCell(6).innerText = key;
+    row.insertCell(1).innerText = "";
+    row.insertCell(2).innerText = now.toLocaleTimeString();
+    row.insertCell(3).innerText = lot;
+    row.insertCell(4).innerText = model;
+    row.insertCell(5).innerText = chassis;
+    row.insertCell(6).innerText = engine;
+    row.insertCell(7).innerText = key;
 
-    const statusCell = row.insertCell(7);
-    const downtimeCell = row.insertCell(8);
+    const statusCell = row.insertCell(8);
+    const downtimeCell = row.insertCell(9);
 
     if (downtimeEvent) {
       statusCell.innerText = "DOWN TIME";
@@ -1061,6 +1071,8 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
       statusCell.classList.add("status-green");
       downtimeCell.innerText = "";
     }
+
+    renumberScanTable();
 
     // One completed 4-scan cycle = one actual unit.
     actualCount++;
@@ -1216,8 +1228,8 @@ function openSummary() {
   rows.forEach(row => {
     const cells = row.querySelectorAll("td");
     if (cells.length > 0) {
-      const statusCell = cells[7];
-      const downtimeCell = cells[8];
+      const statusCell = cells[8];
+      const downtimeCell = cells[9];
 
       let statusClass = "";
       if (statusCell.classList.contains("status-red")) {
@@ -1235,7 +1247,7 @@ function openSummary() {
 
       tableRows += `
 <tr>
-<td>${cells[0].innerText}</td> <td>${cells[1].innerText}</td> <td>${cells[2].innerText}</td> <td>${cells[3].innerText}</td> <td>${cells[4].innerText}</td> <td>${cells[5].innerText}</td> <td>${cells[6].innerText}</td> <td class="${statusClass}">${cells[7].innerText}</td> <td class="${downtimeClass}">${cells[8].innerText}</td> </tr>`;
+<td>${cells[0].innerText}</td> <td>${cells[1].innerText}</td> <td>${cells[2].innerText}</td> <td>${cells[3].innerText}</td> <td>${cells[4].innerText}</td> <td>${cells[5].innerText}</td> <td>${cells[6].innerText}</td> <td>${cells[7].innerText}</td> <td class="${statusClass}">${cells[8].innerText}</td> <td class="${downtimeClass}">${cells[9].innerText}</td> </tr>`;
     }
   });
 
@@ -1414,6 +1426,7 @@ print-color-adjust: exact;
 <thead>
 <tr>
 <th>Date</th>
+<th>#</th>
 <th>Time</th>
 <th>Lot</th>
 <th>Model</th>
@@ -1447,7 +1460,7 @@ ${tableRows}
 
 function downloadExcel() {
   const wb = XLSX.utils.book_new();
-  const data = [["Date", "Time", "Lot", "Model", "Chassis", "Engine No", "Key No", "Status", "Downtime"]];
+  const data = [["Date", "#", "Time", "Lot", "Model", "Chassis", "Engine No", "Key No", "Status", "Downtime"]];
 
   document.querySelectorAll("#scanTable tr").forEach(row => {
     const cells = row.querySelectorAll("td");
@@ -1461,7 +1474,8 @@ function downloadExcel() {
         cells[5].innerText,
         cells[6].innerText,
         cells[7].innerText,
-        cells[8].innerText
+        cells[8].innerText,
+        cells[9].innerText
       ]);
     }
   });
@@ -1469,7 +1483,7 @@ function downloadExcel() {
   const ws = XLSX.utils.aoa_to_sheet(data);
 
   for (let i = 1; i < data.length; i++) {
-    const cell = "E" + (i + 1);
+    const cell = "I" + (i + 1);
     if (ws[cell]) {
       if (ws[cell].v === "DOWN TIME") {
         ws[cell].s = { font: { color: { rgb: "FF0000" }, bold: true } };
@@ -1497,13 +1511,29 @@ function toggleFullScreen() {
 function toggleHistoryPanel(forceOpen) {
   const panel = document.getElementById("historyPanel");
   if (!panel) return;
+
+  let open;
   if (typeof forceOpen === "boolean") {
-    panel.classList.toggle("open", forceOpen);
-    if (forceOpen) triggerEnterAnimation(panel);
-    return;
+    open = forceOpen;
+  } else {
+    open = !panel.classList.contains("open");
   }
-  panel.classList.toggle("open");
-  if (panel.classList.contains("open")) triggerEnterAnimation(panel);
+
+  if (open) {
+    document.body.classList.remove("summary-mode");
+    const summaryPage = document.getElementById("summaryPage");
+    if (summaryPage) summaryPage.classList.remove("open");
+    document.body.classList.remove("graph-mode");
+    const graphPage = document.getElementById("graphPage");
+    if (graphPage) graphPage.classList.remove("open");
+    document.body.classList.add("history-mode");
+    panel.classList.add("open");
+    triggerEnterAnimation(panel);
+  } else {
+    document.body.classList.remove("history-mode");
+    panel.classList.remove("open");
+  }
+  updateViewToggleMenuItem();
 }
 
 function toggleMenuDropdown(forceOpen) {
@@ -1541,7 +1571,8 @@ function updateViewToggleMenuItem() {
     || document.querySelector("#menuDropdown .menu-item");
   if (!item) return;
   const onSubPage = document.body.classList.contains("summary-mode")
-    || document.body.classList.contains("graph-mode");
+    || document.body.classList.contains("graph-mode")
+    || document.body.classList.contains("history-mode");
   item.innerText = onSubPage
     ? "Main Page"
     : "Daily Summary";
@@ -1549,7 +1580,8 @@ function updateViewToggleMenuItem() {
 
 function toggleViewFromMenu() {
   if (document.body.classList.contains("summary-mode")
-    || document.body.classList.contains("graph-mode")) {
+    || document.body.classList.contains("graph-mode")
+    || document.body.classList.contains("history-mode")) {
     showMainPage();
   } else {
     showSummaryPage();
@@ -1560,10 +1592,13 @@ function showMainPage() {
   toggleMenuDropdown(false);
   document.body.classList.remove("summary-mode");
   document.body.classList.remove("graph-mode");
+  document.body.classList.remove("history-mode");
   const summaryPage = document.getElementById("summaryPage");
   if (summaryPage) summaryPage.classList.remove("open");
   const graphPage = document.getElementById("graphPage");
   if (graphPage) graphPage.classList.remove("open");
+  const historyPanel = document.getElementById("historyPanel");
+  if (historyPanel) historyPanel.classList.remove("open");
   triggerEnterAnimation(document.querySelector(".dashboard"));
   triggerEnterAnimation(document.querySelector(".bottom-row"));
   updateViewToggleMenuItem();
@@ -1628,10 +1663,10 @@ function collectHourlyGraphData() {
   rows.forEach(row => {
     const cells = row.querySelectorAll("td");
     if (cells.length === 0) return;
-    const hour = parseHourFromTimeText(cells[1]?.innerText || "");
+    const hour = parseHourFromTimeText(cells[2]?.innerText || "");
     if (hour == null) return;
     outputByHour[hour] = (outputByHour[hour] || 0) + 1;
-    const downtimeSec = parseMmSsToSeconds(cells[8]?.innerText || "");
+    const downtimeSec = parseMmSsToSeconds(cells[9]?.innerText || "");
     if (downtimeSec > 0) {
       downtimeByHour[hour] = (downtimeByHour[hour] || 0) + downtimeSec;
     }
@@ -1674,8 +1709,11 @@ function showGraphPage() {
   `;
 
   document.body.classList.remove("summary-mode");
+  document.body.classList.remove("history-mode");
   const summaryPage = document.getElementById("summaryPage");
   if (summaryPage) summaryPage.classList.remove("open");
+  const historyPanel = document.getElementById("historyPanel");
+  if (historyPanel) historyPanel.classList.remove("open");
   document.body.classList.add("graph-mode");
   graphPage.classList.add("open");
   triggerEnterAnimation(graphPage);
@@ -1696,7 +1734,7 @@ function showSummaryPage() {
   rows.forEach(row => {
     const cells = row.querySelectorAll("td");
     if (cells.length > 0) {
-      const statusText = (cells[7]?.innerText || "").trim().toUpperCase();
+      const statusText = (cells[8]?.innerText || "").trim().toUpperCase();
       const isDowntime = statusText === "DOWN TIME";
       const statusClass = isDowntime ? "summary-status-downtime" : "summary-status-scanned";
       const downtimeClass = isDowntime ? "summary-downtime-red" : "";
@@ -1708,8 +1746,9 @@ function showSummaryPage() {
         <td>${cells[4].innerText}</td>
         <td>${cells[5].innerText}</td>
         <td>${cells[6].innerText}</td>
-        <td class="${statusClass}">${cells[7].innerText}</td>
-        <td class="${downtimeClass}">${cells[8].innerText}</td>
+        <td>${cells[7].innerText}</td>
+        <td class="${statusClass}">${cells[8].innerText}</td>
+        <td class="${downtimeClass}">${cells[9].innerText}</td>
       </tr>`;
     }
   });
@@ -1737,7 +1776,7 @@ function showSummaryPage() {
       <table>
         <thead>
           <tr>
-            <th>Date</th><th>Time</th><th>Lot</th><th>Model</th><th>Chassis</th><th>Engine No</th><th>Key No</th><th>Status</th><th>Downtime</th>
+            <th>Date</th><th>#</th><th>Time</th><th>Lot</th><th>Model</th><th>Chassis</th><th>Engine No</th><th>Key No</th><th>Status</th><th>Downtime</th>
           </tr>
         </thead>
         <tbody>${tableRows}</tbody>
@@ -1747,8 +1786,11 @@ function showSummaryPage() {
 
   document.body.classList.add("summary-mode");
   document.body.classList.remove("graph-mode");
+  document.body.classList.remove("history-mode");
   const graphPage = document.getElementById("graphPage");
   if (graphPage) graphPage.classList.remove("open");
+  const historyPanel = document.getElementById("historyPanel");
+  if (historyPanel) historyPanel.classList.remove("open");
   summaryPage.classList.add("open");
   triggerEnterAnimation(summaryPage);
   updateViewToggleMenuItem();
@@ -1764,24 +1806,20 @@ function triggerEnterAnimation(el) {
 
 document.addEventListener("click", (event) => {
   const menu = document.getElementById("menuDropdown");
-  const panel = document.getElementById("historyPanel");
   const menuBtn = event.target.closest(".menu-btn");
   const clickedMenu = event.target.closest("#menuDropdown");
-  const clickedInside = event.target.closest("#historyPanel");
 
   if (menu && menu.classList.contains("open") && !menuBtn && !clickedMenu) {
     toggleMenuDropdown(false);
-  }
-
-  if (panel && panel.classList.contains("open") && !menuBtn && !clickedInside) {
-    toggleHistoryPanel(false);
   }
 });
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     toggleMenuDropdown(false);
-    toggleHistoryPanel(false);
+    if (document.body.classList.contains("history-mode")) {
+      showMainPage();
+    }
   }
 });
 
@@ -2071,44 +2109,45 @@ function loadLiveData() {
 
           const fullDateTime = new Date(row[0]);
           newRow.insertCell(0).innerText = fullDateTime.toLocaleDateString("en-GB");
-          newRow.insertCell(1).innerText = fullDateTime.toLocaleTimeString("en-GB", {
+          newRow.insertCell(1).innerText = "";
+          newRow.insertCell(2).innerText = fullDateTime.toLocaleTimeString("en-GB", {
             hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true
           }).toLowerCase();
 
-          newRow.insertCell(2).innerText = legacyLayout
+          newRow.insertCell(3).innerText = legacyLayout
             ? (row[1] || "-")
             : idxLot >= 0
               ? (row[idxLot] || "-")
               : "-";
-          newRow.insertCell(3).innerText = legacyLayout
+          newRow.insertCell(4).innerText = legacyLayout
             ? (row[2] || "-")
             : idxModel >= 0
               ? (row[idxModel] || "-")
               : "-";
-          newRow.insertCell(4).innerText = legacyLayout
+          newRow.insertCell(5).innerText = legacyLayout
             ? (row[3] || "-")
             : idxChassis >= 0
               ? (row[idxChassis] || "-")
               : "-";
-          newRow.insertCell(5).innerText = legacyLayout
+          newRow.insertCell(6).innerText = legacyLayout
             ? (row[4] || "-")
             : idxEngine >= 0
               ? (row[idxEngine] || "-")
               : "-";
-          newRow.insertCell(6).innerText = legacyLayout
+          newRow.insertCell(7).innerText = legacyLayout
             ? (row[5] || "-")
             : idxKey >= 0
               ? (row[idxKey] || "-")
               : "-";
 
-          const statusCell = newRow.insertCell(7);
+          const statusCell = newRow.insertCell(8);
           const statusText = legacyLayout ? (row[6] || "") : idxStatus >= 0 ? (row[idxStatus] || "") : "";
           statusCell.innerText = statusText;
 
           if (statusText === "SCANNED") statusCell.className = "status-green";
           if (statusText === "DOWN TIME") statusCell.className = "status-red";
 
-          const downtimeCell = newRow.insertCell(8);
+          const downtimeCell = newRow.insertCell(9);
 
           if (statusText === "DOWN TIME") {
             const rawDowntime = pickBestDowntimeValue(row, idxDowntime, downtimeCandidateIdxs, legacyLayout);
@@ -2119,6 +2158,7 @@ function loadLiveData() {
             downtimeCell.innerText = "";
           }
         });
+        renumberScanTable();
         syncDowntimeSecondsFromTable();
         refreshDowntimeCardFromTable();
       }
