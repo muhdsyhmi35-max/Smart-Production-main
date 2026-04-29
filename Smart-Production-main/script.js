@@ -1615,7 +1615,9 @@ function toggleMenuDropdown(forceOpen) {
 
 function openHistoryPanelFromMenu() {
   toggleMenuDropdown(false);
-  toggleHistoryPanel(true);
+  // Delay open by a tick so outside-click handlers from the same click
+  // cannot immediately close the newly opened panel.
+  setTimeout(() => toggleHistoryPanel(true), 0);
 }
 
 function openSummaryFromMenu() {

@@ -363,13 +363,13 @@ tr:nth-child(even){background:#0b1220;}
   position:fixed;
   top:clamp(46px, 7vh, 72px);
   left:clamp(10px, 2vw, 20px);
-  min-width:180px;
+  min-width:140px;
   border:1px solid rgba(71,85,105,.55);
-  border-radius:8px;
+  border-radius:6px;
   background:rgba(8,13,25,.98);
   box-shadow:0 10px 28px rgba(0,0,0,.45);
   z-index:10030;
-  padding:6px;
+  padding:4px;
 }
 
 .menu-dropdown.open{
@@ -382,9 +382,9 @@ tr:nth-child(even){background:#0b1220;}
   background:rgba(30,41,59,.65);
   color:#cbd5e1;
   border:1px solid rgba(71,85,105,.45);
-  border-radius:6px;
-  padding:8px 10px;
-  font-size:14px;
+  border-radius:4px;
+  padding:6px 8px;
+  font-size:12px;
   font-weight:600;
   cursor:pointer;
 }
@@ -397,9 +397,9 @@ tr:nth-child(even){background:#0b1220;}
 .history-panel{
   display:none;
   position:fixed;
-  top:clamp(46px, 7vh, 72px);
+  top:clamp(52px, 8vh, 82px);
   left:clamp(10px, 2vw, 20px);
-  width:min(92vw, 1040px);
+  width:min(76vw, 820px);
   max-height:60vh;
   border:1px solid rgba(71,85,105,.55);
   border-radius:8px;
