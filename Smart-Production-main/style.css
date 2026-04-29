@@ -492,6 +492,18 @@ body.summary-mode{
   overflow:hidden;
 }
 
+body.graph-mode .datetime,
+body.graph-mode .controls,
+body.graph-mode .dashboard,
+body.graph-mode .bottom-row,
+body.graph-mode #historyPanel{
+  display:none !important;
+}
+
+body.graph-mode{
+  overflow:hidden;
+}
+
 .summary-page{
   display:none;
   position:fixed;
@@ -509,6 +521,24 @@ body.summary-mode{
 .summary-page.open{
   display:flex;
   flex-direction:column;
+}
+
+.graph-page{
+  display:none;
+  position:fixed;
+  top:clamp(96px, 14vh, 150px);
+  left:20px;
+  right:20px;
+  bottom:16px;
+  border:1px solid rgba(71,85,105,.55);
+  border-radius:8px;
+  background:rgba(8,13,25,.96);
+  padding:14px;
+  overflow:auto;
+}
+
+.graph-page.open{
+  display:block;
 }
 
 .summary-head{

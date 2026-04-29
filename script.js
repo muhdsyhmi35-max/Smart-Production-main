@@ -1539,8 +1539,11 @@ function toggleViewFromMenu() {
 function showMainPage() {
   toggleMenuDropdown(false);
   document.body.classList.remove("summary-mode");
+  document.body.classList.remove("graph-mode");
   const summaryPage = document.getElementById("summaryPage");
   if (summaryPage) summaryPage.classList.remove("open");
+  const graphPage = document.getElementById("graphPage");
+  if (graphPage) graphPage.classList.remove("open");
   updateViewToggleMenuItem();
 }
 
@@ -1595,6 +1598,66 @@ function buildSummaryBarChart(title, labels, values, color, valueSuffix = "") {
   `;
 }
 
+function collectHourlyGraphData() {
+  const rows = document.querySelectorAll("#scanTable tr");
+  const outputByHour = {};
+  const downtimeByHour = {};
+
+  rows.forEach(row => {
+    const cells = row.querySelectorAll("td");
+    if (cells.length === 0) return;
+    const hour = parseHourFromTimeText(cells[1]?.innerText || "");
+    if (hour == null) return;
+    outputByHour[hour] = (outputByHour[hour] || 0) + 1;
+    const downtimeSec = parseMmSsToSeconds(cells[8]?.innerText || "");
+    if (downtimeSec > 0) {
+      downtimeByHour[hour] = (downtimeByHour[hour] || 0) + downtimeSec;
+    }
+  });
+
+  const hourKeys = Array.from(new Set([
+    ...Object.keys(outputByHour),
+    ...Object.keys(downtimeByHour)
+  ].map(v => parseInt(v, 10)).filter(Number.isFinite))).sort((a, b) => a - b);
+  const labels = hourKeys.map(h => `${String(h).padStart(2, "0")}:00`);
+  const outputVals = hourKeys.map(h => outputByHour[h] || 0);
+  const downtimeMins = hourKeys.map(h => Math.round((downtimeByHour[h] || 0) / 60));
+  return { labels, outputVals, downtimeMins };
+}
+
+function showGraphPageFromMenu() {
+  toggleMenuDropdown(false);
+  showGraphPage();
+}
+
+function showGraphPage() {
+  const { labels, outputVals, downtimeMins } = collectHourlyGraphData();
+  const outputChart = buildSummaryBarChart("Output by Hour", labels, outputVals, "#22c55e");
+  const downtimeChart = buildSummaryBarChart("Downtime by Hour (min)", labels, downtimeMins, "#ef4444");
+
+  let graphPage = document.getElementById("graphPage");
+  if (!graphPage) {
+    graphPage = document.createElement("div");
+    graphPage.id = "graphPage";
+    graphPage.className = "graph-page";
+    document.body.appendChild(graphPage);
+  }
+
+  graphPage.innerHTML = `
+    <div class="summary-head">Graph</div>
+    <div class="summary-graphs">
+      <div class="summary-graph-card">${outputChart}</div>
+      <div class="summary-graph-card">${downtimeChart}</div>
+    </div>
+  `;
+
+  document.body.classList.remove("summary-mode");
+  const summaryPage = document.getElementById("summaryPage");
+  if (summaryPage) summaryPage.classList.remove("open");
+  document.body.classList.add("graph-mode");
+  graphPage.classList.add("open");
+}
+
 function showSummaryPage() {
   const plan = parseInt(document.getElementById("plan").innerText, 10) || 0;
   const actual = parseInt(document.getElementById("actual").innerText, 10) || 0;
@@ -1606,8 +1669,6 @@ function showSummaryPage() {
 
   const rows = document.querySelectorAll("#scanTable tr");
   let tableRows = "";
-  const outputByHour = {};
-  const downtimeByHour = {};
   rows.forEach(row => {
     const cells = row.querySelectorAll("td");
     if (cells.length > 0) {
@@ -1615,14 +1676,6 @@ function showSummaryPage() {
       const isDowntime = statusText === "DOWN TIME";
       const statusClass = isDowntime ? "summary-status-downtime" : "summary-status-scanned";
       const downtimeClass = isDowntime ? "summary-downtime-red" : "";
-      const hour = parseHourFromTimeText(cells[1]?.innerText || "");
-      if (hour != null) {
-        outputByHour[hour] = (outputByHour[hour] || 0) + 1;
-        const downtimeSec = parseMmSsToSeconds(cells[8]?.innerText || "");
-        if (downtimeSec > 0) {
-          downtimeByHour[hour] = (downtimeByHour[hour] || 0) + downtimeSec;
-        }
-      }
       tableRows += `<tr>
         <td>${cells[0].innerText}</td>
         <td>${cells[1].innerText}</td>
@@ -1636,17 +1689,6 @@ function showSummaryPage() {
       </tr>`;
     }
   });
-
-  const hourKeys = Array.from(new Set([
-    ...Object.keys(outputByHour),
-    ...Object.keys(downtimeByHour)
-  ].map(v => parseInt(v, 10)).filter(Number.isFinite))).sort((a, b) => a - b);
-  const labels = hourKeys.map(h => `${String(h).padStart(2, "0")}:00`);
-  const outputVals = hourKeys.map(h => outputByHour[h] || 0);
-  const downtimeMins = hourKeys.map(h => Math.round((downtimeByHour[h] || 0) / 60));
-
-  const outputChart = buildSummaryBarChart("Output by Hour", labels, outputVals, "#22c55e");
-  const downtimeChart = buildSummaryBarChart("Downtime by Hour (min)", labels, downtimeMins, "#ef4444");
 
   let summaryPage = document.getElementById("summaryPage");
   if (!summaryPage) {
@@ -1667,11 +1709,6 @@ function showSummaryPage() {
       <div class="summary-tile"><span>Downtime</span><strong>${downtime}</strong></div>
       <div class="summary-tile"><span>Efficiency</span><strong>${efficiency}</strong></div>
     </div>
-    <div class="summary-graph-title">Graph</div>
-    <div class="summary-graphs">
-      <div class="summary-graph-card">${outputChart}</div>
-      <div class="summary-graph-card">${downtimeChart}</div>
-    </div>
     <div class="summary-table-wrap">
       <table>
         <thead>
@@ -1685,6 +1722,9 @@ function showSummaryPage() {
   `;
 
   document.body.classList.add("summary-mode");
+  document.body.classList.remove("graph-mode");
+  const graphPage = document.getElementById("graphPage");
+  if (graphPage) graphPage.classList.remove("open");
   summaryPage.classList.add("open");
   updateViewToggleMenuItem();
 }
