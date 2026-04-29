@@ -196,7 +196,7 @@ function renumberScanTable() {
   const table = document.getElementById("scanTable");
   if (!table) return;
   Array.from(table.rows).forEach((tr, i) => {
-    const noCell = tr.cells[1];
+    const noCell = tr.cells[0];
     if (noCell) noCell.innerText = String(i + 1);
   });
 }
@@ -1049,8 +1049,8 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
 
     const row = document.getElementById("scanTable").insertRow(0);
 
-    row.insertCell(0).innerText = now.toLocaleDateString();
-    row.insertCell(1).innerText = "";
+    row.insertCell(0).innerText = "";
+    row.insertCell(1).innerText = now.toLocaleDateString();
     row.insertCell(2).innerText = now.toLocaleTimeString();
     row.insertCell(3).innerText = lot;
     row.insertCell(4).innerText = model;
@@ -1425,8 +1425,8 @@ print-color-adjust: exact;
 <table class="detail-table">
 <thead>
 <tr>
-<th>Date</th>
 <th>#</th>
+<th>Date</th>
 <th>Time</th>
 <th>Lot</th>
 <th>Model</th>
@@ -1460,7 +1460,7 @@ ${tableRows}
 
 function downloadExcel() {
   const wb = XLSX.utils.book_new();
-  const data = [["Date", "#", "Time", "Lot", "Model", "Chassis", "Engine No", "Key No", "Status", "Downtime"]];
+  const data = [["#", "Date", "Time", "Lot", "Model", "Chassis", "Engine No", "Key No", "Status", "Downtime"]];
 
   document.querySelectorAll("#scanTable tr").forEach(row => {
     const cells = row.querySelectorAll("td");
@@ -1776,7 +1776,7 @@ function showSummaryPage() {
       <table>
         <thead>
           <tr>
-            <th>Date</th><th>#</th><th>Time</th><th>Lot</th><th>Model</th><th>Chassis</th><th>Engine No</th><th>Key No</th><th>Status</th><th>Downtime</th>
+            <th>#</th><th>Date</th><th>Time</th><th>Lot</th><th>Model</th><th>Chassis</th><th>Engine No</th><th>Key No</th><th>Status</th><th>Downtime</th>
           </tr>
         </thead>
         <tbody>${tableRows}</tbody>
@@ -2108,8 +2108,8 @@ function loadLiveData() {
           const newRow = table.insertRow();
 
           const fullDateTime = new Date(row[0]);
-          newRow.insertCell(0).innerText = fullDateTime.toLocaleDateString("en-GB");
-          newRow.insertCell(1).innerText = "";
+          newRow.insertCell(0).innerText = "";
+          newRow.insertCell(1).innerText = fullDateTime.toLocaleDateString("en-GB");
           newRow.insertCell(2).innerText = fullDateTime.toLocaleTimeString("en-GB", {
             hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true
           }).toLowerCase();
