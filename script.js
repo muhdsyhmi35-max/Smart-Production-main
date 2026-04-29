@@ -1523,13 +1523,16 @@ function updateViewToggleMenuItem() {
   const item = document.getElementById("viewToggleMenuItem")
     || document.querySelector("#menuDropdown .menu-item");
   if (!item) return;
-  item.innerText = document.body.classList.contains("summary-mode")
+  const onSubPage = document.body.classList.contains("summary-mode")
+    || document.body.classList.contains("graph-mode");
+  item.innerText = onSubPage
     ? "Main Page"
     : "Daily Summary";
 }
 
 function toggleViewFromMenu() {
-  if (document.body.classList.contains("summary-mode")) {
+  if (document.body.classList.contains("summary-mode")
+    || document.body.classList.contains("graph-mode")) {
     showMainPage();
   } else {
     showSummaryPage();
