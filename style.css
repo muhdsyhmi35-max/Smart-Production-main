@@ -475,12 +475,11 @@ body.summary-mode{
   background:rgba(8,13,25,.96);
   padding:14px;
   overflow:hidden;
-  display:flex;
-  flex-direction:column;
 }
 
 .summary-page.open{
   display:flex;
+  flex-direction:column;
 }
 
 .summary-head{
