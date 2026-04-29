@@ -1538,7 +1538,7 @@ print-color-adjust: exact;
 <table class="detail-table">
 <thead>
 <tr>
-<th>#</th>
+<th>No</th>
 <th>Date</th>
 <th>Time</th>
 <th>Lot</th>
@@ -1573,7 +1573,7 @@ ${tableRows}
 
 function downloadExcel() {
   const wb = XLSX.utils.book_new();
-  const data = [["#", "Date", "Time", "Lot", "Model", "Chassis", "Engine No", "Key No", "Status", "Downtime"]];
+  const data = [["No", "Date", "Time", "Lot", "Model", "Chassis", "Engine No", "Key No", "Status", "Downtime"]];
 
   document.querySelectorAll("#scanTable tr").forEach(row => {
     const cells = row.querySelectorAll("td");
@@ -1889,7 +1889,7 @@ function showSummaryPage() {
       <table>
         <thead>
           <tr>
-            <th>#</th><th>Date</th><th>Time</th><th>Lot</th><th>Model</th><th>Chassis</th><th>Engine No</th><th>Key No</th><th>Status</th><th>Downtime</th>
+            <th>No</th><th>Date</th><th>Time</th><th>Lot</th><th>Model</th><th>Chassis</th><th>Engine No</th><th>Key No</th><th>Status</th><th>Downtime</th>
           </tr>
         </thead>
         <tbody>${tableRows}</tbody>
