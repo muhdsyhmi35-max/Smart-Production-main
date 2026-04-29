@@ -370,21 +370,25 @@ tr:nth-child(even){background:#0b1220;}
   position:absolute;
   left:clamp(10px, 2vw, 20px);
   top:clamp(8px, 2vh, 18px);
-  width:clamp(28px, 3.2vw, 36px);
-  height:clamp(28px, 3.2vw, 36px);
-  border:1px solid rgba(56,189,248,0.75);
+  width:clamp(20px, 3vw, 30px);
+  height:clamp(20px, 3vw, 30px);
+  border:1px solid rgba(148,163,184,0.35);
   border-radius:clamp(6px, 1vw, 10px);
-  background:rgba(30,58,138,0.9);
-  color:#e0f2fe;
-  font-size:clamp(16px, 1.8vw, 20px);
+  background:rgba(15,23,42,0.55);
+  color:#93c5fd;
+  font-size:clamp(10px, 1.5vw, 14px);
   line-height:1;
+  opacity:0.8;
   cursor:pointer;
-  z-index:10000;
-  box-shadow:0 0 0 1px rgba(2,6,23,.6), 0 4px 12px rgba(0,0,0,.45);
+  z-index:9999;
+  transition:opacity .2s ease, border-color .2s ease, background .2s ease, transform .2s ease;
 }
 
 .menu-btn:hover{
-  filter:brightness(1.12);
+  opacity:1;
+  border-color:rgba(147,197,253,0.55);
+  background:rgba(15,23,42,0.75);
+  transform:translateY(-1px);
 }
 
 .menu-dropdown{
