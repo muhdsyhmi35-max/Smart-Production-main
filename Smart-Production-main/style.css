@@ -342,7 +342,7 @@ table{
   background:#0b1324;
   border:1px solid rgba(71,85,105,.45);
   border-radius:8px;
-  overflow:hidden;
+  overflow:visible;
 }
 
 th,td{
@@ -567,6 +567,13 @@ body.summary-mode{
 }
 
 .summary-table-wrap thead th{
+  position:sticky;
+  top:0;
+  z-index:6;
+  background:#1e293b;
+}
+
+.history-table-wrap thead th{
   position:sticky;
   top:0;
   z-index:6;
