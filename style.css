@@ -360,16 +360,12 @@ tr:nth-child(even){background:#0b1220;}
 
 .history-panel{
   display:none;
-  position:fixed;
-  left:12px;
-  right:12px;
-  top:clamp(170px, 24vh, 260px);
+  margin:10px 20px 16px;
   border:1px solid rgba(71,85,105,.55);
   border-radius:8px;
   background:rgba(8,13,25,.96);
   box-shadow:0 10px 28px rgba(0,0,0,.45);
   overflow:hidden;
-  z-index:9998;
 }
 
 .history-panel.open{
@@ -385,7 +381,7 @@ tr:nth-child(even){background:#0b1220;}
 }
 
 .history-table-wrap{
-  max-height:42vh;
+  max-height:38vh;
   overflow:auto;
 }
 
