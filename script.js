@@ -1518,11 +1518,28 @@ function toggleRamadanFromMenu() {
   toggleRamadan();
 }
 
+function updateViewToggleMenuItem() {
+  const item = document.getElementById("viewToggleMenuItem");
+  if (!item) return;
+  item.innerText = document.body.classList.contains("summary-mode")
+    ? "Main Page"
+    : "Daily Summary";
+}
+
+function toggleViewFromMenu() {
+  if (document.body.classList.contains("summary-mode")) {
+    showMainPage();
+  } else {
+    showSummaryPage();
+  }
+}
+
 function showMainPage() {
   toggleMenuDropdown(false);
   document.body.classList.remove("summary-mode");
   const summaryPage = document.getElementById("summaryPage");
   if (summaryPage) summaryPage.classList.remove("open");
+  updateViewToggleMenuItem();
 }
 
 function showSummaryPage() {
@@ -1539,7 +1556,21 @@ function showSummaryPage() {
   rows.forEach(row => {
     const cells = row.querySelectorAll("td");
     if (cells.length > 0) {
-      tableRows += `<tr>${Array.from(cells).map(c => `<td>${c.innerText}</td>`).join("")}</tr>`;
+      const statusText = (cells[7]?.innerText || "").trim().toUpperCase();
+      const isDowntime = statusText === "DOWN TIME";
+      const statusClass = isDowntime ? "summary-status-downtime" : "summary-status-scanned";
+      const downtimeClass = isDowntime ? "summary-downtime-red" : "";
+      tableRows += `<tr>
+        <td>${cells[0].innerText}</td>
+        <td>${cells[1].innerText}</td>
+        <td>${cells[2].innerText}</td>
+        <td>${cells[3].innerText}</td>
+        <td>${cells[4].innerText}</td>
+        <td>${cells[5].innerText}</td>
+        <td>${cells[6].innerText}</td>
+        <td class="${statusClass}">${cells[7].innerText}</td>
+        <td class="${downtimeClass}">${cells[8].innerText}</td>
+      </tr>`;
     }
   });
 
@@ -1576,6 +1607,7 @@ function showSummaryPage() {
 
   document.body.classList.add("summary-mode");
   summaryPage.classList.add("open");
+  updateViewToggleMenuItem();
 }
 
 document.addEventListener("click", (event) => {
@@ -2004,4 +2036,5 @@ window.onload = async function() {
     setInterval(loadLiveData, 3000);
     setInterval(updateLiveStateOnly, 2000);
   }
+  updateViewToggleMenuItem();
 };

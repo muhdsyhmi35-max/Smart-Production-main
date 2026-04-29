@@ -477,7 +477,7 @@ body.summary-mode #historyPanel{
   display:grid;
   grid-template-columns:repeat(4, minmax(0,1fr));
   gap:10px;
-  margin-bottom:12px;
+  margin-bottom:4px;
 }
 
 .summary-tile{
@@ -504,6 +504,18 @@ body.summary-mode #historyPanel{
 .summary-table-wrap{
   max-height:52vh;
   overflow:auto;
+  margin-top:2px;
+}
+
+.summary-status-scanned{
+  color:#22c55e;
+  font-weight:700;
+}
+
+.summary-status-downtime,
+.summary-downtime-red{
+  color:#ef4444;
+  font-weight:700;
 }
 
 /* Fullscreen layout tuning for TV: keep dashboard on first screen,
