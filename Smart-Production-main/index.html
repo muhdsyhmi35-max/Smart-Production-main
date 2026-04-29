@@ -13,7 +13,12 @@
 <body>
 
 <div class="header">
-    <button class="menu-btn" onclick="toggleHistoryPanel()" aria-label="Toggle history menu">☰</button>
+    <button class="menu-btn" onclick="toggleMenuDropdown()" aria-label="Toggle menu">☰</button>
+    <div id="menuDropdown" class="menu-dropdown">
+      <button class="menu-item" onclick="openHistoryPanelFromMenu()">History</button>
+      <button class="menu-item" onclick="openSummaryFromMenu()">Daily Summary</button>
+      <button class="menu-item" id="ramadanToggle" onclick="toggleRamadanFromMenu()">🌙 Ramadhan : OFF</button>
+    </div>
     TF 2 PRODUCTION MONITORING SYSTEM
     <button class="fullscreen-btn" onclick="toggleFullScreen()">⛶</button>
 </div>
@@ -43,11 +48,6 @@
 <button class="start" onclick="startProduction()">Start</button>
 <button class="stop" onclick="stopProduction()">Stop</button>
 <button class="reset" onclick="resetProduction()">Reset</button>
-<button class="summary" onclick="openSummary()">Daily Summary</button>
-
-<button class="summary" id="ramadanToggle" onclick="toggleRamadan()">
-🌙 Ramadhan : OFF
-</button>
 </div>
 
 </div>

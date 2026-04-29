@@ -1491,17 +1491,50 @@ function toggleHistoryPanel(forceOpen) {
   panel.classList.toggle("open");
 }
 
+function toggleMenuDropdown(forceOpen) {
+  const menu = document.getElementById("menuDropdown");
+  if (!menu) return;
+  if (typeof forceOpen === "boolean") {
+    menu.classList.toggle("open", forceOpen);
+    return;
+  }
+  menu.classList.toggle("open");
+}
+
+function openHistoryPanelFromMenu() {
+  toggleMenuDropdown(false);
+  toggleHistoryPanel(true);
+}
+
+function openSummaryFromMenu() {
+  toggleMenuDropdown(false);
+  openSummary();
+}
+
+function toggleRamadanFromMenu() {
+  toggleMenuDropdown(false);
+  toggleRamadan();
+}
+
 document.addEventListener("click", (event) => {
+  const menu = document.getElementById("menuDropdown");
   const panel = document.getElementById("historyPanel");
-  if (!panel || !panel.classList.contains("open")) return;
   const menuBtn = event.target.closest(".menu-btn");
+  const clickedMenu = event.target.closest("#menuDropdown");
   const clickedInside = event.target.closest("#historyPanel");
-  if (menuBtn || clickedInside) return;
-  toggleHistoryPanel(false);
+
+  if (menu && menu.classList.contains("open") && !menuBtn && !clickedMenu) {
+    toggleMenuDropdown(false);
+  }
+
+  if (panel && panel.classList.contains("open") && !menuBtn && !clickedInside) {
+    toggleHistoryPanel(false);
+  }
 });
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
+    toggleMenuDropdown(false);
     toggleHistoryPanel(false);
   }
 });

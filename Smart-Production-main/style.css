@@ -387,6 +387,42 @@ tr:nth-child(even){background:#0b1220;}
   filter:brightness(1.12);
 }
 
+.menu-dropdown{
+  display:none;
+  position:fixed;
+  top:clamp(46px, 7vh, 72px);
+  left:clamp(10px, 2vw, 20px);
+  min-width:180px;
+  border:1px solid rgba(71,85,105,.55);
+  border-radius:8px;
+  background:rgba(8,13,25,.98);
+  box-shadow:0 10px 28px rgba(0,0,0,.45);
+  z-index:10030;
+  padding:6px;
+}
+
+.menu-dropdown.open{
+  display:block;
+}
+
+.menu-item{
+  width:100%;
+  text-align:left;
+  background:rgba(30,41,59,.65);
+  color:#cbd5e1;
+  border:1px solid rgba(71,85,105,.45);
+  border-radius:6px;
+  padding:8px 10px;
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+}
+
+.menu-item:hover{
+  background:rgba(59,130,246,.25);
+  color:#e2e8f0;
+}
+
 .history-panel{
   display:none;
   position:fixed;
