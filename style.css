@@ -321,3 +321,44 @@ th{
   color:#60a5fa;
 }
 tr:nth-child(even){background:#0f172a;}
+
+/* Fullscreen layout tuning for TV: keep dashboard on first screen,
+   push table below fold, and scale cards/text to viewport. */
+:fullscreen .header,
+:-webkit-full-screen .header{
+  padding:clamp(14px, 2vh, 28px);
+}
+
+:fullscreen .controls,
+:-webkit-full-screen .controls{
+  margin:clamp(8px, 1.8vh, 18px) clamp(10px, 1.6vw, 24px);
+  padding:clamp(8px, 1.6vh, 14px) clamp(10px, 1.4vw, 18px);
+}
+
+:fullscreen .dashboard,
+:-webkit-full-screen .dashboard,
+:fullscreen .bottom-row,
+:-webkit-full-screen .bottom-row{
+  margin:clamp(8px, 1.5vh, 16px) clamp(10px, 1.4vw, 18px);
+  gap:clamp(10px, 1.2vw, 16px);
+}
+
+:fullscreen .card,
+:-webkit-full-screen .card{
+  min-height:clamp(95px, 15vh, 150px);
+}
+
+:fullscreen .card h3,
+:-webkit-full-screen .card h3{
+  font-size:clamp(22px, 2.5vh, 30px);
+}
+
+:fullscreen .big-number,
+:-webkit-full-screen .big-number{
+  font-size:clamp(48px, 5.2vh, 68px);
+}
+
+:fullscreen table,
+:-webkit-full-screen table{
+  margin:clamp(110px, 22vh, 260px) auto 24px;
+}
