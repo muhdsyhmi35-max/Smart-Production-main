@@ -1585,7 +1585,7 @@ function buildSummaryBarChart(title, labels, values, color, valueSuffix = "") {
     const h = Math.max((v / maxVal) * chartH, v > 0 ? 2 : 0);
     const y = topPad + (chartH - h);
     return `
-      <rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="${color}" opacity="0.9"></rect>
+      <rect class="summary-bar" style="animation-delay:${i * 90}ms" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="${color}" opacity="0.9"></rect>
       <text x="${(x + (barW / 2)).toFixed(2)}" y="${(height - 14).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="10">${label}</text>
       <text x="${(x + (barW / 2)).toFixed(2)}" y="${(Math.max(y - 4, 10)).toFixed(2)}" text-anchor="middle" fill="#e2e8f0" font-size="10">${v}${valueSuffix}</text>
     `;

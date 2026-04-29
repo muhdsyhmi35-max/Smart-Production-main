@@ -495,8 +495,7 @@ body.summary-mode{
 body.graph-mode .datetime,
 body.graph-mode .controls,
 body.graph-mode .dashboard,
-body.graph-mode .bottom-row,
-body.graph-mode #historyPanel{
+body.graph-mode .bottom-row{
   display:none !important;
 }
 
@@ -588,6 +587,18 @@ body.graph-mode{
   width:100%;
   height:auto;
   display:block;
+}
+
+.summary-chart-svg .summary-bar{
+  transform-box:fill-box;
+  transform-origin:center bottom;
+  transform:scaleY(0);
+  animation:summaryBarGrow .8s cubic-bezier(.22,.61,.36,1) forwards;
+}
+
+@keyframes summaryBarGrow{
+  from{transform:scaleY(0);}
+  to{transform:scaleY(1);}
 }
 
 .summary-graph-empty{
