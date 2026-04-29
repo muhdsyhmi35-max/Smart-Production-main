@@ -1519,23 +1519,6 @@ function toggleRamadanFromMenu() {
   toggleRamadan();
 }
 
-function applyTheme(theme) {
-  const isLight = theme === "light";
-  document.body.classList.toggle("light-mode", isLight);
-  const themeBtn = document.getElementById("themeToggleMenuItem");
-  if (themeBtn) {
-    themeBtn.innerText = isLight ? "🌞 Light Mode" : "🌙 Dark Mode";
-  }
-}
-
-function toggleThemeFromMenu() {
-  toggleMenuDropdown(false);
-  const isCurrentlyLight = document.body.classList.contains("light-mode");
-  const nextTheme = isCurrentlyLight ? "dark" : "light";
-  localStorage.setItem("DASH_THEME", nextTheme);
-  applyTheme(nextTheme);
-}
-
 function updateViewToggleMenuItem() {
   const item = document.getElementById("viewToggleMenuItem")
     || document.querySelector("#menuDropdown .menu-item");
@@ -2055,6 +2038,5 @@ window.onload = async function() {
     setInterval(loadLiveData, 3000);
     setInterval(updateLiveStateOnly, 2000);
   }
-  applyTheme(localStorage.getItem("DASH_THEME") || "dark");
   updateViewToggleMenuItem();
 };
