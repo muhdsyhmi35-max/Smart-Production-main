@@ -642,6 +642,29 @@ body.graph-mode{
   padding:8px;
 }
 
+.summary-graph-card-span{
+  grid-column:1 / -1;
+}
+
+.plan-actual-sub{
+  font-weight:600;
+  font-size:11px;
+  color:#64748b;
+  margin-left:6px;
+}
+
+.plan-actual-diff{
+  font-size:12px;
+  font-weight:700;
+  color:#93c5fd;
+  margin:-4px 0 6px;
+}
+
+.summary-chart-plan-actual{
+  max-width:560px;
+  margin:0 auto;
+}
+
 .summary-graph-card-title{
   color:#94a3b8;
   font-size:12px;

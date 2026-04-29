@@ -1768,6 +1768,60 @@ function buildSummaryBarChart(title, labels, values, color, valueSuffix = "") {
   `;
 }
 
+function buildPlanVsActualChart() {
+  const planRaw = document.getElementById("plan").innerText.trim();
+  let plan = parseInt(planRaw, 10);
+  if (!Number.isFinite(plan) || plan < 0) {
+    plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+  }
+  const actual = parseInt(document.getElementById("actual").innerText, 10) || 0;
+
+  if (plan <= 0 && actual <= 0) {
+    return `
+      <div class="summary-graph-card-title">Plan vs Actual</div>
+      <div class="summary-graph-empty">No daily plan or actual output yet</div>`;
+  }
+
+  const width = 520;
+  const height = 200;
+  const leftPad = 44;
+  const rightPad = 24;
+  const topPad = 18;
+  const bottomPad = 36;
+  const chartW = width - leftPad - rightPad;
+  const chartH = height - topPad - bottomPad;
+  const maxVal = Math.max(plan, actual, 1);
+  const midGap = chartW * 0.22;
+  const barW = (chartW - midGap) / 2;
+  const xPlan = leftPad + midGap * 0.25;
+  const xActual = xPlan + barW + midGap * 0.5;
+
+  const hPlan = Math.max((plan / maxVal) * chartH, plan > 0 ? 3 : 0);
+  const hActual = Math.max((actual / maxVal) * chartH, actual > 0 ? 3 : 0);
+  const yBase = topPad + chartH;
+  const yPlan = yBase - hPlan;
+  const yActual = yBase - hActual;
+  const diff = actual - plan;
+  let diffNote = "";
+  if (plan > 0) {
+    diffNote = diff === 0 ? "On plan" : diff > 0 ? `Ahead by ${diff}` : `Behind by ${Math.abs(diff)}`;
+  }
+
+  return `
+    <div class="summary-graph-card-title">Plan vs Actual <span class="plan-actual-sub">${plan > 0 ? `(target ${plan}, done ${actual})` : `(output ${actual})`}</span></div>
+    ${diffNote ? `<div class="plan-actual-diff">${diffNote}</div>` : ""}
+    <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg summary-chart-plan-actual" role="img" aria-label="Plan versus actual output">
+      <line x1="${leftPad}" y1="${yBase}" x2="${width - rightPad}" y2="${yBase}" stroke="rgba(148,163,184,.45)" stroke-width="1"></line>
+      <line x1="${leftPad}" y1="${topPad}" x2="${leftPad}" y2="${yBase}" stroke="rgba(148,163,184,.45)" stroke-width="1"></line>
+      <rect class="summary-bar" style="animation-delay:0ms" x="${xPlan.toFixed(2)}" y="${yPlan.toFixed(2)}" width="${barW.toFixed(2)}" height="${hPlan.toFixed(2)}" rx="2" fill="#60a5fa" opacity="0.92"></rect>
+      <rect class="summary-bar" style="animation-delay:110ms" x="${xActual.toFixed(2)}" y="${yActual.toFixed(2)}" width="${barW.toFixed(2)}" height="${hActual.toFixed(2)}" rx="2" fill="#22c55e" opacity="0.92"></rect>
+      <text x="${(xPlan + barW / 2).toFixed(2)}" y="${(height - 12).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="11">Plan</text>
+      <text x="${(xActual + barW / 2).toFixed(2)}" y="${(height - 12).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="11">Actual</text>
+      <text x="${(xPlan + barW / 2).toFixed(2)}" y="${Math.max(yPlan - 6, 14).toFixed(2)}" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="700">${plan}</text>
+      <text x="${(xActual + barW / 2).toFixed(2)}" y="${Math.max(yActual - 6, 14).toFixed(2)}" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="700">${actual}</text>
+    </svg>`;
+}
+
 function collectHourlyGraphData() {
   const rows = document.querySelectorAll("#scanTable tr");
   const outputByHour = {};
@@ -1802,6 +1856,7 @@ function showGraphPageFromMenu() {
 
 function showGraphPage() {
   const { labels, outputVals, downtimeMins } = collectHourlyGraphData();
+  const planActualChart = buildPlanVsActualChart();
   const outputChart = buildSummaryBarChart("Output by Hour", labels, outputVals, "#22c55e");
   const downtimeChart = buildSummaryBarChart("Downtime by Hour (min)", labels, downtimeMins, "#ef4444");
 
@@ -1816,6 +1871,7 @@ function showGraphPage() {
   graphPage.innerHTML = `
     <div class="summary-head">Graph</div>
     <div class="summary-graphs">
+      <div class="summary-graph-card summary-graph-card-span">${planActualChart}</div>
       <div class="summary-graph-card">${outputChart}</div>
       <div class="summary-graph-card">${downtimeChart}</div>
     </div>
