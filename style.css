@@ -53,6 +53,8 @@ body::-webkit-scrollbar{
   font-weight:900;
   text-align:center;
   padding:18px;
+  padding-left:72px;
+  padding-right:72px;
   color:var(--blue);
   letter-spacing:1.6px;
   text-shadow:0 0 16px rgba(56,189,248,.25);
@@ -341,14 +343,19 @@ tr:nth-child(even){background:#0b1220;}
   top:clamp(8px, 2vh, 18px);
   width:clamp(28px, 3.2vw, 36px);
   height:clamp(28px, 3.2vw, 36px);
-  border:1px solid rgba(148,163,184,0.35);
+  border:1px solid rgba(56,189,248,0.75);
   border-radius:clamp(6px, 1vw, 10px);
-  background:rgba(15,23,42,0.55);
-  color:#93c5fd;
-  font-size:clamp(14px, 1.6vw, 18px);
+  background:rgba(30,58,138,0.9);
+  color:#e0f2fe;
+  font-size:clamp(16px, 1.8vw, 20px);
   line-height:1;
   cursor:pointer;
   z-index:10000;
+  box-shadow:0 0 0 1px rgba(2,6,23,.6), 0 4px 12px rgba(0,0,0,.45);
+}
+
+.menu-btn:hover{
+  filter:brightness(1.12);
 }
 
 .history-panel{
