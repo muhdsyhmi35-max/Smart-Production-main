@@ -814,13 +814,15 @@ function startProduction(shouldSync = true) {
     }
 
     if (breakPauseStartMs != null) {
-      const breakPausedMs = Math.max(Date.now() - breakPauseStartMs, 0);
+      // Consume this break marker once to avoid any accidental double add.
+      const breakStartMs = breakPauseStartMs;
+      breakPauseStartMs = null;
+      const breakPausedMs = Math.max(Date.now() - breakStartMs, 0);
       if (lastScanTime) {
         lastScanTime = new Date(lastScanTime.getTime() + breakPausedMs);
       } else if (startTime) {
         startTime = new Date(startTime.getTime() + breakPausedMs);
       }
-      breakPauseStartMs = null;
     }
 
     const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;

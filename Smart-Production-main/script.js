@@ -926,13 +926,9 @@ function startProduction(shouldSync = true) {
       return;
     }
 
+    // Break overlap has already been compensated via getBreakOverlapMs(lastTimerTickMs, nowMs).
+    // Do not add break pause again here, otherwise countdown gets extra time after break.
     if (breakPauseStartMs != null) {
-      const breakPausedMs = Math.max(nowMs - breakPauseStartMs, 0);
-      if (lastScanTime) {
-        lastScanTime = new Date(lastScanTime.getTime() + breakPausedMs);
-      } else if (startTime) {
-        startTime = new Date(startTime.getTime() + breakPausedMs);
-      }
       breakPauseStartMs = null;
     }
 
