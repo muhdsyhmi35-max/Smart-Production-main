@@ -88,6 +88,14 @@ const FIREBASE_CONFIG = window.FIREBASE_CONFIG || {
   measurementId: "G-SCSMT5BDZB"
 };
 
+function setMonitorConnectionStatus(isConnected) {
+  if (!isMonitor) return;
+  const badge = document.getElementById("monitorConnectionStatus");
+  if (!badge) return;
+  badge.textContent = isConnected ? "LIVE" : "DISCONNECTED";
+  badge.classList.toggle("offline", !isConnected);
+}
+
 /* ===== FORMAT ===== */
 
 function format(s) {
@@ -487,6 +495,11 @@ function initFirebaseSync() {
   firebaseDb = firebase.database();
   firebaseCommandRef = firebaseDb.ref(FIREBASE_COMMAND_PATH);
   firebaseLiveStateRef = firebaseDb.ref(FIREBASE_LIVE_STATE_PATH);
+
+  if (isMonitor) {
+    const connectedRef = firebaseDb.ref(".info/connected");
+    connectedRef.on("value", snap => setMonitorConnectionStatus(!!snap.val()));
+  }
 
   firebaseCommandRef.on("value", snapshot => {
     const command = snapshot.val();
@@ -2235,10 +2248,29 @@ window.onload = async function() {
   if (isMonitor) {
     document.body.classList.add("monitor-mode");
 
-    document.getElementById("chassisInput").style.display = "none";
-    document.getElementById("modelInput").style.display = "none";
-    document.getElementById("engineInput").style.display = "none";
-    document.getElementById("keyInput").style.display = "none";
+    const monitorCard = document.querySelector(".bottom-row .card.wide");
+    if (monitorCard) {
+      const monitorTitle = monitorCard.querySelector("h3");
+      if (monitorTitle) monitorTitle.textContent = "CONNECTION STATUS";
+      const scanGrid = monitorCard.querySelector(".scan-grid");
+      if (scanGrid) {
+        scanGrid.innerHTML = `
+          <div class="monitor-status-wrap">
+            <div class="monitor-only-text">MONITOR ONLY</div>
+            <div id="monitorConnectionStatus" class="monitor-connection-badge">LIVE</div>
+          </div>
+        `;
+      }
+    }
+
+    const chassisInput = document.getElementById("chassisInput");
+    const modelInput = document.getElementById("modelInput");
+    const engineInput = document.getElementById("engineInput");
+    const keyInput = document.getElementById("keyInput");
+    if (chassisInput) chassisInput.style.display = "none";
+    if (modelInput) modelInput.style.display = "none";
+    if (engineInput) engineInput.style.display = "none";
+    if (keyInput) keyInput.style.display = "none";
 
     document.getElementById("cycleTarget").readOnly = true;
     document.getElementById("dailyPlanTarget").readOnly = true;
