@@ -445,6 +445,67 @@ tr:nth-child(even){background:#0b1220;}
   border-bottom:0;
 }
 
+body.summary-mode .datetime,
+body.summary-mode .controls,
+body.summary-mode .dashboard,
+body.summary-mode .bottom-row,
+body.summary-mode #historyPanel{
+  display:none !important;
+}
+
+.summary-page{
+  display:none;
+  margin:14px 20px 18px;
+  border:1px solid rgba(71,85,105,.55);
+  border-radius:8px;
+  background:rgba(8,13,25,.96);
+  padding:14px;
+}
+
+.summary-page.open{
+  display:block;
+}
+
+.summary-head{
+  font-size:24px;
+  font-weight:800;
+  color:#60a5fa;
+  margin-bottom:10px;
+}
+
+.summary-grid{
+  display:grid;
+  grid-template-columns:repeat(4, minmax(0,1fr));
+  gap:10px;
+  margin-bottom:12px;
+}
+
+.summary-tile{
+  border:1px solid rgba(71,85,105,.45);
+  border-radius:6px;
+  padding:8px 10px;
+  background:rgba(30,41,59,.45);
+}
+
+.summary-tile span{
+  display:block;
+  font-size:12px;
+  color:#94a3b8;
+}
+
+.summary-tile strong{
+  display:block;
+  margin-top:3px;
+  font-size:22px;
+  color:#e2e8f0;
+  font-family:Consolas, "Courier New", monospace;
+}
+
+.summary-table-wrap{
+  max-height:52vh;
+  overflow:auto;
+}
+
 /* Fullscreen layout tuning for TV: keep dashboard on first screen,
    push table below fold, and scale cards/text to viewport. */
 :fullscreen .header,

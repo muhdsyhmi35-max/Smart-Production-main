@@ -1622,12 +1622,72 @@ function openHistoryPanelFromMenu() {
 
 function openSummaryFromMenu() {
   toggleMenuDropdown(false);
-  openSummary();
+  showSummaryPage();
 }
 
 function toggleRamadanFromMenu() {
   toggleMenuDropdown(false);
   toggleRamadan();
+}
+
+function showMainPage() {
+  toggleMenuDropdown(false);
+  document.body.classList.remove("summary-mode");
+  const summaryPage = document.getElementById("summaryPage");
+  if (summaryPage) summaryPage.classList.remove("open");
+}
+
+function showSummaryPage() {
+  const plan = parseInt(document.getElementById("plan").innerText, 10) || 0;
+  const actual = parseInt(document.getElementById("actual").innerText, 10) || 0;
+  const expected = parseInt(document.getElementById("expected").innerText, 10) || 0;
+  const downtime = document.getElementById("downtime").innerText;
+  const efficiency = document.getElementById("efficiency").innerText;
+  const diff = actual - plan;
+  const diffDisplay = diff > 0 ? ("+" + diff) : String(diff);
+
+  const rows = document.querySelectorAll("#scanTable tr");
+  let tableRows = "";
+  rows.forEach(row => {
+    const cells = row.querySelectorAll("td");
+    if (cells.length > 0) {
+      tableRows += `<tr>${Array.from(cells).map(c => `<td>${c.innerText}</td>`).join("")}</tr>`;
+    }
+  });
+
+  let summaryPage = document.getElementById("summaryPage");
+  if (!summaryPage) {
+    summaryPage = document.createElement("div");
+    summaryPage.id = "summaryPage";
+    summaryPage.className = "summary-page";
+    document.body.appendChild(summaryPage);
+  }
+
+  summaryPage.innerHTML = `
+    <div class="summary-head">Daily Summary</div>
+    <div class="summary-grid">
+      <div class="summary-tile"><span>Date</span><strong>${new Date().toLocaleDateString()}</strong></div>
+      <div class="summary-tile"><span>Plan</span><strong>${plan}</strong></div>
+      <div class="summary-tile"><span>Actual</span><strong>${actual}</strong></div>
+      <div class="summary-tile"><span>Expected</span><strong>${expected}</strong></div>
+      <div class="summary-tile"><span>Difference</span><strong>${diffDisplay}</strong></div>
+      <div class="summary-tile"><span>Downtime</span><strong>${downtime}</strong></div>
+      <div class="summary-tile"><span>Efficiency</span><strong>${efficiency}</strong></div>
+    </div>
+    <div class="summary-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Time</th><th>Lot</th><th>Model</th><th>Chassis</th><th>Engine No</th><th>Key No</th><th>Status</th><th>Downtime</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+  `;
+
+  document.body.classList.add("summary-mode");
+  summaryPage.classList.add("open");
 }
 
 document.addEventListener("click", (event) => {
