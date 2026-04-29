@@ -558,11 +558,20 @@ body.summary-mode{
 .summary-page table{
   border-collapse:collapse;
   margin:0 !important;
+  width:100%;
+  table-layout:fixed;
 }
 
 .summary-page th,
 .summary-page td{
   border:1px solid rgba(71,85,105,.55);
+}
+
+.summary-table-wrap thead th{
+  position:sticky;
+  top:0;
+  z-index:6;
+  background:#1e293b;
 }
 
 .summary-status-scanned{
