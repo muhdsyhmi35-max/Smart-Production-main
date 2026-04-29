@@ -1593,6 +1593,31 @@ function toggleFullScreen() {
   }
 }
 
+function toggleHistoryPanel(forceOpen) {
+  const panel = document.getElementById("historyPanel");
+  if (!panel) return;
+  if (typeof forceOpen === "boolean") {
+    panel.classList.toggle("open", forceOpen);
+    return;
+  }
+  panel.classList.toggle("open");
+}
+
+document.addEventListener("click", (event) => {
+  const panel = document.getElementById("historyPanel");
+  if (!panel || !panel.classList.contains("open")) return;
+  const menuBtn = event.target.closest(".menu-btn");
+  const clickedInside = event.target.closest("#historyPanel");
+  if (menuBtn || clickedInside) return;
+  toggleHistoryPanel(false);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    toggleHistoryPanel(false);
+  }
+});
+
 /* ===== RAMADHAN TOGGLE ===== */
 
 function toggleRamadan() {

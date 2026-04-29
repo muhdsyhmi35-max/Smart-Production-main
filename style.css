@@ -335,6 +335,58 @@ tr:nth-child(even){background:#0b1220;}
   text-transform:uppercase;
 }
 
+.menu-btn{
+  position:absolute;
+  left:clamp(10px, 2vw, 20px);
+  top:clamp(8px, 2vh, 18px);
+  width:clamp(28px, 3.2vw, 36px);
+  height:clamp(28px, 3.2vw, 36px);
+  border:1px solid rgba(148,163,184,0.35);
+  border-radius:clamp(6px, 1vw, 10px);
+  background:rgba(15,23,42,0.55);
+  color:#93c5fd;
+  font-size:clamp(14px, 1.6vw, 18px);
+  line-height:1;
+  cursor:pointer;
+  z-index:10000;
+}
+
+.history-panel{
+  display:none;
+  margin:10px 20px 16px;
+  border:1px solid rgba(71,85,105,.55);
+  border-radius:8px;
+  background:rgba(8,13,25,.96);
+  box-shadow:0 10px 28px rgba(0,0,0,.45);
+  overflow:hidden;
+}
+
+.history-panel.open{
+  display:block;
+}
+
+.history-panel-title{
+  padding:10px 14px;
+  font-weight:700;
+  color:#93c5fd;
+  border-bottom:1px solid rgba(71,85,105,.45);
+  background:rgba(30,41,59,.5);
+}
+
+.history-table-wrap{
+  max-height:38vh;
+  overflow:auto;
+}
+
+.history-panel table{
+  width:100%;
+  margin:0 !important;
+  border-radius:0;
+  border-left:0;
+  border-right:0;
+  border-bottom:0;
+}
+
 /* Fullscreen layout tuning for TV: keep dashboard on first screen,
    push table below fold, and scale cards/text to viewport. */
 :fullscreen .header,

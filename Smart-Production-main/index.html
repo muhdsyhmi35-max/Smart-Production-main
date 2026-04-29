@@ -13,6 +13,7 @@
 <body>
 
 <div class="header">
+    <button class="menu-btn" onclick="toggleHistoryPanel()" aria-label="Toggle history menu">☰</button>
     TF 2 PRODUCTION MONITORING SYSTEM
     <button class="fullscreen-btn" onclick="toggleFullScreen()">⛶</button>
 </div>
@@ -97,22 +98,27 @@
   
 </div>
   
-<table>
-<thead>
-<tr>
-<th>Date</th>
-<th>Time</th>
-<th>Lot</th>
-<th>Model</th>
-<th>Chassis</th>
-<th>Engine No</th>
-<th>Key No</th>
-<th>Status</th>
-<th>Downtime</th>
-</tr>
-</thead>
-<tbody id="scanTable"></tbody>
-</table>
+<div id="historyPanel" class="history-panel">
+  <div class="history-panel-title">History</div>
+  <div class="history-table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Time</th>
+          <th>Lot</th>
+          <th>Model</th>
+          <th>Chassis</th>
+          <th>Engine No</th>
+          <th>Key No</th>
+          <th>Status</th>
+          <th>Downtime</th>
+        </tr>
+      </thead>
+      <tbody id="scanTable"></tbody>
+    </table>
+  </div>
+</div>
 
 <script src="./script.js"></script>
 </body>
