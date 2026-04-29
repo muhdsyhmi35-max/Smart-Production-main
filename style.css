@@ -466,7 +466,7 @@ body.summary-mode{
 .summary-page{
   display:none;
   position:fixed;
-  top:70px;
+  top:clamp(96px, 14vh, 150px);
   left:20px;
   right:20px;
   bottom:16px;
@@ -475,10 +475,12 @@ body.summary-mode{
   background:rgba(8,13,25,.96);
   padding:14px;
   overflow:hidden;
+  display:flex;
+  flex-direction:column;
 }
 
 .summary-page.open{
-  display:block;
+  display:flex;
 }
 
 .summary-head{
@@ -493,6 +495,7 @@ body.summary-mode{
   grid-template-columns:repeat(4, minmax(0,1fr));
   gap:10px;
   margin-bottom:4px;
+  flex:0 0 auto;
 }
 
 .summary-tile{
@@ -517,7 +520,8 @@ body.summary-mode{
 }
 
 .summary-table-wrap{
-  max-height:calc(100% - 170px);
+  flex:1 1 auto;
+  min-height:0;
   overflow:auto;
   margin-top:2px;
 }
