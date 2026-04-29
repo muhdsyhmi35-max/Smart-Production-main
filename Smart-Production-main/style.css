@@ -56,6 +56,7 @@ body::-webkit-scrollbar{
   color:var(--blue);
   letter-spacing:2px;
   text-shadow:none;
+  position:relative; /* anchor absolute fullscreen button */
 }
 
 /* CLOCK */
@@ -279,19 +280,20 @@ th{
 
 .fullscreen-btn{
   position:absolute;
-  right:12px;
-  top:12px;
-  width:24px;
-  height:24px;
+  right:clamp(10px, 2vw, 20px);
+  top:clamp(8px, 2vh, 18px);
+  width:clamp(20px, 3vw, 30px);
+  height:clamp(20px, 3vw, 30px);
   padding:0;
-  font-size:12px;
+  font-size:clamp(10px, 1.5vw, 14px);
   border:1px solid rgba(148,163,184,0.35);
-  border-radius:8px;
+  border-radius:clamp(6px, 1vw, 10px);
   background:rgba(15,23,42,0.55);
   color:#93c5fd;
   opacity:0.8;
   cursor:pointer;
   transition:opacity .2s ease, border-color .2s ease, background .2s ease, transform .2s ease;
+  z-index:9999;
 }
 
 .fullscreen-btn:hover{
@@ -330,7 +332,7 @@ th{
 
 table{
   width:95%;
-  margin:30px auto;
+  margin:clamp(45px, 12vh, 120px) auto 30px;
   border-collapse:collapse;
   background:#111827;
   border-radius:15px;
