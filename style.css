@@ -497,6 +497,46 @@ body.summary-mode{
   flex:0 0 auto;
 }
 
+.summary-graph-title{
+  margin:6px 0 8px;
+  font-size:18px;
+  font-weight:700;
+  color:#93c5fd;
+}
+
+.summary-graphs{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-bottom:8px;
+  flex:0 0 auto;
+}
+
+.summary-graph-card{
+  border:1px solid rgba(71,85,105,.45);
+  border-radius:6px;
+  background:rgba(30,41,59,.35);
+  padding:8px;
+}
+
+.summary-graph-card-title{
+  color:#94a3b8;
+  font-size:12px;
+  margin-bottom:6px;
+}
+
+.summary-chart-svg{
+  width:100%;
+  height:auto;
+  display:block;
+}
+
+.summary-graph-empty{
+  color:#94a3b8;
+  font-size:12px;
+  padding:8px 0;
+}
+
 .summary-tile{
   border:1px solid rgba(71,85,105,.45);
   border-radius:6px;

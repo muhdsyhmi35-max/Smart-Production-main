@@ -1656,6 +1656,57 @@ function showMainPage() {
   updateViewToggleMenuItem();
 }
 
+function parseHourFromTimeText(timeText) {
+  const text = String(timeText || "").trim().toLowerCase();
+  const match = text.match(/(\d{1,2}):\d{2}(?::\d{2})?\s*(am|pm)?/i);
+  if (!match) return null;
+  let hour = parseInt(match[1], 10);
+  if (!Number.isFinite(hour)) return null;
+  const ampm = (match[2] || "").toLowerCase();
+  if (ampm === "pm" && hour < 12) hour += 12;
+  if (ampm === "am" && hour === 12) hour = 0;
+  if (hour < 0 || hour > 23) return null;
+  return hour;
+}
+
+function buildSummaryBarChart(title, labels, values, color, valueSuffix = "") {
+  if (!labels.length || !values.length) {
+    return `<div class="summary-graph-empty">No data</div>`;
+  }
+  const width = 520;
+  const height = 210;
+  const leftPad = 36;
+  const rightPad = 12;
+  const topPad = 16;
+  const bottomPad = 34;
+  const chartW = width - leftPad - rightPad;
+  const chartH = height - topPad - bottomPad;
+  const maxVal = Math.max(...values, 1);
+  const stepX = chartW / labels.length;
+  const barW = Math.max(Math.min(stepX * 0.58, 36), 10);
+
+  const bars = labels.map((label, i) => {
+    const v = values[i];
+    const x = leftPad + (i * stepX) + ((stepX - barW) / 2);
+    const h = Math.max((v / maxVal) * chartH, v > 0 ? 2 : 0);
+    const y = topPad + (chartH - h);
+    return `
+      <rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="${color}" opacity="0.9"></rect>
+      <text x="${(x + (barW / 2)).toFixed(2)}" y="${(height - 14).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="10">${label}</text>
+      <text x="${(x + (barW / 2)).toFixed(2)}" y="${(Math.max(y - 4, 10)).toFixed(2)}" text-anchor="middle" fill="#e2e8f0" font-size="10">${v}${valueSuffix}</text>
+    `;
+  }).join("");
+
+  return `
+    <div class="summary-graph-card-title">${title}</div>
+    <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg" role="img" aria-label="${title}">
+      <line x1="${leftPad}" y1="${topPad + chartH}" x2="${width - rightPad}" y2="${topPad + chartH}" stroke="rgba(148,163,184,.45)" stroke-width="1"></line>
+      <line x1="${leftPad}" y1="${topPad}" x2="${leftPad}" y2="${topPad + chartH}" stroke="rgba(148,163,184,.45)" stroke-width="1"></line>
+      ${bars}
+    </svg>
+  `;
+}
+
 function showSummaryPage() {
   const plan = parseInt(document.getElementById("plan").innerText, 10) || 0;
   const actual = parseInt(document.getElementById("actual").innerText, 10) || 0;
@@ -1667,6 +1718,8 @@ function showSummaryPage() {
 
   const rows = document.querySelectorAll("#scanTable tr");
   let tableRows = "";
+  const outputByHour = {};
+  const downtimeByHour = {};
   rows.forEach(row => {
     const cells = row.querySelectorAll("td");
     if (cells.length > 0) {
@@ -1674,6 +1727,14 @@ function showSummaryPage() {
       const isDowntime = statusText === "DOWN TIME";
       const statusClass = isDowntime ? "summary-status-downtime" : "summary-status-scanned";
       const downtimeClass = isDowntime ? "summary-downtime-red" : "";
+      const hour = parseHourFromTimeText(cells[1]?.innerText || "");
+      if (hour != null) {
+        outputByHour[hour] = (outputByHour[hour] || 0) + 1;
+        const downtimeSec = parseMmSsToSeconds(cells[8]?.innerText || "");
+        if (downtimeSec > 0) {
+          downtimeByHour[hour] = (downtimeByHour[hour] || 0) + downtimeSec;
+        }
+      }
       tableRows += `<tr>
         <td>${cells[0].innerText}</td>
         <td>${cells[1].innerText}</td>
@@ -1687,6 +1748,17 @@ function showSummaryPage() {
       </tr>`;
     }
   });
+
+  const hourKeys = Array.from(new Set([
+    ...Object.keys(outputByHour),
+    ...Object.keys(downtimeByHour)
+  ].map(v => parseInt(v, 10)).filter(Number.isFinite))).sort((a, b) => a - b);
+  const labels = hourKeys.map(h => `${String(h).padStart(2, "0")}:00`);
+  const outputVals = hourKeys.map(h => outputByHour[h] || 0);
+  const downtimeMins = hourKeys.map(h => Math.round((downtimeByHour[h] || 0) / 60));
+
+  const outputChart = buildSummaryBarChart("Output by Hour", labels, outputVals, "#22c55e");
+  const downtimeChart = buildSummaryBarChart("Downtime by Hour (min)", labels, downtimeMins, "#ef4444");
 
   let summaryPage = document.getElementById("summaryPage");
   if (!summaryPage) {
@@ -1706,6 +1778,11 @@ function showSummaryPage() {
       <div class="summary-tile"><span>Difference</span><strong>${diffDisplay}</strong></div>
       <div class="summary-tile"><span>Downtime</span><strong>${downtime}</strong></div>
       <div class="summary-tile"><span>Efficiency</span><strong>${efficiency}</strong></div>
+    </div>
+    <div class="summary-graph-title">Graph</div>
+    <div class="summary-graphs">
+      <div class="summary-graph-card">${outputChart}</div>
+      <div class="summary-graph-card">${downtimeChart}</div>
     </div>
     <div class="summary-table-wrap">
       <table>
