@@ -1486,9 +1486,11 @@ function toggleHistoryPanel(forceOpen) {
   if (!panel) return;
   if (typeof forceOpen === "boolean") {
     panel.classList.toggle("open", forceOpen);
+    if (forceOpen) triggerEnterAnimation(panel);
     return;
   }
   panel.classList.toggle("open");
+  if (panel.classList.contains("open")) triggerEnterAnimation(panel);
 }
 
 function toggleMenuDropdown(forceOpen) {
@@ -1497,9 +1499,11 @@ function toggleMenuDropdown(forceOpen) {
   updateViewToggleMenuItem();
   if (typeof forceOpen === "boolean") {
     menu.classList.toggle("open", forceOpen);
+    if (forceOpen) triggerEnterAnimation(menu);
     return;
   }
   menu.classList.toggle("open");
+  if (menu.classList.contains("open")) triggerEnterAnimation(menu);
 }
 
 function openHistoryPanelFromMenu() {
@@ -1547,6 +1551,8 @@ function showMainPage() {
   if (summaryPage) summaryPage.classList.remove("open");
   const graphPage = document.getElementById("graphPage");
   if (graphPage) graphPage.classList.remove("open");
+  triggerEnterAnimation(document.querySelector(".dashboard"));
+  triggerEnterAnimation(document.querySelector(".bottom-row"));
   updateViewToggleMenuItem();
 }
 
@@ -1659,6 +1665,8 @@ function showGraphPage() {
   if (summaryPage) summaryPage.classList.remove("open");
   document.body.classList.add("graph-mode");
   graphPage.classList.add("open");
+  triggerEnterAnimation(graphPage);
+  updateViewToggleMenuItem();
 }
 
 function showSummaryPage() {
@@ -1729,7 +1737,16 @@ function showSummaryPage() {
   const graphPage = document.getElementById("graphPage");
   if (graphPage) graphPage.classList.remove("open");
   summaryPage.classList.add("open");
+  triggerEnterAnimation(summaryPage);
   updateViewToggleMenuItem();
+}
+
+function triggerEnterAnimation(el) {
+  if (!el) return;
+  el.classList.remove("enter-anim");
+  // Force reflow so animation can replay each time.
+  void el.offsetWidth;
+  el.classList.add("enter-anim");
 }
 
 document.addEventListener("click", (event) => {

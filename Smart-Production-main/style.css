@@ -601,6 +601,21 @@ body.graph-mode{
   to{transform:scaleY(1);}
 }
 
+.enter-anim{
+  animation:pageEnter .28s ease-out;
+}
+
+@keyframes pageEnter{
+  from{
+    opacity:.2;
+    transform:translateY(10px) scale(.985);
+  }
+  to{
+    opacity:1;
+    transform:translateY(0) scale(1);
+  }
+}
+
 .summary-graph-empty{
   color:#94a3b8;
   font-size:12px;
