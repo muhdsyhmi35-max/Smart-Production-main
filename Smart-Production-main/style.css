@@ -243,6 +243,13 @@ body::-webkit-scrollbar{
   border:1px solid rgba(71,85,105,.65);
   background:rgba(2,6,23,.85);
   color:#e2e8f0;
+  color-scheme:dark;
+}
+
+.downtime-day-filter input[type="date"]::-webkit-calendar-picker-indicator{
+  cursor:pointer;
+  filter:invert(1) brightness(1.25);
+  opacity:1;
 }
 
 .downtime-today-btn{
