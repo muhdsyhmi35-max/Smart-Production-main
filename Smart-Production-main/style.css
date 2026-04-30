@@ -833,8 +833,9 @@ body.graph-mode{
 .graph-filter-row{
   display:flex;
   align-items:center;
-  justify-content:flex-end;
-  gap:8px;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:10px;
   margin:0 0 10px;
   color:#94a3b8;
   font-size:13px;
@@ -845,7 +846,34 @@ body.graph-mode{
   display:flex;
   align-items:center;
   gap:6px;
-  margin-right:8px;
+}
+
+.graph-range-box{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  padding:8px 10px;
+  border:1px solid rgba(37,99,235,.25);
+  border-radius:8px;
+  background:rgba(15,23,42,.55);
+}
+
+.graph-range-label{
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.04em;
+  color:#93c5fd;
+}
+
+.graph-range-inputs{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.graph-range-sep{
+  color:#94a3b8;
+  opacity:.9;
 }
 
 .graph-period-btn{

@@ -40,6 +40,8 @@ let downtimeFilterDate = null;
 /** null = today in graph filters; else YYYY-MM-DD. */
 let graphFilterDate = null;
 let graphPeriod = "day";
+let graphRangeStartDate = null;
+let graphRangeEndDate = null;
 /** null = today in history filter; else YYYY-MM-DD. */
 let historyFilterDate = null;
 /** null = today in summary filter; else YYYY-MM-DD. */
@@ -239,9 +241,74 @@ function onGraphDayTodayClick() {
   renderGraphCharts();
 }
 
+function getDayKeysBetween(startIso, endIso) {
+  if (!startIso || !endIso) return [];
+  const [sy, sm, sd] = String(startIso).split("-").map(v => parseInt(v, 10));
+  const [ey, em, ed] = String(endIso).split("-").map(v => parseInt(v, 10));
+  let cur = new Date(sy, (sm || 1) - 1, sd || 1);
+  let end = new Date(ey, (em || 1) - 1, ed || 1);
+  if (!Number.isFinite(cur.getTime()) || !Number.isFinite(end.getTime())) return [];
+  if (cur > end) [cur, end] = [end, cur];
+  const out = [];
+  while (cur <= end) {
+    out.push(toIsoDateLocal(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
+}
+
+function getDefaultGraphRangeFromPeriod() {
+  const anchor = getActiveGraphDayKey();
+  const keys = getPeriodDayKeys(anchor, graphPeriod);
+  if (!keys.length) return { start: anchor, end: anchor };
+  return { start: keys[0], end: keys[keys.length - 1] };
+}
+
+function getActiveGraphRange() {
+  if (graphRangeStartDate && graphRangeEndDate) {
+    const keys = getDayKeysBetween(graphRangeStartDate, graphRangeEndDate);
+    if (keys.length) return { start: keys[0], end: keys[keys.length - 1] };
+  }
+  return getDefaultGraphRangeFromPeriod();
+}
+
+function syncGraphRangePickerUi() {
+  const startEl = document.getElementById("graphRangeStart");
+  const endEl = document.getElementById("graphRangeEnd");
+  const range = getActiveGraphRange();
+  if (startEl) startEl.value = range.start;
+  if (endEl) endEl.value = range.end;
+}
+
+function onGraphRangeFilterChange() {
+  const startEl = document.getElementById("graphRangeStart");
+  const endEl = document.getElementById("graphRangeEnd");
+  if (!startEl || !endEl) return;
+  const sv = (startEl.value || "").trim().slice(0, 10);
+  const ev = (endEl.value || "").trim().slice(0, 10);
+  if (!sv || !ev) return;
+  const keys = getDayKeysBetween(sv, ev);
+  if (!keys.length) return;
+  graphRangeStartDate = keys[0];
+  graphRangeEndDate = keys[keys.length - 1];
+  graphFilterDate = graphRangeStartDate;
+  syncGraphRangePickerUi();
+  renderGraphCharts();
+}
+
+function onGraphRangeTodayClick() {
+  const today = toIsoDateLocal(new Date());
+  graphRangeStartDate = today;
+  graphRangeEndDate = today;
+  graphFilterDate = null;
+  syncGraphRangePickerUi();
+  renderGraphCharts();
+}
+
 function onGraphPeriodChange(period) {
   graphPeriod = (period === "week" || period === "month") ? period : "day";
   syncGraphPeriodButtonsUi();
+  if (!graphRangeStartDate || !graphRangeEndDate) syncGraphRangePickerUi();
   renderGraphCharts();
 }
 
@@ -2069,7 +2136,8 @@ function buildSummaryBarChart(title, labels, values, color, valueSuffix = "") {
 }
 
 function getPlanActualForPeriod(anchorDay, period = "day") {
-  const periodKeys = getPeriodDayKeys(anchorDay, period);
+  const range = getActiveGraphRange();
+  const periodKeys = getDayKeysBetween(range.start, range.end);
   const periodKeySet = new Set(periodKeys);
   const rows = document.querySelectorAll("#scanTable tr");
   const planByDay = {};
@@ -2102,7 +2170,7 @@ function getPlanActualForPeriod(anchorDay, period = "day") {
     const planCard = parseInt(planRaw, 10);
     const planInput = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
     const fallbackDayPlan = Number.isFinite(planCard) && planCard > 0 ? planCard : planInput;
-    const multiplier = period === "day" ? 1 : periodKeys.length;
+    const multiplier = Math.max(periodKeys.length, 1);
     plan = Math.max(0, fallbackDayPlan * multiplier);
   }
 
@@ -2112,6 +2180,8 @@ function getPlanActualForPeriod(anchorDay, period = "day") {
 function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphPeriod) {
   const { plan, actual } = getPlanActualForPeriod(dayKey, period);
   const periodLabel = period === "week" ? "Week" : period === "month" ? "Month" : "Day";
+  const range = getActiveGraphRange();
+  const rangeLabel = range.start === range.end ? range.start : `${range.start} to ${range.end}`;
 
   if (plan <= 0 && actual <= 0) {
     return `
@@ -2145,7 +2215,7 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
   }
 
   return `
-      <div class="summary-graph-card-title">Plan vs Actual (${periodLabel}: ${dayKey}) <span class="plan-actual-sub">${plan > 0 ? `(target ${plan}, done ${actual})` : `(output ${actual})`}</span></div>
+      <div class="summary-graph-card-title">Plan vs Actual (${periodLabel}: ${rangeLabel}) <span class="plan-actual-sub">${plan > 0 ? `(target ${plan}, done ${actual})` : `(output ${actual})`}</span></div>
     ${diffNote ? `<div class="plan-actual-diff">${diffNote}</div>` : ""}
     <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg summary-chart-plan-actual" role="img" aria-label="Plan versus actual output">
       <line x1="${leftPad}" y1="${yBase}" x2="${width - rightPad}" y2="${yBase}" stroke="rgba(148,163,184,.45)" stroke-width="1"></line>
@@ -2174,17 +2244,19 @@ function getHistoricalPlanForDay(dayKey) {
 
 function collectHourlyGraphData(dayKey = getActiveGraphDayKey(), period = graphPeriod) {
   const rows = document.querySelectorAll("#scanTable tr");
-  const periodKeys = getPeriodDayKeys(dayKey, period);
+  const range = getActiveGraphRange();
+  const periodKeys = getDayKeysBetween(range.start, range.end);
   const periodKeySet = new Set(periodKeys);
   const outputByBucket = {};
   const downtimeByBucket = {};
 
-  if (period === "day") {
+  if (period === "day" && periodKeys.length === 1) {
+    const oneDay = periodKeys[0];
     rows.forEach(row => {
       const cells = row.querySelectorAll("td");
       if (cells.length === 0) return;
       const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
-      if (!rowDay || rowDay !== dayKey) return;
+      if (!rowDay || rowDay !== oneDay) return;
       const hour = parseHourFromTimeText(cells[2]?.innerText || "");
       if (hour == null) return;
       outputByBucket[hour] = (outputByBucket[hour] || 0) + 1;
@@ -2241,11 +2313,13 @@ function renderGraphCharts() {
   const graphBody = document.getElementById("graphChartsBody");
   if (!graphBody) return;
   const activeDay = getActiveGraphDayKey();
+  const range = getActiveGraphRange();
+  const rangeLabel = range.start === range.end ? range.start : `${range.start} to ${range.end}`;
   const { labels, outputVals, downtimeMins, bucketName } = collectHourlyGraphData(activeDay, graphPeriod);
   const periodLabel = graphPeriod === "week" ? "Week" : graphPeriod === "month" ? "Month" : "Day";
   const planActualChart = buildPlanVsActualChart(activeDay, graphPeriod);
-  const outputChart = buildSummaryBarChart(`Output by ${bucketName} (${periodLabel}: ${activeDay})`, labels, outputVals, "#22c55e");
-  const downtimeChart = buildSummaryBarChart(`Downtime by ${bucketName} (${periodLabel}: ${activeDay})`, labels, downtimeMins, "#ef4444");
+  const outputChart = buildSummaryBarChart(`Output by ${bucketName} (${periodLabel}: ${rangeLabel})`, labels, outputVals, "#22c55e");
+  const downtimeChart = buildSummaryBarChart(`Downtime by ${bucketName} (${periodLabel}: ${rangeLabel})`, labels, downtimeMins, "#ef4444");
   graphBody.innerHTML = `
     <div class="summary-graph-card summary-graph-card-span">${planActualChart}</div>
     <div class="summary-graph-card">${outputChart}</div>
@@ -2275,22 +2349,30 @@ function showGraphPage() {
         <button type="button" id="graphPeriodWeekBtn" class="graph-period-btn">Week</button>
         <button type="button" id="graphPeriodMonthBtn" class="graph-period-btn">Month</button>
       </div>
-      <label for="graphDayFilter">Date</label>
-      <input type="date" id="graphDayFilter" title="Select date for graph charts">
-      <button type="button" id="graphDayTodayBtn" class="graph-today-btn">Today</button>
+      <div class="graph-range-box">
+        <span class="graph-range-label">DATE RANGE</span>
+        <div class="graph-range-inputs">
+          <input type="date" id="graphRangeStart" title="Graph range start date">
+          <span class="graph-range-sep">-</span>
+          <input type="date" id="graphRangeEnd" title="Graph range end date">
+          <button type="button" id="graphRangeTodayBtn" class="graph-today-btn">Today</button>
+        </div>
+      </div>
     </div>
     <div class="summary-graphs" id="graphChartsBody">
     </div>
   `;
-  syncGraphDayPickerUi();
+  syncGraphRangePickerUi();
   syncGraphPeriodButtonsUi();
-  const graphDayFilter = document.getElementById("graphDayFilter");
-  const graphDayTodayBtn = document.getElementById("graphDayTodayBtn");
+  const graphRangeStart = document.getElementById("graphRangeStart");
+  const graphRangeEnd = document.getElementById("graphRangeEnd");
+  const graphRangeTodayBtn = document.getElementById("graphRangeTodayBtn");
   const graphPeriodDayBtn = document.getElementById("graphPeriodDayBtn");
   const graphPeriodWeekBtn = document.getElementById("graphPeriodWeekBtn");
   const graphPeriodMonthBtn = document.getElementById("graphPeriodMonthBtn");
-  if (graphDayFilter) graphDayFilter.addEventListener("change", onGraphDayFilterChange);
-  if (graphDayTodayBtn) graphDayTodayBtn.addEventListener("click", onGraphDayTodayClick);
+  if (graphRangeStart) graphRangeStart.addEventListener("change", onGraphRangeFilterChange);
+  if (graphRangeEnd) graphRangeEnd.addEventListener("change", onGraphRangeFilterChange);
+  if (graphRangeTodayBtn) graphRangeTodayBtn.addEventListener("click", onGraphRangeTodayClick);
   if (graphPeriodDayBtn) graphPeriodDayBtn.addEventListener("click", () => onGraphPeriodChange("day"));
   if (graphPeriodWeekBtn) graphPeriodWeekBtn.addEventListener("click", () => onGraphPeriodChange("week"));
   if (graphPeriodMonthBtn) graphPeriodMonthBtn.addEventListener("click", () => onGraphPeriodChange("month"));
