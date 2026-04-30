@@ -523,29 +523,36 @@ tr:nth-child(even){background:#0b1220;}
 .menu-brand{
   display:flex;
   align-items:center;
-  gap:7px;
+  gap:10px;
   width:100%;
-  min-height:46px;
+  min-height:52px;
   margin:-54px 0 10px;
-  padding:8px 10px;
+  padding:9px 12px;
   border:none;
   border-radius:0;
   background:rgba(17,24,39,1);
+  overflow:hidden;
+  box-sizing:border-box;
 }
 
 .menu-brand-icon{
-  font-size:23px;
+  font-size:26px;
   line-height:1;
   filter:grayscale(1) brightness(2.2);
+  flex:0 0 auto;
 }
 
 .menu-brand-text{
-  font-size:11px;
+  font-size:13px;
   line-height:1.05;
   font-weight:800;
   color:#f8fafc;
   letter-spacing:.2px;
   text-transform:uppercase;
+  flex:1 1 auto;
+  min-width:0;
+  white-space:normal;
+  overflow-wrap:anywhere;
 }
 
 .menu-item{
