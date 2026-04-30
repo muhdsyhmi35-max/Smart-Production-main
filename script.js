@@ -2069,7 +2069,7 @@ function buildSummaryLineChart(title, labels, values, color, valueSuffix = "", y
   }));
   const path = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
   const circles = points.map((p, i) => `
-    <circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="3.8" fill="${color}">
+    <circle class="trend-dot" style="animation-delay:${i * 45}ms" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="3.8" fill="${color}">
       <title>${labels[i]}: ${p.value}${valueSuffix}</title>
     </circle>
   `).join("");
@@ -2099,7 +2099,7 @@ function buildSummaryLineChart(title, labels, values, color, valueSuffix = "", y
     ${yAxisLabel ? `<div class="trend-units">${yAxisLabel}</div>` : ""}
     <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg" role="img" aria-label="${title}">
       ${yGrid}
-      <path d="${path}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+      <path class="trend-line" d="${path}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
       ${circles}
       ${xLabels}
     </svg>
@@ -2285,7 +2285,6 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
         ${actualDots}
         ${xLabels}
       </svg>
-      <div class="plan-actual-sub">${totalPlan > 0 ? `Target ${formatNum(totalPlan)} | Actual ${formatNum(finalActual)}` : `Actual ${formatNum(finalActual)}`}</div>
   `;
 }
 
