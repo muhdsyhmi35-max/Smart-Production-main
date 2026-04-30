@@ -2453,15 +2453,6 @@ function renderGraphCharts() {
       <div class="summary-graph-card">${downtimeChart}</div>
     </div>
     <div class="report-bottom-grid">
-      <div class="report-table-wrap">
-        <div class="summary-graph-card-title">Daily Summary</div>
-        <div class="report-table-scroll">
-          <table class="report-mini-table">
-            <thead><tr><th>Date</th><th>Target</th><th>Produced</th><th>Balance</th><th>Achv</th><th>Downtime</th></tr></thead>
-            <tbody>${dailyRows || `<tr><td colspan="6">No data</td></tr>`}</tbody>
-          </table>
-        </div>
-      </div>
       <div class="summary-graph-card">${prodHourChart}</div>
       <div class="summary-graph-card">${oeeChart}</div>
     </div>
