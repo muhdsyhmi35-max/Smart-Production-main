@@ -517,6 +517,30 @@ tr:nth-child(even){background:#0b1220;}
   pointer-events:auto;
 }
 
+.menu-brand{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin:0 0 8px;
+  padding:6px 8px;
+  border:1px solid rgba(71,85,105,.45);
+  border-radius:6px;
+  background:rgba(30,41,59,.5);
+}
+
+.menu-brand-icon{
+  font-size:18px;
+  line-height:1;
+}
+
+.menu-brand-text{
+  font-size:11px;
+  line-height:1.15;
+  font-weight:800;
+  color:#e2e8f0;
+  letter-spacing:.35px;
+}
+
 .menu-item{
   width:100%;
   text-align:left;
