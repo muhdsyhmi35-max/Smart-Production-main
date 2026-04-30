@@ -2124,27 +2124,41 @@ function buildSummaryBarChart(title, labels, values, color, valueSuffix = "") {
   const bottomPad = 30;
   const chartW = width - leftPad - rightPad;
   const chartH = height - topPad - bottomPad;
+  const yBase = topPad + chartH;
   const maxVal = Math.max(...values, 1);
   const stepX = chartW / labels.length;
   const barW = Math.max(Math.min(stepX * 0.58, 36), 10);
+  const labelStride = labels.length > 24 ? 3 : labels.length > 16 ? 2 : 1;
 
   const bars = labels.map((label, i) => {
     const v = values[i];
     const x = leftPad + (i * stepX) + ((stepX - barW) / 2);
     const h = Math.max((v / maxVal) * chartH, v > 0 ? 2 : 0);
     const y = topPad + (chartH - h);
+    const showLabel = i % labelStride === 0 || i === labels.length - 1;
     return `
       <rect class="summary-bar" style="animation-delay:${i * 90}ms" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="${color}" opacity="0.9"></rect>
-      <text x="${(x + (barW / 2)).toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>
+      ${showLabel ? `<text x="${(x + (barW / 2)).toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>` : ""}
       <text x="${(x + (barW / 2)).toFixed(2)}" y="${(Math.max(y - 3, 10)).toFixed(2)}" text-anchor="middle" fill="#e2e8f0" font-size="9">${v}${valueSuffix}</text>
+    `;
+  }).join("");
+  const yTicks = 4;
+  const yGrid = Array.from({ length: yTicks + 1 }, (_, i) => {
+    const ratio = i / yTicks;
+    const y = topPad + chartH * ratio;
+    const val = Math.round(maxVal * (1 - ratio));
+    return `
+      <line x1="${leftPad}" y1="${y.toFixed(2)}" x2="${(width - rightPad).toFixed(2)}" y2="${y.toFixed(2)}" stroke="rgba(148,163,184,.16)" stroke-width="1"></line>
+      <text x="${(leftPad - 6).toFixed(2)}" y="${(y + 4).toFixed(2)}" text-anchor="end" fill="#94a3b8" font-size="9">${val}</text>
     `;
   }).join("");
 
   return `
     <div class="summary-graph-card-title">${title}</div>
     <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg" role="img" aria-label="${title}">
-      <line x1="${leftPad}" y1="${topPad + chartH}" x2="${width - rightPad}" y2="${topPad + chartH}" stroke="rgba(148,163,184,.45)" stroke-width="1"></line>
-      <line x1="${leftPad}" y1="${topPad}" x2="${leftPad}" y2="${topPad + chartH}" stroke="rgba(148,163,184,.45)" stroke-width="1"></line>
+      ${yGrid}
+      <line x1="${leftPad}" y1="${yBase}" x2="${width - rightPad}" y2="${yBase}" stroke="rgba(148,163,184,.45)" stroke-width="1"></line>
+      <line x1="${leftPad}" y1="${topPad}" x2="${leftPad}" y2="${yBase}" stroke="rgba(148,163,184,.45)" stroke-width="1"></line>
       ${bars}
     </svg>
   `;
