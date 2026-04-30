@@ -67,14 +67,32 @@ body::-webkit-scrollbar{
   justify-content:center;
   flex-wrap:wrap;
   gap:8px;
-  margin:4px 0 8px;
+  margin:0;
   font-size:13px;
   font-weight:600;
   color:#94a3b8;
+  max-height:0;
+  opacity:0;
+  overflow:hidden;
+  pointer-events:none;
+  transform:translateY(-3px);
+  transition:max-height .18s ease, opacity .18s ease, margin .18s ease, transform .18s ease;
 }
 
 .downtime-day-filter label{
   white-space:nowrap;
+}
+
+#downtimeCard{
+  cursor:default;
+}
+
+#downtimeCard.show-date-filter .downtime-day-filter{
+  margin:4px 0 8px;
+  max-height:42px;
+  opacity:.95;
+  pointer-events:auto;
+  transform:translateY(0);
 }
 
 .downtime-day-filter input[type="date"]{

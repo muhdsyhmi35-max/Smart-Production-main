@@ -43,6 +43,7 @@ let graphFilterDate = null;
 let historyFilterDate = null;
 /** null = today in summary filter; else YYYY-MM-DD. */
 let summaryFilterDate = null;
+let downtimeFilterExpanded = false;
 let lastScanTime = null;
 let startTime = null;
 let firstScanAtMs = null;
@@ -200,6 +201,17 @@ function onDowntimeDayTodayClick() {
   syncDowntimeDayPickerUi();
   refreshDowntimeCardFromTable();
   if (!isMonitor) updateLiveStateOnly();
+}
+
+function toggleDowntimeDateFilter(forceOpen) {
+  const card = document.getElementById("downtimeCard");
+  if (!card) return;
+  if (typeof forceOpen === "boolean") {
+    downtimeFilterExpanded = forceOpen;
+  } else {
+    downtimeFilterExpanded = !downtimeFilterExpanded;
+  }
+  card.classList.toggle("show-date-filter", downtimeFilterExpanded);
 }
 
 function getActiveGraphDayKey() {
@@ -2656,6 +2668,10 @@ if (downtimeDayFilterEl) {
 if (downtimeDayTodayBtn) {
   downtimeDayTodayBtn.addEventListener("click", onDowntimeDayTodayClick);
 }
+const downtimeCard = document.getElementById("downtimeCard");
+if (downtimeCard) {
+  downtimeCard.addEventListener("dblclick", () => toggleDowntimeDateFilter());
+}
 const historyDayFilterEl = document.getElementById("historyDayFilter");
 const historyDayTodayBtn = document.getElementById("historyDayTodayBtn");
 if (historyDayFilterEl) {
@@ -2671,6 +2687,7 @@ window.onload = async function() {
   if (!allowed) return;
 
   syncDowntimeDayPickerUi();
+  toggleDowntimeDateFilter(false);
 
   updateDateTime();
   setInterval(updateDateTime, 1000);
