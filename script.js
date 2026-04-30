@@ -2353,10 +2353,12 @@ function renderGraphCharts() {
     </div>
     <div class="report-table-wrap">
       <div class="summary-graph-card-title">Daily Summary</div>
-      <table class="report-mini-table">
-        <thead><tr><th>Date</th><th>Target</th><th>Produced</th><th>Balance</th><th>Achv</th><th>Downtime</th></tr></thead>
-        <tbody>${dailyRows || `<tr><td colspan="6">No data</td></tr>`}</tbody>
-      </table>
+      <div class="report-table-scroll">
+        <table class="report-mini-table">
+          <thead><tr><th>Date</th><th>Target</th><th>Produced</th><th>Balance</th><th>Achv</th><th>Downtime</th></tr></thead>
+          <tbody>${dailyRows || `<tr><td colspan="6">No data</td></tr>`}</tbody>
+        </table>
+      </div>
     </div>
   `;
 }

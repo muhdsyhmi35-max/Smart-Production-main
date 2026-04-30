@@ -1109,12 +1109,21 @@ body.graph-mode{
   border-radius:6px;
   background:rgba(30,41,59,.35);
   padding:6px;
-  overflow:auto;
+  overflow:hidden;
   margin-top:0;
+  display:flex;
+  flex-direction:column;
+  min-height:0;
 }
 
 .report-table-wrap .summary-graph-card-title{
   margin:0 0 2px;
+}
+
+.report-table-scroll{
+  flex:1 1 auto;
+  min-height:0;
+  overflow:auto;
 }
 
 .report-mini-table{
@@ -1132,11 +1141,11 @@ body.graph-mode{
   font-size:11px;
 }
 
-/* Prevent inherited global sticky-header behavior causing scroll gap here. */
 .report-mini-table th{
-  position:static;
-  top:auto;
-  z-index:auto;
+  position:sticky;
+  top:0;
+  z-index:2;
+  background:#1e293b;
 }
 
 .summary-graph-card{
