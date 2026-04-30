@@ -777,6 +777,47 @@ body.graph-mode{
   filter:brightness(1.08);
 }
 
+.summary-filter-row{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+  margin:0 0 10px;
+  color:#94a3b8;
+  font-size:13px;
+  font-weight:600;
+}
+
+.summary-filter-row input[type="date"]{
+  padding:4px 8px;
+  border-radius:6px;
+  border:1px solid rgba(71,85,105,.65);
+  background:rgba(2,6,23,.85);
+  color:#e2e8f0;
+  color-scheme:dark;
+}
+
+.summary-filter-row input[type="date"]::-webkit-calendar-picker-indicator{
+  cursor:pointer;
+  filter:invert(1) brightness(1.25);
+  opacity:1;
+}
+
+.summary-today-btn{
+  padding:4px 10px;
+  font-size:12px;
+  font-weight:800;
+  border-radius:6px;
+  border:1px solid rgba(56,189,248,.45);
+  background:rgba(30,58,138,.45);
+  color:#93c5fd;
+  cursor:pointer;
+}
+
+.summary-today-btn:hover{
+  filter:brightness(1.08);
+}
+
 .summary-graphs{
   display:grid;
   grid-template-columns:1fr 1fr;

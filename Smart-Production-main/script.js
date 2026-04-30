@@ -41,6 +41,8 @@ let downtimeFilterDate = null;
 let graphFilterDate = null;
 /** null = today in history filter; else YYYY-MM-DD. */
 let historyFilterDate = null;
+/** null = today in summary filter; else YYYY-MM-DD. */
+let summaryFilterDate = null;
 let lastScanTime = null;
 let startTime = null;
 let firstScanAtMs = null;
@@ -222,6 +224,29 @@ function onGraphDayTodayClick() {
   graphFilterDate = null;
   syncGraphDayPickerUi();
   renderGraphCharts();
+}
+
+function getActiveSummaryDayKey() {
+  return summaryFilterDate || toIsoDateLocal(new Date());
+}
+
+function syncSummaryDayPickerUi() {
+  const el = document.getElementById("summaryDayFilter");
+  if (el) el.value = getActiveSummaryDayKey();
+}
+
+function onSummaryDayFilterChange() {
+  const el = document.getElementById("summaryDayFilter");
+  if (!el) return;
+  const v = (el.value || "").trim().slice(0, 10);
+  const todayK = toIsoDateLocal(new Date());
+  summaryFilterDate = v && v !== todayK ? v : null;
+  showSummaryPage();
+}
+
+function onSummaryDayTodayClick() {
+  summaryFilterDate = null;
+  showSummaryPage();
 }
 
 function getActiveHistoryDayKey() {
@@ -2131,25 +2156,35 @@ function showGraphPage() {
 }
 
 function showSummaryPage() {
-  const plan = parseInt(document.getElementById("plan").innerText, 10) || 0;
-  const actual = parseInt(document.getElementById("actual").innerText, 10) || 0;
-  const expected = parseInt(document.getElementById("expected").innerText, 10) || 0;
-  const downtime = document.getElementById("downtime").innerText;
-  const efficiency = document.getElementById("efficiency").innerText;
-  const diff = actual - plan;
-  const diffDisplay = diff > 0 ? ("+" + diff) : String(diff);
+  const activeDay = getActiveSummaryDayKey();
+  let plan = getHistoricalPlanForDay(activeDay);
+  if (!Number.isFinite(plan) || plan < 0) {
+    plan = parseInt(document.getElementById("plan").innerText, 10) || 0;
+  }
+  if (!Number.isFinite(plan) || plan < 0) {
+    plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+  }
+
+  let actual = 0;
+  let downtimeSec = 0;
+  const expected = plan > 0 ? plan : 0;
 
   const rows = document.querySelectorAll("#scanTable tr");
   let tableRows = "";
+  let rowNo = 1;
   rows.forEach(row => {
     const cells = row.querySelectorAll("td");
     if (cells.length > 0) {
+      const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
+      if (!rowDay || rowDay !== activeDay) return;
       const statusText = (cells[8]?.innerText || "").trim().toUpperCase();
       const isDowntime = statusText === "DOWN TIME";
       const statusClass = isDowntime ? "summary-status-downtime" : "summary-status-scanned";
       const downtimeClass = isDowntime ? "summary-downtime-red" : "";
+      actual += 1;
+      if (isDowntime) downtimeSec += parseMmSsToSeconds(cells[9]?.innerText || "");
       tableRows += `<tr>
-        <td>${cells[0].innerText}</td>
+        <td>${rowNo++}</td>
         <td>${cells[1].innerText}</td>
         <td>${cells[2].innerText}</td>
         <td>${cells[3].innerText}</td>
@@ -2162,6 +2197,10 @@ function showSummaryPage() {
       </tr>`;
     }
   });
+  const downtime = format(downtimeSec);
+  const diff = actual - plan;
+  const diffDisplaySafe = diff > 0 ? ("+" + diff) : String(diff);
+  const efficiency = plan > 0 ? `${Math.floor((actual / plan) * 100)}%` : "0%";
 
   let summaryPage = document.getElementById("summaryPage");
   if (!summaryPage) {
@@ -2173,12 +2212,17 @@ function showSummaryPage() {
 
   summaryPage.innerHTML = `
     <div class="summary-head">Daily Summary</div>
+    <div class="summary-filter-row">
+      <label for="summaryDayFilter">Date</label>
+      <input type="date" id="summaryDayFilter" title="Select date for daily summary">
+      <button type="button" id="summaryDayTodayBtn" class="summary-today-btn">Today</button>
+    </div>
     <div class="summary-grid">
-      <div class="summary-tile"><span>Date</span><strong>${new Date().toLocaleDateString()}</strong></div>
+      <div class="summary-tile"><span>Date</span><strong>${activeDay}</strong></div>
       <div class="summary-tile"><span>Plan</span><strong>${plan}</strong></div>
       <div class="summary-tile"><span>Actual</span><strong>${actual}</strong></div>
       <div class="summary-tile"><span>Expected</span><strong>${expected}</strong></div>
-      <div class="summary-tile"><span>Difference</span><strong>${diffDisplay}</strong></div>
+      <div class="summary-tile"><span>Difference</span><strong>${diffDisplaySafe}</strong></div>
       <div class="summary-tile"><span>Downtime</span><strong>${downtime}</strong></div>
       <div class="summary-tile"><span>Efficiency</span><strong>${efficiency}</strong></div>
     </div>
@@ -2193,6 +2237,11 @@ function showSummaryPage() {
       </table>
     </div>
   `;
+  syncSummaryDayPickerUi();
+  const summaryDayFilter = document.getElementById("summaryDayFilter");
+  const summaryDayTodayBtn = document.getElementById("summaryDayTodayBtn");
+  if (summaryDayFilter) summaryDayFilter.addEventListener("change", onSummaryDayFilterChange);
+  if (summaryDayTodayBtn) summaryDayTodayBtn.addEventListener("click", onSummaryDayTodayClick);
 
   document.body.classList.add("summary-mode");
   document.body.classList.remove("graph-mode");
