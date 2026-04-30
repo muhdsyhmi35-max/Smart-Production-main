@@ -2112,7 +2112,7 @@ function parseHourFromTimeText(timeText) {
   return hour;
 }
 
-function buildSummaryBarChart(title, labels, values, color, valueSuffix = "") {
+function buildSummaryBarChart(title, labels, values, color, valueSuffix = "", yAxisLabel = "") {
   if (!labels.length || !values.length) {
     return `<div class="summary-graph-empty">No data</div>`;
   }
@@ -2153,8 +2153,15 @@ function buildSummaryBarChart(title, labels, values, color, valueSuffix = "") {
     `;
   }).join("");
 
+  const titleMatch = String(title).match(/^(.*?)(\s*\((.*)\))$/);
+  const titleMain = titleMatch ? titleMatch[1].trim() : String(title);
+  const titleSub = titleMatch ? String(titleMatch[3] || "").trim() : "";
   return `
-    <div class="summary-graph-card-title">${title}</div>
+    <div class="trend-title-wrap trend-title-wrap-compact">
+      <div class="trend-title trend-title-small">${titleMain}</div>
+      ${titleSub ? `<div class="trend-subtitle">${titleSub}</div>` : ""}
+    </div>
+    ${yAxisLabel ? `<div class="trend-units">${yAxisLabel}</div>` : ""}
     <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg" role="img" aria-label="${title}">
       ${yGrid}
       <line x1="${leftPad}" y1="${yBase}" x2="${width - rightPad}" y2="${yBase}" stroke="rgba(148,163,184,.45)" stroke-width="1"></line>
@@ -2531,7 +2538,7 @@ function renderGraphCharts() {
     </tr>`;
   }).join("");
   const planActualChart = buildPlanVsActualChart(activeDay, graphPeriod);
-  const downtimeChart = buildSummaryBarChart(`Downtime Trend (${periodLabel}: ${rangeLabel})`, labels, downtimeMins, "#ef4444");
+  const downtimeChart = buildSummaryBarChart(`Downtime Trend (${periodLabel}: ${rangeLabel})`, labels, downtimeMins, "#ef4444", "", "Minutes");
   const daysCount = Math.max(periodKeys.length, 1);
   const hourlyProduced = {};
   rows.forEach(row => {
@@ -2546,7 +2553,7 @@ function renderGraphCharts() {
   const activeHours = Object.keys(hourlyProduced).map(v => parseInt(v, 10)).filter(Number.isFinite).sort((a, b) => a - b);
   const prodHourLabels = activeHours.map(h => `${String(h).padStart(2, "0")}:00`);
   const prodHourValues = activeHours.map(h => Number((hourlyProduced[h] / daysCount).toFixed(1)));
-  const prodHourChart = buildSummaryBarChart("PRODUCTION BY HOUR (AVERAGE)", prodHourLabels, prodHourValues, "#3b82f6");
+  const prodHourChart = buildSummaryBarChart("PRODUCTION BY HOUR (AVERAGE)", prodHourLabels, prodHourValues, "#3b82f6", "", "Units");
   const oeeLabels = periodKeys.map(k => {
     const d = new Date(`${k}T00:00:00`);
     return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });

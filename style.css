@@ -50,7 +50,7 @@
     padding:5px;
   }
   .summary-chart-plan-actual{
-    max-height:31vh;
+    max-height:20vh;
   }
   .summary-chart-svg{
     max-height:20vh;
@@ -91,7 +91,7 @@
     gap:12px;
   }
   .summary-chart-plan-actual{
-    max-height:38vh;
+    max-height:27vh;
   }
   .summary-chart-svg{
     max-height:27vh;
@@ -1213,7 +1213,7 @@ body.graph-mode{
 .summary-chart-plan-actual{
   max-width:100%;
   margin:0 auto;
-  max-height:34vh;
+  max-height:24vh;
 }
 
 .trend-header{
@@ -1228,6 +1228,15 @@ body.graph-mode{
   font-weight:800;
   letter-spacing:.01em;
   color:#e2e8f0;
+}
+
+.trend-title-small{
+  font-size:12px;
+  font-weight:700;
+}
+
+.trend-title-wrap-compact{
+  margin-bottom:1px;
 }
 
 .trend-subtitle{
