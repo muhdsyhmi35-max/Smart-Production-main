@@ -2268,15 +2268,17 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
   return `
       <div class="trend-header">
         <div class="trend-title-wrap trend-title-wrap-compact">
-          <div class="trend-title trend-title-small">Production Trend</div>
+          <div class="trend-title trend-title-small">PRODUCTION TREND</div>
           <div class="trend-subtitle">${periodLabel}: ${rangeLabel}</div>
         </div>
-        <div class="trend-legend">
-          <span class="trend-legend-item"><i class="trend-swatch trend-swatch-actual"></i>Actual</span>
-          <span class="trend-legend-item"><i class="trend-swatch trend-swatch-target"></i>Target</span>
+        <div class="trend-legend-stack">
+          <div class="trend-legend">
+            <span class="trend-legend-item"><i class="trend-swatch trend-swatch-actual"></i>Actual</span>
+            <span class="trend-legend-item"><i class="trend-swatch trend-swatch-target"></i>Target</span>
+          </div>
+          ${diffNote ? `<div class="plan-actual-diff">${diffNote}</div>` : ""}
         </div>
       </div>
-      ${diffNote ? `<div class="plan-actual-diff">${diffNote}</div>` : ""}
       <div class="trend-units">Units</div>
       <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg summary-chart-plan-actual" role="img" aria-label="Production trend chart">
         <defs>
@@ -2427,7 +2429,7 @@ function renderGraphCharts() {
     </tr>`;
   }).join("");
   const planActualChart = buildPlanVsActualChart(activeDay, graphPeriod);
-  const downtimeChart = buildSummaryBarChart(`Downtime Trend (${periodLabel}: ${rangeLabel})`, labels, downtimeMins, "#ef4444", "", "Minutes");
+  const downtimeChart = buildSummaryBarChart(`DOWNTIME TREND (${periodLabel}: ${rangeLabel})`, labels, downtimeMins, "#ef4444", "", "Minutes");
   const daysCount = Math.max(periodKeys.length, 1);
   const hourlyProduced = {};
   rows.forEach(row => {

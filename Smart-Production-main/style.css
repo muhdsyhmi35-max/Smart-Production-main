@@ -1257,7 +1257,8 @@ body.graph-mode{
   font-size:11px;
   font-weight:700;
   color:#93c5fd;
-  margin:0 0 3px;
+  margin:0;
+  text-align:right;
 }
 
 .summary-chart-plan-actual{
@@ -1302,6 +1303,13 @@ body.graph-mode{
   color:#cbd5e1;
   font-size:10px;
   font-weight:700;
+}
+
+.trend-legend-stack{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:2px;
 }
 
 .trend-legend-item{
