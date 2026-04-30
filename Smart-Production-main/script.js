@@ -2339,11 +2339,12 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
   const bottomPad = 28;
   const chartW = width - leftPad - rightPad;
   const chartH = height - topPad - bottomPad;
-  // Match OEE-like baseline scale (0-100) for visual consistency.
+  // Match OEE-like baseline scale (0-100) for visual consistency; y-axis domain ×10 for this chart.
   const maxVal = Math.max(totalPlan, finalActual, 100);
+  const axisMax = maxVal * 10;
   const xStep = dayKeys.length <= 1 ? chartW : (chartW / (dayKeys.length - 1));
   const yBase = topPad + chartH;
-  const toY = (v) => yBase - ((v / maxVal) * chartH);
+  const toY = (v) => yBase - ((v / axisMax) * chartH);
   const formatNum = (n) => Number(n || 0).toLocaleString();
 
   const actualPoints = dayKeys.map((_, i) => ({
@@ -2374,7 +2375,7 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
   const gridLines = Array.from({ length: yTicks + 1 }, (_, i) => {
     const ratio = i / yTicks;
     const y = topPad + (chartH * ratio);
-    const v = Math.round(maxVal * (1 - ratio));
+    const v = Math.round(axisMax * (1 - ratio));
     return `
       <line x1="${leftPad}" y1="${y.toFixed(2)}" x2="${(width - rightPad).toFixed(2)}" y2="${y.toFixed(2)}" stroke="rgba(30,64,175,.2)" stroke-width="1"></line>
       <text x="${(leftPad - 8).toFixed(2)}" y="${(y + 4).toFixed(2)}" text-anchor="end" fill="#94a3b8" font-size="10">${formatNum(v)}</text>
