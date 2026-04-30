@@ -2610,11 +2610,6 @@ function showGraphPage() {
   graphPage.innerHTML = `
     <div class="summary-head">Production Report</div>
     <div class="graph-filter-row">
-      <div class="report-selects">
-        <select><option>Daily Production Report</option></select>
-        <select><option>All Shifts</option></select>
-        <select><option>All Lines</option></select>
-      </div>
       <div class="graph-period-toggle" role="group" aria-label="Graph period">
         <button type="button" id="graphPeriodDayBtn" class="graph-period-btn">Day</button>
         <button type="button" id="graphPeriodWeekBtn" class="graph-period-btn">Week</button>
