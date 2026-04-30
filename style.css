@@ -1112,7 +1112,7 @@ body.graph-mode{
 
 .report-chart-grid{
   display:grid;
-  grid-template-columns:1.3fr 1fr;
+  grid-template-columns:1.15fr 1fr;
   gap:10px;
   align-items:stretch;
   min-height:0;
