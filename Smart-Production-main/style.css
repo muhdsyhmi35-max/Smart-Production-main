@@ -1118,13 +1118,13 @@ body.graph-mode{
 
 .report-kpi span{
   display:block;
-  font-size:10px;
+  font-size:12px;
   color:#94a3b8;
 }
 
 .report-kpi strong{
   display:inline-block;
-  font-size:26px;
+  font-size:34px;
   line-height:1.1;
   color:#60a5fa;
 }
@@ -1134,7 +1134,7 @@ body.graph-mode{
 
 .report-kpi em{
   margin-left:4px;
-  font-size:10px;
+  font-size:12px;
   color:#94a3b8;
   font-style:normal;
 }
