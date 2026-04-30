@@ -2150,6 +2150,58 @@ function buildSummaryBarChart(title, labels, values, color, valueSuffix = "") {
   `;
 }
 
+function buildSummaryLineChart(title, labels, values, color, valueSuffix = "", yAxisLabel = "") {
+  if (!labels.length || !values.length) {
+    return `<div class="summary-graph-empty">No data</div>`;
+  }
+  const width = 500;
+  const height = 170;
+  const leftPad = 36;
+  const rightPad = 12;
+  const topPad = 14;
+  const bottomPad = 28;
+  const chartW = width - leftPad - rightPad;
+  const chartH = height - topPad - bottomPad;
+  const maxVal = Math.max(...values, 1);
+  const stepX = labels.length <= 1 ? chartW : (chartW / (labels.length - 1));
+  const yBase = topPad + chartH;
+  const toY = (v) => yBase - ((v / maxVal) * chartH);
+  const points = values.map((v, i) => ({
+    x: leftPad + (stepX * i),
+    y: toY(v),
+    value: v
+  }));
+  const path = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+  const circles = points.map((p, i) => `
+    <circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="3.8" fill="${color}">
+      <title>${labels[i]}: ${p.value}${valueSuffix}</title>
+    </circle>
+  `).join("");
+  const xLabels = labels.map((label, i) => `
+    <text x="${(leftPad + stepX * i).toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>
+  `).join("");
+  const yTicks = 4;
+  const yGrid = Array.from({ length: yTicks + 1 }, (_, i) => {
+    const ratio = i / yTicks;
+    const y = topPad + chartH * ratio;
+    const val = Math.round(maxVal * (1 - ratio));
+    return `
+      <line x1="${leftPad}" y1="${y.toFixed(2)}" x2="${(width - rightPad).toFixed(2)}" y2="${y.toFixed(2)}" stroke="rgba(148,163,184,.16)" stroke-width="1"></line>
+      <text x="${(leftPad - 6).toFixed(2)}" y="${(y + 4).toFixed(2)}" text-anchor="end" fill="#94a3b8" font-size="9">${val}</text>
+    `;
+  }).join("");
+  return `
+    <div class="summary-graph-card-title">${title}</div>
+    ${yAxisLabel ? `<div class="trend-units">${yAxisLabel}</div>` : ""}
+    <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg" role="img" aria-label="${title}">
+      ${yGrid}
+      <path d="${path}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+      ${circles}
+      ${xLabels}
+    </svg>
+  `;
+}
+
 function getPlanActualForPeriod(anchorDay, period = "day") {
   const range = getActiveGraphRange();
   const periodKeys = getDayKeysBetween(range.start, range.end);
@@ -2464,6 +2516,32 @@ function renderGraphCharts() {
   }).join("");
   const planActualChart = buildPlanVsActualChart(activeDay, graphPeriod);
   const downtimeChart = buildSummaryBarChart(`Downtime Trend (${periodLabel}: ${rangeLabel})`, labels, downtimeMins, "#ef4444");
+  const daysCount = Math.max(periodKeys.length, 1);
+  const hourlyProduced = {};
+  rows.forEach(row => {
+    const cells = row.querySelectorAll("td");
+    if (!cells.length) return;
+    const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
+    if (!rowDay || !keySet.has(rowDay)) return;
+    const hour = parseHourFromTimeText(cells[2]?.innerText || "");
+    if (hour == null) return;
+    hourlyProduced[hour] = (hourlyProduced[hour] || 0) + 1;
+  });
+  const activeHours = Object.keys(hourlyProduced).map(v => parseInt(v, 10)).filter(Number.isFinite).sort((a, b) => a - b);
+  const prodHourLabels = activeHours.map(h => `${String(h).padStart(2, "0")}:00`);
+  const prodHourValues = activeHours.map(h => Number((hourlyProduced[h] / daysCount).toFixed(1)));
+  const prodHourChart = buildSummaryBarChart("PRODUCTION BY HOUR (AVERAGE)", prodHourLabels, prodHourValues, "#3b82f6");
+  const oeeLabels = periodKeys.map(k => {
+    const d = new Date(`${k}T00:00:00`);
+    return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  });
+  const oeeValues = periodKeys.map(k => {
+    const target = dayTarget[k] || 0;
+    const produced = dayProduced[k] || 0;
+    if (target <= 0) return 0;
+    return Number(Math.max(0, Math.min(100, (produced / target) * 100)).toFixed(1));
+  });
+  const oeeChart = buildSummaryLineChart("OEE TREND (%)", oeeLabels, oeeValues, "#a855f7", "%", "%");
   graphBody.innerHTML = `
     <div class="report-kpi-grid">
       <div class="report-kpi"><span>Total Produced</span><strong>${totalProduced}</strong><em>units</em></div>
@@ -2474,16 +2552,20 @@ function renderGraphCharts() {
     </div>
     <div class="report-chart-grid">
       <div class="summary-graph-card">${planActualChart}</div>
+      <div class="summary-graph-card">${prodHourChart}</div>
       <div class="summary-graph-card">${downtimeChart}</div>
     </div>
-    <div class="report-table-wrap">
-      <div class="summary-graph-card-title">Daily Summary</div>
-      <div class="report-table-scroll">
-        <table class="report-mini-table">
-          <thead><tr><th>Date</th><th>Target</th><th>Produced</th><th>Balance</th><th>Achv</th><th>Downtime</th></tr></thead>
-          <tbody>${dailyRows || `<tr><td colspan="6">No data</td></tr>`}</tbody>
-        </table>
+    <div class="report-bottom-grid">
+      <div class="report-table-wrap">
+        <div class="summary-graph-card-title">Daily Summary</div>
+        <div class="report-table-scroll">
+          <table class="report-mini-table">
+            <thead><tr><th>Date</th><th>Target</th><th>Produced</th><th>Balance</th><th>Achv</th><th>Downtime</th></tr></thead>
+            <tbody>${dailyRows || `<tr><td colspan="6">No data</td></tr>`}</tbody>
+          </table>
+        </div>
       </div>
+      <div class="summary-graph-card">${oeeChart}</div>
     </div>
   `;
 }
