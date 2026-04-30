@@ -2099,7 +2099,12 @@ function collectHourlyGraphData(dayKey = getActiveGraphDayKey()) {
   ].map(v => parseInt(v, 10)).filter(Number.isFinite))).sort((a, b) => a - b);
   const labels = hourKeys.map(h => `${String(h).padStart(2, "0")}:00`);
   const outputVals = hourKeys.map(h => outputByHour[h] || 0);
-  const downtimeMins = hourKeys.map(h => Math.round((downtimeByHour[h] || 0) / 60));
+  // Keep sub-1-minute downtime visible on the chart (minimum 1 minute bar).
+  const downtimeMins = hourKeys.map(h => {
+    const sec = downtimeByHour[h] || 0;
+    if (sec <= 0) return 0;
+    return Math.max(1, Math.round(sec / 60));
+  });
   return { labels, outputVals, downtimeMins };
 }
 
@@ -2162,6 +2167,7 @@ function showGraphPage() {
 }
 
 function showSummaryPage() {
+  toggleMenuDropdown(false);
   const activeDay = getActiveSummaryDayKey();
   let plan = getHistoricalPlanForDay(activeDay);
   if (!Number.isFinite(plan) || plan < 0) {
