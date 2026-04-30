@@ -2053,55 +2053,133 @@ function getPlanActualForPeriod(anchorDay, period = "day") {
 }
 
 function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphPeriod) {
-  const { plan, actual } = getPlanActualForPeriod(dayKey, period);
-  const periodLabel = period === "week" ? "Week" : period === "month" ? "Month" : "Day";
   const range = getActiveGraphRange();
   const rangeLabel = range.start === range.end ? range.start : `${range.start} to ${range.end}`;
+  const dayKeys = getDayKeysBetween(range.start, range.end);
+  const daySet = new Set(dayKeys);
+  const periodLabel = period === "week" ? "Week" : period === "month" ? "Month" : "Day";
 
-  if (plan <= 0 && actual <= 0) {
+  const dailyActualMap = {};
+  const rows = document.querySelectorAll("#scanTable tr");
+  rows.forEach(row => {
+    const cells = row.querySelectorAll("td");
+    if (!cells.length) return;
+    const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
+    if (!rowDay || !daySet.has(rowDay)) return;
+    dailyActualMap[rowDay] = (dailyActualMap[rowDay] || 0) + 1;
+  });
+
+  const totalDailyPlan = dayKeys.reduce((sum, key) => {
+    const hist = getHistoricalPlanForDay(key);
+    if (Number.isFinite(hist) && hist > 0) return sum + hist;
+    return sum;
+  }, 0);
+  let fallbackDayPlan = parseInt(document.getElementById("plan").innerText.trim(), 10);
+  if (!Number.isFinite(fallbackDayPlan) || fallbackDayPlan <= 0) {
+    fallbackDayPlan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+  }
+  const totalPlan = totalDailyPlan > 0 ? totalDailyPlan : Math.max(0, fallbackDayPlan * Math.max(dayKeys.length, 1));
+
+  let runningActual = 0;
+  const actualSeries = dayKeys.map(k => {
+    runningActual += (dailyActualMap[k] || 0);
+    return runningActual;
+  });
+  const targetSeries = dayKeys.map((_, i) => {
+    if (!dayKeys.length) return 0;
+    return Math.round((totalPlan * (i + 1)) / dayKeys.length);
+  });
+
+  const finalActual = actualSeries[actualSeries.length - 1] || 0;
+  const diff = finalActual - totalPlan;
+  const diffNote = totalPlan > 0
+    ? (diff === 0 ? "On target" : diff > 0 ? `Ahead by ${diff}` : `Behind by ${Math.abs(diff)}`)
+    : "";
+
+  if (totalPlan <= 0 && finalActual <= 0) {
     return `
       <div class="summary-graph-card-title">Plan vs Actual</div>
       <div class="summary-graph-empty">No daily plan or actual output yet</div>`;
   }
 
-  const width = 520;
-  const height = 200;
-  const leftPad = 44;
-  const rightPad = 24;
-  const topPad = 18;
-  const bottomPad = 36;
+  const width = 620;
+  const height = 230;
+  const leftPad = 56;
+  const rightPad = 16;
+  const topPad = 32;
+  const bottomPad = 38;
   const chartW = width - leftPad - rightPad;
   const chartH = height - topPad - bottomPad;
-  const maxVal = Math.max(plan, actual, 1);
-  const midGap = chartW * 0.22;
-  const barW = (chartW - midGap) / 2;
-  const xPlan = leftPad + midGap * 0.25;
-  const xActual = xPlan + barW + midGap * 0.5;
-
-  const hPlan = Math.max((plan / maxVal) * chartH, plan > 0 ? 3 : 0);
-  const hActual = Math.max((actual / maxVal) * chartH, actual > 0 ? 3 : 0);
+  const maxVal = Math.max(totalPlan, finalActual, 1);
+  const xStep = dayKeys.length <= 1 ? chartW : (chartW / (dayKeys.length - 1));
   const yBase = topPad + chartH;
-  const yPlan = yBase - hPlan;
-  const yActual = yBase - hActual;
-  const diff = actual - plan;
-  let diffNote = "";
-  if (plan > 0) {
-    diffNote = diff === 0 ? "On plan" : diff > 0 ? `Ahead by ${diff}` : `Behind by ${Math.abs(diff)}`;
-  }
+  const toY = (v) => yBase - ((v / maxVal) * chartH);
+  const formatNum = (n) => Number(n || 0).toLocaleString();
+
+  const actualPoints = dayKeys.map((_, i) => ({
+    x: leftPad + (xStep * i),
+    y: toY(actualSeries[i] || 0),
+    value: actualSeries[i] || 0
+  }));
+  const targetPoints = dayKeys.map((_, i) => ({
+    x: leftPad + (xStep * i),
+    y: toY(targetSeries[i] || 0),
+    value: targetSeries[i] || 0
+  }));
+  const actualPath = actualPoints.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+  const targetPath = targetPoints.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+  const areaPath = actualPoints.length
+    ? `${actualPath} L ${actualPoints[actualPoints.length - 1].x.toFixed(2)} ${yBase.toFixed(2)} L ${actualPoints[0].x.toFixed(2)} ${yBase.toFixed(2)} Z`
+    : "";
+  const yTicks = 4;
+  const gridLines = Array.from({ length: yTicks + 1 }, (_, i) => {
+    const ratio = i / yTicks;
+    const y = topPad + (chartH * ratio);
+    const v = Math.round(maxVal * (1 - ratio));
+    return `
+      <line x1="${leftPad}" y1="${y.toFixed(2)}" x2="${(width - rightPad).toFixed(2)}" y2="${y.toFixed(2)}" stroke="rgba(30,64,175,.2)" stroke-width="1"></line>
+      <text x="${(leftPad - 8).toFixed(2)}" y="${(y + 4).toFixed(2)}" text-anchor="end" fill="#94a3b8" font-size="10">${formatNum(v)}</text>
+    `;
+  }).join("");
+  const xLabels = dayKeys.map((k, i) => {
+    const d = new Date(`${k}T00:00:00`);
+    const label = d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    const x = leftPad + (xStep * i);
+    return `<text x="${x.toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="10">${label}</text>`;
+  }).join("");
+  const actualDots = actualPoints.map((p, i) => `<circle class="trend-dot" style="animation-delay:${i * 45}ms" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="4.2" fill="#4ade80"></circle>`).join("");
+  const targetDots = targetPoints.map((p, i) => `<circle class="trend-dot" style="animation-delay:${i * 45}ms" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="4.2" fill="#3b82f6"></circle>`).join("");
 
   return `
-      <div class="summary-graph-card-title">Plan vs Actual (${periodLabel}: ${rangeLabel}) <span class="plan-actual-sub">${plan > 0 ? `(target ${plan}, done ${actual})` : `(output ${actual})`}</span></div>
-    ${diffNote ? `<div class="plan-actual-diff">${diffNote}</div>` : ""}
-    <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg summary-chart-plan-actual" role="img" aria-label="Plan versus actual output">
-      <line x1="${leftPad}" y1="${yBase}" x2="${width - rightPad}" y2="${yBase}" stroke="rgba(148,163,184,.45)" stroke-width="1"></line>
-      <line x1="${leftPad}" y1="${topPad}" x2="${leftPad}" y2="${yBase}" stroke="rgba(148,163,184,.45)" stroke-width="1"></line>
-      <rect class="summary-bar" style="animation-delay:0ms" x="${xPlan.toFixed(2)}" y="${yPlan.toFixed(2)}" width="${barW.toFixed(2)}" height="${hPlan.toFixed(2)}" rx="2" fill="#60a5fa" opacity="0.92"></rect>
-      <rect class="summary-bar" style="animation-delay:110ms" x="${xActual.toFixed(2)}" y="${yActual.toFixed(2)}" width="${barW.toFixed(2)}" height="${hActual.toFixed(2)}" rx="2" fill="#22c55e" opacity="0.92"></rect>
-      <text x="${(xPlan + barW / 2).toFixed(2)}" y="${(height - 12).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="11">Plan</text>
-      <text x="${(xActual + barW / 2).toFixed(2)}" y="${(height - 12).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="11">Actual</text>
-      <text x="${(xPlan + barW / 2).toFixed(2)}" y="${Math.max(yPlan - 6, 14).toFixed(2)}" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="700">${plan}</text>
-      <text x="${(xActual + barW / 2).toFixed(2)}" y="${Math.max(yActual - 6, 14).toFixed(2)}" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="700">${actual}</text>
-    </svg>`;
+      <div class="trend-header">
+        <div class="trend-title-wrap">
+          <div class="trend-title">PRODUCTION TREND</div>
+          <div class="trend-subtitle">${periodLabel}: ${rangeLabel}</div>
+        </div>
+        <div class="trend-legend">
+          <span class="trend-legend-item"><i class="trend-swatch trend-swatch-actual"></i>Actual</span>
+          <span class="trend-legend-item"><i class="trend-swatch trend-swatch-target"></i>Target</span>
+        </div>
+      </div>
+      ${diffNote ? `<div class="plan-actual-diff">${diffNote}</div>` : ""}
+      <div class="trend-units">Units</div>
+      <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg summary-chart-plan-actual" role="img" aria-label="Production trend chart">
+        <defs>
+          <linearGradient id="actualTrendFill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stop-color="rgba(74,222,128,.35)"></stop>
+            <stop offset="100%" stop-color="rgba(74,222,128,0)"></stop>
+          </linearGradient>
+        </defs>
+        ${gridLines}
+        ${areaPath ? `<path d="${areaPath}" fill="url(#actualTrendFill)"></path>` : ""}
+        <path class="trend-line trend-line-target" d="${targetPath}" fill="none" stroke="#3b82f6" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path class="trend-line trend-line-actual" d="${actualPath}" fill="none" stroke="#4ade80" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"></path>
+        ${targetDots}
+        ${actualDots}
+        ${xLabels}
+      </svg>
+      <div class="plan-actual-sub">${totalPlan > 0 ? `Target ${formatNum(totalPlan)} | Actual ${formatNum(finalActual)}` : `Actual ${formatNum(finalActual)}`}</div>
+  `;
 }
 
 function getHistoricalPlanForDay(dayKey) {

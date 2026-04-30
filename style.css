@@ -962,7 +962,7 @@ body.graph-mode{
   font-weight:600;
   font-size:11px;
   color:#64748b;
-  margin-left:6px;
+  margin-top:4px;
 }
 
 .plan-actual-diff{
@@ -973,8 +973,85 @@ body.graph-mode{
 }
 
 .summary-chart-plan-actual{
-  max-width:560px;
+  max-width:680px;
   margin:0 auto;
+}
+
+.trend-header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.trend-title{
+  font-size:30px;
+  font-weight:800;
+  letter-spacing:.01em;
+  color:#e2e8f0;
+}
+
+.trend-subtitle{
+  font-size:11px;
+  color:#64748b;
+  margin-top:2px;
+}
+
+.trend-legend{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  color:#cbd5e1;
+  font-size:12px;
+  font-weight:700;
+}
+
+.trend-legend-item{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+}
+
+.trend-swatch{
+  display:inline-block;
+  width:18px;
+  height:3px;
+  border-radius:999px;
+}
+
+.trend-swatch-actual{ background:#4ade80; }
+.trend-swatch-target{ background:#3b82f6; }
+
+.trend-units{
+  margin:6px 0 2px;
+  font-size:12px;
+  font-weight:700;
+  color:#94a3b8;
+}
+
+.trend-line{
+  stroke-dasharray:1400;
+  stroke-dashoffset:1400;
+  animation:trendLineDraw 1s ease-out forwards;
+}
+
+.trend-line-target{
+  stroke-dasharray:8 8;
+}
+
+.trend-dot{
+  opacity:0;
+  transform-origin:center;
+  animation:trendDotPop .28s ease-out forwards;
+}
+
+@keyframes trendLineDraw{
+  to{ stroke-dashoffset:0; }
+}
+
+@keyframes trendDotPop{
+  from{ opacity:0; transform:scale(.4); }
+  to{ opacity:1; transform:scale(1); }
 }
 
 .summary-graph-card-title{
