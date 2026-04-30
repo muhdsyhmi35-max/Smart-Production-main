@@ -553,9 +553,9 @@ tr:nth-child(even){background:#0b1220;}
   display:flex;
   align-items:center;
   gap:7px;
-  width:160px;
+  width:calc(100% + 20px);
   min-height:42px;
-  margin:-54px 0 10px -10px;
+  margin:-54px -10px 10px;
   padding:7px 10px;
   border:none;
   border-radius:0;
@@ -657,7 +657,7 @@ body.history-mode #historyPanel.open .history-table-wrap{
   padding:10px 14px;
   font-weight:700;
   color:#93c5fd;
-  border-bottom:1px solid rgba(71,85,105,.45);
+  border-bottom:none;
   background:rgba(30,41,59,.5);
 }
 
@@ -711,6 +711,7 @@ body.history-mode #historyPanel.open .history-table-wrap{
 .history-table-wrap{
   max-height:calc(60vh - 44px);
   overflow:auto;
+  margin-top:-1px;
 }
 
 .history-panel table{
