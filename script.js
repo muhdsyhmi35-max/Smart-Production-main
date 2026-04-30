@@ -2156,11 +2156,13 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
       <text x="${(leftPad - 8).toFixed(2)}" y="${(y + 4).toFixed(2)}" text-anchor="end" fill="#94a3b8" font-size="10">${formatNum(v)}</text>
     `;
   }).join("");
+  const labelStride = dayKeys.length > 24 ? 3 : dayKeys.length > 16 ? 2 : 1;
   const xLabels = dayKeys.map((k, i) => {
+    if (i % labelStride !== 0 && i !== dayKeys.length - 1) return "";
     const d = new Date(`${k}T00:00:00`);
     const label = d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
     const x = leftPad + (xStep * i);
-    return `<text x="${x.toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="10">${label}</text>`;
+    return `<text x="${x.toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>`;
   }).join("");
   const actualDots = actualPoints.map((p, i) => {
     const dTxt = formatIsoDateAsDdMmYy(dayKeys[i]);
