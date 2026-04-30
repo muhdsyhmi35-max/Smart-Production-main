@@ -2101,12 +2101,12 @@ function buildSummaryBarChart(title, labels, values, color, valueSuffix = "") {
   if (!labels.length || !values.length) {
     return `<div class="summary-graph-empty">No data</div>`;
   }
-  const width = 520;
-  const height = 210;
+  const width = 500;
+  const height = 170;
   const leftPad = 36;
   const rightPad = 12;
-  const topPad = 16;
-  const bottomPad = 34;
+  const topPad = 14;
+  const bottomPad = 28;
   const chartW = width - leftPad - rightPad;
   const chartH = height - topPad - bottomPad;
   const maxVal = Math.max(...values, 1);
@@ -2120,8 +2120,8 @@ function buildSummaryBarChart(title, labels, values, color, valueSuffix = "") {
     const y = topPad + (chartH - h);
     return `
       <rect class="summary-bar" style="animation-delay:${i * 90}ms" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="${color}" opacity="0.9"></rect>
-      <text x="${(x + (barW / 2)).toFixed(2)}" y="${(height - 14).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="10">${label}</text>
-      <text x="${(x + (barW / 2)).toFixed(2)}" y="${(Math.max(y - 4, 10)).toFixed(2)}" text-anchor="middle" fill="#e2e8f0" font-size="10">${v}${valueSuffix}</text>
+      <text x="${(x + (barW / 2)).toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>
+      <text x="${(x + (barW / 2)).toFixed(2)}" y="${(Math.max(y - 3, 10)).toFixed(2)}" text-anchor="middle" fill="#e2e8f0" font-size="9">${v}${valueSuffix}</text>
     `;
   }).join("");
 
@@ -2228,11 +2228,11 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
   }
 
   const width = 620;
-  const height = 230;
+  const height = 190;
   const leftPad = 56;
   const rightPad = 16;
-  const topPad = 32;
-  const bottomPad = 38;
+  const topPad = 24;
+  const bottomPad = 30;
   const chartW = width - leftPad - rightPad;
   const chartH = height - topPad - bottomPad;
   const maxVal = Math.max(totalPlan, finalActual, 1);

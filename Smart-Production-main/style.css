@@ -1,3 +1,80 @@
+/* Graph page fitting presets for common displays (1366x768, 1920x1080). */
+@media (max-height: 820px){
+  .graph-page{
+    top:88px;
+    bottom:10px;
+    padding:10px;
+  }
+  .summary-head{
+    font-size:18px;
+    margin-bottom:4px;
+  }
+  .graph-filter-row{
+    gap:8px;
+    margin:0 0 4px;
+  }
+  .graph-range-box{
+    padding:6px 8px;
+    gap:4px;
+  }
+  .graph-range-label{
+    font-size:10px;
+  }
+  .graph-range-inputs{
+    gap:6px;
+  }
+  .graph-filter-row input[type="date"]{
+    padding:3px 6px;
+    font-size:11px;
+  }
+  .graph-period-btn,
+  .graph-today-btn{
+    padding:3px 8px;
+    font-size:11px;
+  }
+  .summary-graphs{
+    gap:8px;
+    grid-template-rows:minmax(0, 1.05fr) minmax(0, .95fr);
+  }
+  .summary-graph-card{
+    padding:5px;
+  }
+  .summary-chart-plan-actual{
+    max-height:31vh;
+  }
+  .summary-chart-svg{
+    max-height:20vh;
+  }
+  .trend-title{
+    font-size:14px;
+  }
+  .trend-subtitle,
+  .trend-legend,
+  .trend-units,
+  .summary-graph-card-title,
+  .plan-actual-sub{
+    font-size:9px;
+  }
+}
+
+@media (min-width: 1800px) and (min-height: 950px){
+  .graph-page{
+    top:112px;
+    padding:14px;
+  }
+  .summary-head{
+    font-size:22px;
+  }
+  .summary-graphs{
+    gap:12px;
+  }
+  .summary-chart-plan-actual{
+    max-height:38vh;
+  }
+  .summary-chart-svg{
+    max-height:27vh;
+  }
+}
 :root{
   --big-number-size: 50px;
   --card-title-size: 25px;
@@ -801,18 +878,19 @@ body.graph-mode{
   border-radius:8px;
   background:rgba(8,13,25,.96);
   padding:14px;
-  overflow:auto;
+  overflow:hidden;
 }
 
 .graph-page.open{
-  display:block;
+  display:flex;
+  flex-direction:column;
 }
 
 .summary-head{
-  font-size:24px;
+  font-size:20px;
   font-weight:800;
   color:#60a5fa;
-  margin-bottom:10px;
+  margin-bottom:6px;
 }
 
 .summary-grid{
@@ -836,7 +914,7 @@ body.graph-mode{
   justify-content:space-between;
   flex-wrap:wrap;
   gap:10px;
-  margin:0 0 10px;
+  margin:0 0 6px;
   color:#94a3b8;
   font-size:13px;
   font-weight:600;
@@ -971,16 +1049,20 @@ body.graph-mode{
 .summary-graphs{
   display:grid;
   grid-template-columns:1fr 1fr;
+  grid-template-rows:minmax(0, 1.1fr) minmax(0, .9fr);
   gap:10px;
-  margin-bottom:8px;
-  flex:0 0 auto;
+  margin-bottom:0;
+  flex:1 1 auto;
+  min-height:0;
 }
 
 .summary-graph-card{
   border:1px solid rgba(71,85,105,.45);
   border-radius:6px;
   background:rgba(30,41,59,.35);
-  padding:8px;
+  padding:6px;
+  min-height:0;
+  overflow:hidden;
 }
 
 .summary-graph-card-span{
@@ -995,15 +1077,16 @@ body.graph-mode{
 }
 
 .plan-actual-diff{
-  font-size:12px;
+  font-size:11px;
   font-weight:700;
   color:#93c5fd;
-  margin:-4px 0 6px;
+  margin:0 0 3px;
 }
 
 .summary-chart-plan-actual{
   max-width:680px;
   margin:0 auto;
+  max-height:34vh;
 }
 
 .trend-header{
@@ -1014,24 +1097,24 @@ body.graph-mode{
 }
 
 .trend-title{
-  font-size:30px;
+  font-size:16px;
   font-weight:800;
   letter-spacing:.01em;
   color:#e2e8f0;
 }
 
 .trend-subtitle{
-  font-size:11px;
+  font-size:10px;
   color:#64748b;
-  margin-top:2px;
+  margin-top:1px;
 }
 
 .trend-legend{
   display:flex;
   align-items:center;
-  gap:12px;
+  gap:10px;
   color:#cbd5e1;
-  font-size:12px;
+  font-size:10px;
   font-weight:700;
 }
 
@@ -1052,8 +1135,8 @@ body.graph-mode{
 .trend-swatch-target{ background:#3b82f6; }
 
 .trend-units{
-  margin:6px 0 2px;
-  font-size:12px;
+  margin:2px 0 2px;
+  font-size:10px;
   font-weight:700;
   color:#94a3b8;
 }
@@ -1093,6 +1176,7 @@ body.graph-mode{
   width:100%;
   height:auto;
   display:block;
+  max-height:24vh;
 }
 
 .summary-chart-svg .summary-bar{
