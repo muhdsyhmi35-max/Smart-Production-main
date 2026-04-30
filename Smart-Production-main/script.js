@@ -2294,12 +2294,12 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
       <div class="summary-graph-empty">No daily plan or actual output yet</div>`;
   }
 
-  const width = 620;
-  const height = 190;
-  const leftPad = 56;
-  const rightPad = 16;
-  const topPad = 24;
-  const bottomPad = 30;
+  const width = 500;
+  const height = 170;
+  const leftPad = 36;
+  const rightPad = 12;
+  const topPad = 14;
+  const bottomPad = 28;
   const chartW = width - leftPad - rightPad;
   const chartH = height - topPad - bottomPad;
   const maxVal = Math.max(totalPlan, finalActual, 1);

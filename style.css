@@ -1112,6 +1112,13 @@ body.graph-mode{
   display:grid;
   grid-template-columns:1.3fr 1fr 1fr;
   gap:10px;
+  align-items:stretch;
+}
+
+.report-chart-grid > .summary-graph-card{
+  height:100%;
+  display:flex;
+  flex-direction:column;
 }
 
 .report-bottom-grid{
@@ -1119,6 +1126,12 @@ body.graph-mode{
   grid-template-columns:1.65fr 1fr;
   gap:10px;
   min-height:0;
+  align-items:stretch;
+}
+
+.report-bottom-grid > .summary-graph-card,
+.report-bottom-grid > .report-table-wrap{
+  height:100%;
 }
 
 .report-table-wrap{
@@ -1141,6 +1154,7 @@ body.graph-mode{
   flex:1 1 auto;
   min-height:0;
   overflow:auto;
+  height:100%;
 }
 
 .report-mini-table{
@@ -1193,7 +1207,7 @@ body.graph-mode{
 }
 
 .summary-chart-plan-actual{
-  max-width:680px;
+  max-width:100%;
   margin:0 auto;
   max-height:34vh;
 }
