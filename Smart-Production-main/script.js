@@ -307,7 +307,9 @@ function onGraphRangeTodayClick() {
 
 function onGraphPeriodChange(period) {
   graphPeriod = (period === "week" || period === "month") ? period : "day";
-  const anchor = graphRangeStartDate || graphRangeEndDate || getActiveGraphDayKey();
+  // Anchor on the latest selected day to avoid landing on empty early dates
+  // when toggling Day/Week/Month back-to-back.
+  const anchor = graphRangeEndDate || graphRangeStartDate || getActiveGraphDayKey();
   graphFilterDate = anchor;
   const periodKeys = getPeriodDayKeys(anchor, graphPeriod);
   if (periodKeys.length) {
