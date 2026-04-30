@@ -1134,7 +1134,7 @@ body.graph-mode{
 
 .report-bottom-grid{
   display:grid;
-  grid-template-columns:1.45fr 1fr 1fr;
+  grid-template-columns:1.2fr 1fr 1fr;
   gap:10px;
   min-height:0;
   align-items:stretch;
@@ -1162,7 +1162,7 @@ body.graph-mode{
   border:1px solid rgba(71,85,105,.45);
   border-radius:6px;
   background:rgba(30,41,59,.35);
-  padding:6px;
+  padding:4px;
   overflow:hidden;
   margin-top:0;
   display:flex;
@@ -1177,23 +1177,28 @@ body.graph-mode{
 .report-table-scroll{
   flex:1 1 auto;
   min-height:0;
-  overflow:auto;
+  overflow-y:auto;
+  overflow-x:hidden;
   height:100%;
 }
 
 .report-mini-table{
   width:100%;
   border-collapse:collapse;
-  table-layout:fixed;
+  table-layout:auto;
   margin:0 !important;
 }
 
 .report-mini-table th,
 .report-mini-table td{
   border:1px solid rgba(71,85,105,.5);
-  padding:3px 5px;
+  padding:2px 4px;
   text-align:center;
-  font-size:10px;
+  font-size:9px;
+  line-height:1.15;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
 
 /* Keep report downtime column compact (avoid global col-width inheritance). */
@@ -1203,6 +1208,17 @@ body.graph-mode{
   min-width:66px;
   max-width:66px;
 }
+
+.report-mini-table th:nth-child(1),
+.report-mini-table td:nth-child(1){ width:16%; }
+.report-mini-table th:nth-child(2),
+.report-mini-table td:nth-child(2){ width:13%; }
+.report-mini-table th:nth-child(3),
+.report-mini-table td:nth-child(3){ width:15%; }
+.report-mini-table th:nth-child(4),
+.report-mini-table td:nth-child(4){ width:14%; }
+.report-mini-table th:nth-child(5),
+.report-mini-table td:nth-child(5){ width:12%; }
 
 .report-mini-table th{
   position:sticky;
