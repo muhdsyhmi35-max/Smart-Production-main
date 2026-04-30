@@ -2357,7 +2357,15 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
     value: targetSeries[i] || 0
   }));
   const actualPath = actualPoints.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
-  const targetPath = targetPoints.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+  const targetBarW = Math.max(Math.min((xStep || 12) * 0.46, 22), 7);
+  const targetBars = targetPoints.map((p, i) => {
+    const barH = Math.max(yBase - p.y, targetSeries[i] > 0 ? 2 : 0);
+    const x = p.x - (targetBarW / 2);
+    const y = yBase - barH;
+    const dTxt = formatIsoDateAsDdMmYy(dayKeys[i]);
+    const vTxt = formatNum(targetSeries[i] || 0);
+    return `<rect class="summary-bar" style="animation-delay:${i * 35}ms" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${targetBarW.toFixed(2)}" height="${barH.toFixed(2)}" rx="2" fill="#3b82f6" opacity=".92"><title>Target\n${dTxt}: ${vTxt}</title></rect>`;
+  }).join("");
   const areaPath = actualPoints.length
     ? `${actualPath} L ${actualPoints[actualPoints.length - 1].x.toFixed(2)} ${yBase.toFixed(2)} L ${actualPoints[0].x.toFixed(2)} ${yBase.toFixed(2)} Z`
     : "";
@@ -2384,11 +2392,6 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
     const vTxt = formatNum(p.value);
     return `<circle class="trend-dot" style="animation-delay:${i * 45}ms" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="4.2" fill="#4ade80"><title>Actual\n${dTxt}: ${vTxt}</title></circle>`;
   }).join("");
-  const targetDots = targetPoints.map((p, i) => {
-    const dTxt = formatIsoDateAsDdMmYy(dayKeys[i]);
-    const vTxt = formatNum(p.value);
-    return `<circle class="trend-dot" style="animation-delay:${i * 45}ms" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="4.2" fill="#3b82f6"><title>Target\n${dTxt}: ${vTxt}</title></circle>`;
-  }).join("");
 
   return `
       <div class="trend-header">
@@ -2414,9 +2417,8 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
         </defs>
         ${gridLines}
         ${areaPath ? `<path d="${areaPath}" fill="url(#actualTrendFill)"></path>` : ""}
-        <path class="trend-line trend-line-target" d="${targetPath}" fill="none" stroke="#3b82f6" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"></path>
+        ${targetBars}
         <path class="trend-line trend-line-actual" d="${actualPath}" fill="none" stroke="#4ade80" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"></path>
-        ${targetDots}
         ${actualDots}
         ${xLabels}
       </svg>
@@ -2492,7 +2494,8 @@ function collectHourlyGraphData(dayKey = getActiveGraphDayKey(), period = graphP
       const dName = dt.toLocaleDateString(undefined, { weekday: "short" });
       return `${dName} ${k.slice(8, 10)}`;
     }
-    return String(parseInt(k.slice(8, 10), 10));
+    const dt = new Date(`${k}T00:00:00`);
+    return dt.toLocaleDateString(undefined, { day: "numeric", month: "short" });
   });
   const outputVals = periodKeys.map(k => outputByBucket[k] || 0);
   const downtimeMins = periodKeys.map(k => {
