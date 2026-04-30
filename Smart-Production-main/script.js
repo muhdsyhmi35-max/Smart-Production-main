@@ -2384,8 +2384,8 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
 
   return `
       <div class="trend-header">
-        <div class="trend-title-wrap">
-          <div class="trend-title">PRODUCTION TREND</div>
+        <div class="trend-title-wrap trend-title-wrap-compact">
+          <div class="trend-title trend-title-small">Production Trend</div>
           <div class="trend-subtitle">${periodLabel}: ${rangeLabel}</div>
         </div>
         <div class="trend-legend">
@@ -2560,7 +2560,7 @@ function renderGraphCharts() {
   const activeHours = Object.keys(hourlyProduced).map(v => parseInt(v, 10)).filter(Number.isFinite).sort((a, b) => a - b);
   const prodHourLabels = activeHours.map(h => `${String(h).padStart(2, "0")}:00`);
   const prodHourValues = activeHours.map(h => Number((hourlyProduced[h] / daysCount).toFixed(1)));
-  const prodHourChart = buildSummaryBarChart("PRODUCTION BY HOUR (AVERAGE)", prodHourLabels, prodHourValues, "#3b82f6", "", "Units");
+  const prodHourChart = buildSummaryBarChart(`PRODUCTION BY HOUR (${periodLabel}: ${rangeLabel})`, prodHourLabels, prodHourValues, "#3b82f6", "", "Units");
   const oeeLabels = periodKeys.map(k => {
     const d = new Date(`${k}T00:00:00`);
     return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
@@ -2571,7 +2571,7 @@ function renderGraphCharts() {
     if (target <= 0) return 0;
     return Number(Math.max(0, Math.min(100, (produced / target) * 100)).toFixed(1));
   });
-  const oeeChart = buildSummaryLineChart("OEE TREND (%)", oeeLabels, oeeValues, "#a855f7", "%", "%");
+  const oeeChart = buildSummaryLineChart(`OEE TREND (${periodLabel}: ${rangeLabel})`, oeeLabels, oeeValues, "#a855f7", "%", "%");
   graphBody.innerHTML = `
     <div class="report-kpi-grid">
       <div class="report-kpi"><span>Total Produced</span><strong>${totalProduced}</strong><em>units</em></div>
