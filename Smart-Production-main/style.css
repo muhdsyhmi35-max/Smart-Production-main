@@ -739,7 +739,7 @@ body.graph-mode{
   display:grid;
   grid-template-columns:repeat(4, minmax(0,1fr));
   gap:10px;
-  margin-bottom:4px;
+  margin-bottom:0;
   flex:0 0 auto;
 }
 
@@ -940,7 +940,7 @@ body.graph-mode{
   flex:1 1 auto;
   min-height:0;
   overflow:auto;
-  margin-top:2px;
+  margin-top:0;
 }
 
 .summary-page table{
