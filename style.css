@@ -1177,6 +1177,14 @@ body.graph-mode{
   font-size:10px;
 }
 
+/* Keep report downtime column compact (avoid global col-width inheritance). */
+.report-mini-table th:nth-child(6),
+.report-mini-table td:nth-child(6){
+  width:66px;
+  min-width:66px;
+  max-width:66px;
+}
+
 .report-mini-table th{
   position:sticky;
   top:0;
