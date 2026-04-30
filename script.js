@@ -2183,6 +2183,11 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
   if (!Number.isFinite(fallbackDayPlan) || fallbackDayPlan <= 0) {
     fallbackDayPlan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
   }
+  const dayTarget = {};
+  dayKeys.forEach(k => {
+    const hist = getHistoricalPlanForDay(k);
+    dayTarget[k] = (Number.isFinite(hist) && hist > 0) ? hist : fallbackDayPlan;
+  });
   const totalPlan = totalDailyPlan > 0 ? totalDailyPlan : Math.max(0, fallbackDayPlan * Math.max(dayKeys.length, 1));
 
   // Use per-day values (not cumulative) for both Actual and Target.
