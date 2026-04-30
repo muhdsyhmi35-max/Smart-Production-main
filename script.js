@@ -2450,7 +2450,6 @@ function renderGraphCharts() {
     </div>
     <div class="report-chart-grid">
       <div class="summary-graph-card">${planActualChart}</div>
-      <div class="summary-graph-card">${prodHourChart}</div>
       <div class="summary-graph-card">${downtimeChart}</div>
     </div>
     <div class="report-bottom-grid">
@@ -2463,6 +2462,7 @@ function renderGraphCharts() {
           </table>
         </div>
       </div>
+      <div class="summary-graph-card">${prodHourChart}</div>
       <div class="summary-graph-card">${oeeChart}</div>
     </div>
   `;
