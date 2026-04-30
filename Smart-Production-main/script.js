@@ -2310,15 +2310,9 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
   }
   const totalPlan = totalDailyPlan > 0 ? totalDailyPlan : Math.max(0, fallbackDayPlan * Math.max(dayKeys.length, 1));
 
-  let runningActual = 0;
-  const actualSeries = dayKeys.map(k => {
-    runningActual += (dailyActualMap[k] || 0);
-    return runningActual;
-  });
-  const targetSeries = dayKeys.map((_, i) => {
-    if (!dayKeys.length) return 0;
-    return Math.round((totalPlan * (i + 1)) / dayKeys.length);
-  });
+  // Use per-day values (not cumulative) for both Actual and Target.
+  const actualSeries = dayKeys.map(k => dailyActualMap[k] || 0);
+  const targetSeries = dayKeys.map(k => dayTarget[k] || 0);
 
   const finalActual = actualSeries[actualSeries.length - 1] || 0;
   const diff = finalActual - totalPlan;
