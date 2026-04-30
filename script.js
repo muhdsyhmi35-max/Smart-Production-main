@@ -1799,7 +1799,24 @@ function toggleRamadanFromMenu() {
 }
 
 function updateViewToggleMenuItem() {
-  // Keep menu labels fixed: Main Page and Daily Summary are separate items.
+  // Keep fixed labels, only highlight active section like sidebar.
+  const main = document.getElementById("mainPageMenuItem");
+  const summary = document.getElementById("dailySummaryMenuItem");
+  const graph = document.getElementById("graphMenuItem");
+  const history = document.getElementById("historyMenuItem");
+  [main, summary, graph, history].forEach(el => {
+    if (el) el.classList.remove("active");
+  });
+
+  if (document.body.classList.contains("summary-mode")) {
+    if (summary) summary.classList.add("active");
+  } else if (document.body.classList.contains("graph-mode")) {
+    if (graph) graph.classList.add("active");
+  } else if (document.body.classList.contains("history-mode")) {
+    if (history) history.classList.add("active");
+  } else {
+    if (main) main.classList.add("active");
+  }
 }
 
 function toggleViewFromMenu() {

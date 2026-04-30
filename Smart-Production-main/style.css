@@ -524,14 +524,17 @@ tr:nth-child(even){background:#0b1220;}
   position:fixed;
   top:0;
   left:0;
-  width:min(280px, 80vw);
+  width:min(250px, 76vw);
   height:100vh;
-  border:1px solid rgba(71,85,105,.55);
-  border-radius:0 10px 10px 0;
-  background:rgba(8,13,25,.98);
+  border-right:1px solid rgba(71,85,105,.35);
+  border-top:none;
+  border-left:none;
+  border-bottom:none;
+  border-radius:0;
+  background:linear-gradient(180deg, rgba(4,10,22,.98), rgba(3,8,18,.98));
   box-shadow:0 10px 28px rgba(0,0,0,.45);
   z-index:10030;
-  padding:78px 10px 12px;
+  padding:54px 10px 12px;
   flex-direction:column;
   gap:6px;
   transform:translateX(-108%);
@@ -549,25 +552,29 @@ tr:nth-child(even){background:#0b1220;}
 .menu-brand{
   display:flex;
   align-items:center;
-  gap:8px;
-  margin:0 0 8px;
-  padding:6px 8px;
-  border:1px solid rgba(71,85,105,.45);
-  border-radius:6px;
-  background:rgba(30,41,59,.5);
+  gap:7px;
+  width:160px;
+  min-height:42px;
+  margin:-54px 0 10px -10px;
+  padding:7px 10px;
+  border:none;
+  border-radius:0;
+  background:rgba(17,24,39,1);
 }
 
 .menu-brand-icon{
-  font-size:18px;
+  font-size:19px;
   line-height:1;
+  filter:grayscale(1) brightness(2.2);
 }
 
 .menu-brand-text{
-  font-size:11px;
-  line-height:1.15;
+  font-size:10px;
+  line-height:1.05;
   font-weight:800;
-  color:#e2e8f0;
-  letter-spacing:.35px;
+  color:#f8fafc;
+  letter-spacing:.2px;
+  text-transform:uppercase;
 }
 
 .menu-item{
@@ -576,13 +583,13 @@ tr:nth-child(even){background:#0b1220;}
   display:flex;
   align-items:center;
   gap:8px;
-  background:rgba(30,41,59,.65);
+  background:rgba(30,41,59,.28);
   color:#cbd5e1;
   border:1px solid rgba(71,85,105,.45);
-  border-radius:4px;
-  padding:6px 10px;
-  font-size:14px;
-  font-weight:600;
+  border-radius:5px;
+  padding:8px 10px;
+  font-size:13px;
+  font-weight:700;
   cursor:pointer;
   margin:0;
   min-height:auto;
@@ -599,6 +606,12 @@ tr:nth-child(even){background:#0b1220;}
 .menu-item:hover{
   background:rgba(59,130,246,.25);
   color:#e2e8f0;
+}
+
+.menu-item.active{
+  background:linear-gradient(180deg, rgba(37,99,235,.9), rgba(29,78,216,.92));
+  border-color:rgba(96,165,250,.6);
+  color:#eaf2ff;
 }
 
 .history-panel{
