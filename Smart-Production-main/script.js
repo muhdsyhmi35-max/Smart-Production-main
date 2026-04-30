@@ -2287,8 +2287,16 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
     const x = leftPad + (xStep * i);
     return `<text x="${x.toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="10">${label}</text>`;
   }).join("");
-  const actualDots = actualPoints.map((p, i) => `<circle class="trend-dot" style="animation-delay:${i * 45}ms" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="4.2" fill="#4ade80"></circle>`).join("");
-  const targetDots = targetPoints.map((p, i) => `<circle class="trend-dot" style="animation-delay:${i * 45}ms" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="4.2" fill="#3b82f6"></circle>`).join("");
+  const actualDots = actualPoints.map((p, i) => {
+    const dTxt = formatIsoDateAsDdMmYy(dayKeys[i]);
+    const vTxt = formatNum(p.value);
+    return `<circle class="trend-dot" style="animation-delay:${i * 45}ms" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="4.2" fill="#4ade80"><title>Actual\n${dTxt}: ${vTxt}</title></circle>`;
+  }).join("");
+  const targetDots = targetPoints.map((p, i) => {
+    const dTxt = formatIsoDateAsDdMmYy(dayKeys[i]);
+    const vTxt = formatNum(p.value);
+    return `<circle class="trend-dot" style="animation-delay:${i * 45}ms" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="4.2" fill="#3b82f6"><title>Target\n${dTxt}: ${vTxt}</title></circle>`;
+  }).join("");
 
   return `
       <div class="trend-header">
