@@ -2339,12 +2339,31 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
   const bottomPad = 28;
   const chartW = width - leftPad - rightPad;
   const chartH = height - topPad - bottomPad;
-  // Match OEE-like baseline scale (0-100) for visual consistency; y-axis domain ×10 for this chart.
-  const maxVal = Math.max(totalPlan, finalActual, 100);
-  const axisMax = maxVal * 10;
+  const seriesMax = Math.max(0, ...actualSeries, ...targetSeries);
+  let yTickStep;
+  let maxVal;
+  if (seriesMax <= 0) {
+    yTickStep = 5;
+    maxVal = 10;
+  } else if (seriesMax <= 5) {
+    yTickStep = 1;
+    maxVal = Math.max(5, Math.ceil(seriesMax));
+  } else if (seriesMax <= 12) {
+    yTickStep = 2;
+    maxVal = Math.ceil(seriesMax / yTickStep) * yTickStep;
+  } else if (seriesMax <= 60) {
+    yTickStep = 10;
+    maxVal = Math.ceil(seriesMax / yTickStep) * yTickStep;
+  } else if (seriesMax <= 150) {
+    yTickStep = 20;
+    maxVal = Math.ceil(seriesMax / yTickStep) * yTickStep;
+  } else {
+    yTickStep = 50;
+    maxVal = Math.ceil(seriesMax / yTickStep) * yTickStep;
+  }
   const xStep = dayKeys.length <= 1 ? chartW : (chartW / (dayKeys.length - 1));
   const yBase = topPad + chartH;
-  const toY = (v) => yBase - ((v / axisMax) * chartH);
+  const toY = (v) => yBase - ((v / maxVal) * chartH);
   const formatNum = (n) => Number(n || 0).toLocaleString();
 
   const actualPoints = dayKeys.map((_, i) => ({
@@ -2371,16 +2390,23 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
   const areaPath = actualPoints.length
     ? `${actualPath} L ${actualPoints[actualPoints.length - 1].x.toFixed(2)} ${yBase.toFixed(2)} L ${actualPoints[0].x.toFixed(2)} ${yBase.toFixed(2)} Z`
     : "";
-  const yTicks = 4;
-  const gridLines = Array.from({ length: yTicks + 1 }, (_, i) => {
-    const ratio = i / yTicks;
+  const yTickValues = [];
+  for (let v = 0; v <= maxVal + 1e-9; v += yTickStep) {
+    yTickValues.push(Math.round(v * 100) / 100);
+  }
+  const gridLines = yTickValues.map(v => {
+    const ratio = 1 - (v / maxVal);
     const y = topPad + (chartH * ratio);
-    const v = Math.round(axisMax * (1 - ratio));
     return `
       <line x1="${leftPad}" y1="${y.toFixed(2)}" x2="${(width - rightPad).toFixed(2)}" y2="${y.toFixed(2)}" stroke="rgba(30,64,175,.2)" stroke-width="1"></line>
       <text x="${(leftPad - 8).toFixed(2)}" y="${(y + 4).toFixed(2)}" text-anchor="end" fill="#94a3b8" font-size="10">${formatNum(v)}</text>
     `;
   }).join("");
+  const axisStroke = "rgba(148,163,184,.72)";
+  const axisLines = `
+    <line x1="${leftPad}" y1="${topPad.toFixed(2)}" x2="${leftPad}" y2="${yBase.toFixed(2)}" stroke="${axisStroke}" stroke-width="2" stroke-linecap="round"></line>
+    <line x1="${leftPad}" y1="${yBase.toFixed(2)}" x2="${(width - rightPad).toFixed(2)}" y2="${yBase.toFixed(2)}" stroke="${axisStroke}" stroke-width="2" stroke-linecap="round"></line>
+  `;
   const labelStride = dayKeys.length > 24 ? 3 : dayKeys.length > 16 ? 2 : 1;
   const xLabels = dayKeys.map((k, i) => {
     if (i % labelStride !== 0 && i !== dayKeys.length - 1) return "";
@@ -2418,6 +2444,7 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
           </linearGradient>
         </defs>
         ${gridLines}
+        ${axisLines}
         ${areaPath ? `<path d="${areaPath}" fill="url(#actualTrendFill)"></path>` : ""}
         ${targetBars}
         <path class="trend-line trend-line-actual" d="${actualPath}" fill="none" stroke="#4ade80" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"></path>
