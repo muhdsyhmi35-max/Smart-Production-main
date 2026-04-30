@@ -391,6 +391,21 @@ function formatIsoDateAsDmy(isoDate) {
   return `${d}/${mo}/${y}`;
 }
 
+function formatIsoDateAsDdMmYy(isoDate) {
+  const m = String(isoDate || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return String(isoDate || "");
+  const yy = String(parseInt(m[1], 10) % 100).padStart(2, "0");
+  const mm = String(parseInt(m[2], 10)).padStart(2, "0");
+  const dd = String(parseInt(m[3], 10)).padStart(2, "0");
+  return `${dd}/${mm}/${yy}`;
+}
+
+function formatIsoRangeAsDdMmYy(startIso, endIso) {
+  const startFmt = formatIsoDateAsDdMmYy(startIso);
+  const endFmt = formatIsoDateAsDdMmYy(endIso);
+  return startIso === endIso ? startFmt : `${startFmt} to ${endFmt}`;
+}
+
 function getActiveHistoryDayKey() {
   return historyFilterDate || toIsoDateLocal(new Date());
 }
@@ -2179,7 +2194,7 @@ function getPlanActualForPeriod(anchorDay, period = "day") {
 
 function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphPeriod) {
   const range = getActiveGraphRange();
-  const rangeLabel = range.start === range.end ? range.start : `${range.start} to ${range.end}`;
+  const rangeLabel = formatIsoRangeAsDdMmYy(range.start, range.end);
   const dayKeys = getDayKeysBetween(range.start, range.end);
   const daySet = new Set(dayKeys);
   const periodLabel = period === "week" ? "Week" : period === "month" ? "Month" : "Day";
@@ -2392,7 +2407,7 @@ function renderGraphCharts() {
   if (!graphBody) return;
   const activeDay = getActiveGraphDayKey();
   const range = getActiveGraphRange();
-  const rangeLabel = range.start === range.end ? range.start : `${range.start} to ${range.end}`;
+  const rangeLabel = formatIsoRangeAsDdMmYy(range.start, range.end);
   const { labels, outputVals, downtimeMins, bucketName } = collectHourlyGraphData(activeDay, graphPeriod);
   const periodLabel = graphPeriod === "week" ? "Week" : graphPeriod === "month" ? "Month" : "Day";
   const planActualChart = buildPlanVsActualChart(activeDay, graphPeriod);
