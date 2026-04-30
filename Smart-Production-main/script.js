@@ -1924,25 +1924,11 @@ function toggleRamadanFromMenu() {
 }
 
 function updateViewToggleMenuItem() {
-  const item = document.getElementById("viewToggleMenuItem")
-    || document.querySelector("#menuDropdown .menu-item");
-  if (!item) return;
-  const onSubPage = document.body.classList.contains("summary-mode")
-    || document.body.classList.contains("graph-mode")
-    || document.body.classList.contains("history-mode");
-  item.innerText = onSubPage
-    ? "Main Page"
-    : "Daily Summary";
+  // Keep menu labels fixed: Main Page and Daily Summary are separate items.
 }
 
 function toggleViewFromMenu() {
-  if (document.body.classList.contains("summary-mode")
-    || document.body.classList.contains("graph-mode")
-    || document.body.classList.contains("history-mode")) {
-    showMainPage();
-  } else {
-    showSummaryPage();
-  }
+  showSummaryPage();
 }
 
 function showMainPage() {
