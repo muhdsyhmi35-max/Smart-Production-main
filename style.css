@@ -1351,6 +1351,18 @@ body.graph-mode{
   animation:summaryBarGrow .8s cubic-bezier(.22,.61,.36,1) forwards;
 }
 
+/* scaleY + SVG <rect> + fill-box can draw past the baseline in some browsers */
+.summary-chart-plan-actual .summary-bar{
+  transform:none;
+  transform-origin:unset;
+  opacity:0;
+  animation:planActualBarFade .55s ease-out forwards;
+}
+
+@keyframes planActualBarFade{
+  to{ opacity:.92; }
+}
+
 @keyframes summaryBarGrow{
   from{transform:scaleY(0);}
   to{transform:scaleY(1);}

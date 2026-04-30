@@ -2253,10 +2253,11 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
   }));
   const actualPath = actualPoints.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
   const targetBarW = Math.max(Math.min((xStep || 12) * 0.34, 16), 6);
-  const targetBarOffsetX = Math.min((xStep || 0) * 0.18, 9);
   const targetBars = targetPoints.map((p, i) => {
-    const barH = Math.max(yBase - p.y, targetSeries[i] > 0 ? 2 : 0);
-    const x = p.x - (targetBarW / 2) + targetBarOffsetX;
+    const val = targetSeries[i] || 0;
+    const barTop = toY(val);
+    const barH = Math.min(Math.max(yBase - barTop, val > 0 ? 2 : 0), chartH);
+    const x = p.x - (targetBarW / 2);
     const y = yBase - barH;
     const dTxt = formatIsoDateAsDdMmYy(dayKeys[i]);
     const vTxt = formatNum(targetSeries[i] || 0);
