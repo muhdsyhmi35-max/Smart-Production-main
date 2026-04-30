@@ -1992,11 +1992,11 @@ function buildSummaryBarChart(title, labels, values, color, valueSuffix = "") {
     return `<div class="summary-graph-empty">No data</div>`;
   }
   const width = 500;
-  const height = 170;
+  const height = 190;
   const leftPad = 36;
   const rightPad = 12;
   const topPad = 14;
-  const bottomPad = 28;
+  const bottomPad = 30;
   const chartW = width - leftPad - rightPad;
   const chartH = height - topPad - bottomPad;
   const maxVal = Math.max(...values, 1);
@@ -2052,9 +2052,11 @@ function buildSummaryLineChart(title, labels, values, color, valueSuffix = "", y
       <title>${labels[i]}: ${p.value}${valueSuffix}</title>
     </circle>
   `).join("");
-  const xLabels = labels.map((label, i) => `
-    <text x="${(leftPad + stepX * i).toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>
-  `).join("");
+  const labelStride = labels.length > 24 ? 3 : labels.length > 16 ? 2 : 1;
+  const xLabels = labels.map((label, i) => {
+    if (i % labelStride !== 0 && i !== labels.length - 1) return "";
+    return `<text x="${(leftPad + stepX * i).toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>`;
+  }).join("");
   const yTicks = 4;
   const yGrid = Array.from({ length: yTicks + 1 }, (_, i) => {
     const ratio = i / yTicks;
