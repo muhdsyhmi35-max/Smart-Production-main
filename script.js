@@ -2200,7 +2200,8 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
   const bottomPad = 28;
   const chartW = width - leftPad - rightPad;
   const chartH = height - topPad - bottomPad;
-  const maxVal = Math.max(totalPlan, finalActual, 1);
+  // Match OEE-like baseline scale (0-100) for visual consistency.
+  const maxVal = Math.max(totalPlan, finalActual, 100);
   const xStep = dayKeys.length <= 1 ? chartW : (chartW / (dayKeys.length - 1));
   const yBase = topPad + chartH;
   const toY = (v) => yBase - ((v / maxVal) * chartH);
