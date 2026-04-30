@@ -2317,14 +2317,15 @@ function toggleRamadan() {
   ramadanMode = !ramadanMode;
 
   const btn = document.getElementById("ramadanToggle");
+  if (!btn) return;
 
   if (ramadanMode) {
     btn.innerText = "🌙 Ramadhan : ON";
-    btn.style.background = "#16a34a";
   } else {
-    btn.innerText = " 🌙 Ramadhan : OFF";
-    btn.style.background = "#2563eb";
+    btn.innerText = "🌙 Ramadhan : OFF";
   }
+  // Keep menu item visual style consistent (no forced ON/OFF background fill).
+  btn.style.background = "";
 
   updateDisplay();
 }
