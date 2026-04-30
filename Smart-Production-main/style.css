@@ -1161,6 +1161,13 @@ body.graph-mode{
   font-size:11px;
 }
 
+/* Prevent inherited global sticky-header behavior causing scroll gap here. */
+.report-mini-table th{
+  position:static;
+  top:auto;
+  z-index:auto;
+}
+
 .summary-graph-card{
   border:1px solid rgba(71,85,105,.45);
   border-radius:6px;
