@@ -812,6 +812,34 @@ body.graph-mode{
   font-weight:600;
 }
 
+.graph-period-toggle{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-right:8px;
+}
+
+.graph-period-btn{
+  padding:4px 10px;
+  font-size:12px;
+  font-weight:800;
+  border-radius:6px;
+  border:1px solid rgba(71,85,105,.7);
+  background:rgba(2,6,23,.75);
+  color:#cbd5e1;
+  cursor:pointer;
+}
+
+.graph-period-btn:hover{
+  filter:brightness(1.08);
+}
+
+.graph-period-btn.active{
+  border-color:rgba(56,189,248,.55);
+  background:rgba(30,58,138,.45);
+  color:#93c5fd;
+}
+
 .graph-filter-row input[type="date"]{
   padding:4px 8px;
   border-radius:6px;

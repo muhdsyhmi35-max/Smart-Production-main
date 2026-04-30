@@ -37,6 +37,7 @@ let actualCount = 0;
 let downtimeSeconds = 0;
 let downtimeFilterDate = null;
 let graphFilterDate = null;
+let graphPeriod = "day";
 let historyFilterDate = null;
 let summaryFilterDate = null;
 let downtimeFilterExpanded = false;
@@ -224,6 +225,58 @@ function onGraphDayTodayClick() {
   graphFilterDate = null;
   syncGraphDayPickerUi();
   renderGraphCharts();
+}
+
+function onGraphPeriodChange(period) {
+  graphPeriod = (period === "week" || period === "month") ? period : "day";
+  syncGraphPeriodButtonsUi();
+  renderGraphCharts();
+}
+
+function syncGraphPeriodButtonsUi() {
+  const dayBtn = document.getElementById("graphPeriodDayBtn");
+  const weekBtn = document.getElementById("graphPeriodWeekBtn");
+  const monthBtn = document.getElementById("graphPeriodMonthBtn");
+  [dayBtn, weekBtn, monthBtn].forEach(btn => btn && btn.classList.remove("active"));
+  if (graphPeriod === "week" && weekBtn) weekBtn.classList.add("active");
+  else if (graphPeriod === "month" && monthBtn) monthBtn.classList.add("active");
+  else if (dayBtn) dayBtn.classList.add("active");
+}
+
+function getWeekStartIso(anchorIso) {
+  const [y, m, d] = String(anchorIso).split("-").map(v => parseInt(v, 10));
+  const dt = new Date(y, (m || 1) - 1, d || 1);
+  const day = dt.getDay(); // 0 Sun .. 6 Sat
+  const mondayOffset = day === 0 ? -6 : (1 - day);
+  dt.setDate(dt.getDate() + mondayOffset);
+  return toIsoDateLocal(dt);
+}
+
+function getPeriodDayKeys(anchorIso, period) {
+  const [y, m, d] = String(anchorIso).split("-").map(v => parseInt(v, 10));
+  const base = new Date(y, (m || 1) - 1, d || 1);
+  const keys = [];
+  if (period === "week") {
+    const weekStartIso = getWeekStartIso(anchorIso);
+    const [wy, wm, wd] = weekStartIso.split("-").map(v => parseInt(v, 10));
+    const ws = new Date(wy, (wm || 1) - 1, wd || 1);
+    for (let i = 0; i < 7; i++) {
+      const dt = new Date(ws);
+      dt.setDate(ws.getDate() + i);
+      keys.push(toIsoDateLocal(dt));
+    }
+    return keys;
+  }
+  if (period === "month") {
+    const start = new Date(base.getFullYear(), base.getMonth(), 1);
+    const end = new Date(base.getFullYear(), base.getMonth() + 1, 0);
+    for (let i = 1; i <= end.getDate(); i++) {
+      const dt = new Date(start.getFullYear(), start.getMonth(), i);
+      keys.push(toIsoDateLocal(dt));
+    }
+    return keys;
+  }
+  return [anchorIso];
 }
 
 function getActiveHistoryDayKey() {
@@ -1890,22 +1943,50 @@ function buildSummaryBarChart(title, labels, values, color, valueSuffix = "") {
   `;
 }
 
-function buildPlanVsActualChart(dayKey = getActiveGraphDayKey()) {
-  const planRaw = document.getElementById("plan").innerText.trim();
-  let plan = getHistoricalPlanForDay(dayKey);
-  if (!Number.isFinite(plan) || plan < 0) {
-    plan = parseInt(planRaw, 10);
-  }
-  if (!Number.isFinite(plan) || plan < 0) {
-    plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
-  }
+function getPlanActualForPeriod(anchorDay, period = "day") {
+  const periodKeys = getPeriodDayKeys(anchorDay, period);
+  const periodKeySet = new Set(periodKeys);
+  const rows = document.querySelectorAll("#scanTable tr");
+  const planByDay = {};
   let actual = 0;
-  document.querySelectorAll("#scanTable tr").forEach(row => {
+
+  rows.forEach(row => {
     const cells = row.querySelectorAll("td");
     if (!cells.length) return;
     const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
-    if (rowDay === dayKey) actual += 1;
+    if (!rowDay || !periodKeySet.has(rowDay)) return;
+    actual += 1;
+    if (!Number.isFinite(planByDay[rowDay])) {
+      const planVal = parseInt((row.dataset.scanPlan || "").trim(), 10);
+      if (Number.isFinite(planVal) && planVal > 0) planByDay[rowDay] = planVal;
+    }
   });
+
+  let plan = 0;
+  periodKeys.forEach(day => {
+    if (Number.isFinite(planByDay[day]) && planByDay[day] > 0) {
+      plan += planByDay[day];
+    } else {
+      const hist = getHistoricalPlanForDay(day);
+      if (Number.isFinite(hist) && hist > 0) plan += hist;
+    }
+  });
+
+  if (plan <= 0) {
+    const planRaw = document.getElementById("plan").innerText.trim();
+    const planCard = parseInt(planRaw, 10);
+    const planInput = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+    const fallbackDayPlan = Number.isFinite(planCard) && planCard > 0 ? planCard : planInput;
+    const multiplier = period === "day" ? 1 : periodKeys.length;
+    plan = Math.max(0, fallbackDayPlan * multiplier);
+  }
+
+  return { plan, actual };
+}
+
+function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphPeriod) {
+  const { plan, actual } = getPlanActualForPeriod(dayKey, period);
+  const periodLabel = period === "week" ? "Week" : period === "month" ? "Month" : "Day";
 
   if (plan <= 0 && actual <= 0) {
     return `
@@ -1939,7 +2020,7 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey()) {
   }
 
   return `
-    <div class="summary-graph-card-title">Plan vs Actual (${dayKey}) <span class="plan-actual-sub">${plan > 0 ? `(target ${plan}, done ${actual})` : `(output ${actual})`}</span></div>
+      <div class="summary-graph-card-title">Plan vs Actual (${periodLabel}: ${dayKey}) <span class="plan-actual-sub">${plan > 0 ? `(target ${plan}, done ${actual})` : `(output ${actual})`}</span></div>
     ${diffNote ? `<div class="plan-actual-diff">${diffNote}</div>` : ""}
     <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg summary-chart-plan-actual" role="img" aria-label="Plan versus actual output">
       <line x1="${leftPad}" y1="${yBase}" x2="${width - rightPad}" y2="${yBase}" stroke="rgba(148,163,184,.45)" stroke-width="1"></line>
@@ -1966,48 +2047,80 @@ function getHistoricalPlanForDay(dayKey) {
   return null;
 }
 
-function collectHourlyGraphData(dayKey = getActiveGraphDayKey()) {
+function collectHourlyGraphData(dayKey = getActiveGraphDayKey(), period = graphPeriod) {
   const rows = document.querySelectorAll("#scanTable tr");
-  const outputByHour = {};
-  const downtimeByHour = {};
+  const periodKeys = getPeriodDayKeys(dayKey, period);
+  const periodKeySet = new Set(periodKeys);
+  const outputByBucket = {};
+  const downtimeByBucket = {};
+
+  if (period === "day") {
+    rows.forEach(row => {
+      const cells = row.querySelectorAll("td");
+      if (cells.length === 0) return;
+      const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
+      if (!rowDay || rowDay !== dayKey) return;
+      const hour = parseHourFromTimeText(cells[2]?.innerText || "");
+      if (hour == null) return;
+      outputByBucket[hour] = (outputByBucket[hour] || 0) + 1;
+      const downtimeSec = parseMmSsToSeconds(cells[9]?.innerText || "");
+      if (downtimeSec > 0) {
+        downtimeByBucket[hour] = (downtimeByBucket[hour] || 0) + downtimeSec;
+      }
+    });
+
+    const hourKeys = Array.from(new Set([
+      ...Object.keys(outputByBucket),
+      ...Object.keys(downtimeByBucket)
+    ].map(v => parseInt(v, 10)).filter(Number.isFinite))).sort((a, b) => a - b);
+    const labels = hourKeys.map(h => `${String(h).padStart(2, "0")}:00`);
+    const outputVals = hourKeys.map(h => outputByBucket[h] || 0);
+    const downtimeMins = hourKeys.map(h => {
+      const sec = downtimeByBucket[h] || 0;
+      if (sec <= 0) return 0;
+      return Math.max(1, Math.round(sec / 60));
+    });
+    return { labels, outputVals, downtimeMins, bucketName: "Hour" };
+  }
 
   rows.forEach(row => {
     const cells = row.querySelectorAll("td");
     if (cells.length === 0) return;
     const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
-    if (!rowDay || rowDay !== dayKey) return;
-    const hour = parseHourFromTimeText(cells[2]?.innerText || "");
-    if (hour == null) return;
-    outputByHour[hour] = (outputByHour[hour] || 0) + 1;
+    if (!rowDay || !periodKeySet.has(rowDay)) return;
+    outputByBucket[rowDay] = (outputByBucket[rowDay] || 0) + 1;
     const downtimeSec = parseMmSsToSeconds(cells[9]?.innerText || "");
     if (downtimeSec > 0) {
-      downtimeByHour[hour] = (downtimeByHour[hour] || 0) + downtimeSec;
+      downtimeByBucket[rowDay] = (downtimeByBucket[rowDay] || 0) + downtimeSec;
     }
   });
 
-  const hourKeys = Array.from(new Set([
-    ...Object.keys(outputByHour),
-    ...Object.keys(downtimeByHour)
-  ].map(v => parseInt(v, 10)).filter(Number.isFinite))).sort((a, b) => a - b);
-  const labels = hourKeys.map(h => `${String(h).padStart(2, "0")}:00`);
-  const outputVals = hourKeys.map(h => outputByHour[h] || 0);
-  // Keep sub-1-minute downtime visible on the chart (minimum 1 minute bar).
-  const downtimeMins = hourKeys.map(h => {
-    const sec = downtimeByHour[h] || 0;
+  const labels = periodKeys.map(k => {
+    if (period === "week") {
+      const dt = new Date(`${k}T00:00:00`);
+      const dName = dt.toLocaleDateString(undefined, { weekday: "short" });
+      return `${dName} ${k.slice(8, 10)}`;
+    }
+    return String(parseInt(k.slice(8, 10), 10));
+  });
+  const outputVals = periodKeys.map(k => outputByBucket[k] || 0);
+  const downtimeMins = periodKeys.map(k => {
+    const sec = downtimeByBucket[k] || 0;
     if (sec <= 0) return 0;
     return Math.max(1, Math.round(sec / 60));
   });
-  return { labels, outputVals, downtimeMins };
+  return { labels, outputVals, downtimeMins, bucketName: "Day" };
 }
 
 function renderGraphCharts() {
   const graphBody = document.getElementById("graphChartsBody");
   if (!graphBody) return;
   const activeDay = getActiveGraphDayKey();
-  const { labels, outputVals, downtimeMins } = collectHourlyGraphData(activeDay);
-  const planActualChart = buildPlanVsActualChart(activeDay);
-  const outputChart = buildSummaryBarChart(`Output by Hour (${activeDay})`, labels, outputVals, "#22c55e");
-  const downtimeChart = buildSummaryBarChart(`Downtime by Hour (${activeDay})`, labels, downtimeMins, "#ef4444");
+  const { labels, outputVals, downtimeMins, bucketName } = collectHourlyGraphData(activeDay, graphPeriod);
+  const periodLabel = graphPeriod === "week" ? "Week" : graphPeriod === "month" ? "Month" : "Day";
+  const planActualChart = buildPlanVsActualChart(activeDay, graphPeriod);
+  const outputChart = buildSummaryBarChart(`Output by ${bucketName} (${periodLabel}: ${activeDay})`, labels, outputVals, "#22c55e");
+  const downtimeChart = buildSummaryBarChart(`Downtime by ${bucketName} (${periodLabel}: ${activeDay})`, labels, downtimeMins, "#ef4444");
   graphBody.innerHTML = `
       <div class="summary-graph-card summary-graph-card-span">${planActualChart}</div>
       <div class="summary-graph-card">${outputChart}</div>
@@ -2032,6 +2145,11 @@ function showGraphPage() {
   graphPage.innerHTML = `
     <div class="summary-head">Graph</div>
     <div class="graph-filter-row">
+      <div class="graph-period-toggle" role="group" aria-label="Graph period">
+        <button type="button" id="graphPeriodDayBtn" class="graph-period-btn">Day</button>
+        <button type="button" id="graphPeriodWeekBtn" class="graph-period-btn">Week</button>
+        <button type="button" id="graphPeriodMonthBtn" class="graph-period-btn">Month</button>
+      </div>
       <label for="graphDayFilter">Date</label>
       <input type="date" id="graphDayFilter" title="Select date for graph charts">
       <button type="button" id="graphDayTodayBtn" class="graph-today-btn">Today</button>
@@ -2040,10 +2158,17 @@ function showGraphPage() {
     </div>
   `;
   syncGraphDayPickerUi();
+  syncGraphPeriodButtonsUi();
   const graphDayFilter = document.getElementById("graphDayFilter");
   const graphDayTodayBtn = document.getElementById("graphDayTodayBtn");
+  const graphPeriodDayBtn = document.getElementById("graphPeriodDayBtn");
+  const graphPeriodWeekBtn = document.getElementById("graphPeriodWeekBtn");
+  const graphPeriodMonthBtn = document.getElementById("graphPeriodMonthBtn");
   if (graphDayFilter) graphDayFilter.addEventListener("change", onGraphDayFilterChange);
   if (graphDayTodayBtn) graphDayTodayBtn.addEventListener("click", onGraphDayTodayClick);
+  if (graphPeriodDayBtn) graphPeriodDayBtn.addEventListener("click", () => onGraphPeriodChange("day"));
+  if (graphPeriodWeekBtn) graphPeriodWeekBtn.addEventListener("click", () => onGraphPeriodChange("week"));
+  if (graphPeriodMonthBtn) graphPeriodMonthBtn.addEventListener("click", () => onGraphPeriodChange("month"));
   renderGraphCharts();
 
   document.body.classList.remove("summary-mode");
