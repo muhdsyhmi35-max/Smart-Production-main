@@ -447,6 +447,20 @@ th,td{
   font-size:14px;
 }
 
+/* Table column sizing: No smaller, Chassis wider */
+th:nth-child(1),
+td:nth-child(1){
+  width:46px;
+  min-width:46px;
+  max-width:46px;
+}
+
+th:nth-child(6),
+td:nth-child(6){
+  width:210px;
+  min-width:210px;
+}
+
 th{
   background:#1e293b;
   color:#60a5fa;
