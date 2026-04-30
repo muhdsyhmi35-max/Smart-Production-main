@@ -62,6 +62,9 @@ let isApplyingRemoteCommand = false;
 let hasLocalSession = false;
 let liveCountdownInterval = null;
 let monitorDowntimeOverrideSec = null;
+let monitorFirebaseNetConnected = false;
+let monitorLiveStateReceived = false;
+let monitorLiveStateError = null;
 let initialLiveStateLoaded = false;
 const firebaseSessionStartedAt = Date.now();
 const LOCAL_LIVE_STATE_KEY = "TF2_LIVE_STATE_SNAPSHOT";
@@ -90,10 +93,48 @@ const FIREBASE_CONFIG = window.FIREBASE_CONFIG || {
 
 function setMonitorConnectionStatus(isConnected) {
   if (!isMonitor) return;
+  monitorFirebaseNetConnected = !!isConnected;
   const badge = document.getElementById("monitorConnectionStatus");
   if (!badge) return;
   badge.textContent = isConnected ? "LIVE" : "DISCONNECTED";
   badge.classList.toggle("offline", !isConnected);
+  updateMonitorDataNotice();
+}
+
+/** Explains empty monitor KPIs: offline, permission denied, or main PC not publishing yet. */
+function updateMonitorDataNotice() {
+  if (!isMonitor) return;
+
+  let bar = document.getElementById("monitorDataNotice");
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "monitorDataNotice";
+    bar.className = "monitor-data-notice";
+    const header = document.querySelector(".header");
+    if (header && header.parentNode) {
+      header.parentNode.insertBefore(bar, header.nextSibling);
+    } else {
+      document.body.insertBefore(bar, document.body.firstChild);
+    }
+  }
+
+  let msg = "";
+  let show = true;
+  if (monitorLiveStateError) {
+    const code = monitorLiveStateError.code || "";
+    msg = code === "PERMISSION_DENIED"
+      ? "Firebase: permission denied reading production/liveState. Open Firebase Console → Realtime Database → Rules and allow .read on this path for monitors (or match how the main PC authenticates)."
+      : ("Firebase: " + (monitorLiveStateError.message || String(monitorLiveStateError)));
+  } else if (!monitorFirebaseNetConnected) {
+    msg = "Cannot reach Firebase (check internet). KPIs update when the connection is restored.";
+  } else if (!monitorLiveStateReceived) {
+    msg = "Waiting for live data from the main PC. There the operator must open this app (without ?monitor), start/use production so values publish to Firebase. This URL must end with ?monitor.";
+  } else {
+    show = false;
+  }
+
+  bar.style.display = show ? "block" : "none";
+  bar.textContent = msg;
 }
 
 /* ===== FORMAT ===== */
@@ -523,11 +564,25 @@ function initFirebaseSync() {
   });
 
   if (isMonitor) {
-    firebaseLiveStateRef.on("value", snapshot => {
-      const liveState = snapshot.val();
-      if (!liveState) return;
-      applyLiveState(liveState);
-    });
+    firebaseLiveStateRef.on(
+      "value",
+      snapshot => {
+        monitorLiveStateError = null;
+        const liveState = snapshot.val();
+        if (!liveState) {
+          monitorLiveStateReceived = false;
+          updateMonitorDataNotice();
+          return;
+        }
+        applyLiveState(liveState);
+      },
+      err => {
+        monitorLiveStateError = err;
+        monitorLiveStateReceived = false;
+        console.error("Monitor live state listener:", err);
+        updateMonitorDataNotice();
+      }
+    );
   }
 
   return true;
@@ -834,6 +889,12 @@ function applyLiveState(state) {
     setStatus(status, "status-blue");
     downtimeCard.classList.remove("downtime-alert", "blink");
     downtimeText.classList.remove("status-red", "blink");
+  }
+
+  if (isMonitor) {
+    monitorLiveStateReceived = true;
+    monitorLiveStateError = null;
+    updateMonitorDataNotice();
   }
 }
 
@@ -2379,6 +2440,7 @@ window.onload = async function() {
     // Scan table rows: Google Sheet source of truth.
     loadLiveData();
     setInterval(loadLiveData, 3000);
+    updateMonitorDataNotice();
   } else {
     // IMPORTANT:
     // On refresh, do not immediately publish "READY + countdown 0" to Firebase,

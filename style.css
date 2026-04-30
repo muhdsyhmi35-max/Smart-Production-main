@@ -61,6 +61,20 @@ body::-webkit-scrollbar{
   position:relative; /* anchor absolute fullscreen button */
 }
 
+.monitor-data-notice{
+  display:none;
+  margin:0 16px 10px;
+  padding:10px 14px;
+  border-radius:8px;
+  border:1px solid rgba(251,191,36,.45);
+  background:rgba(69,47,10,.55);
+  color:#fde68a;
+  font-size:14px;
+  font-weight:600;
+  text-align:center;
+  line-height:1.35;
+}
+
 /* CLOCK */
 #clock{
   font-size:var(--clock-size);
