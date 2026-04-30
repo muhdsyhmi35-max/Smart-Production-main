@@ -2162,7 +2162,7 @@ function buildSummaryBarChart(title, labels, values, color, valueSuffix = "", yA
       ${titleSub ? `<div class="trend-subtitle">${titleSub}</div>` : ""}
     </div>
     ${yAxisLabel ? `<div class="trend-units">${yAxisLabel}</div>` : ""}
-    <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg" role="img" aria-label="${title}">
+    <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" class="summary-chart-svg" role="img" aria-label="${title}">
       ${yGrid}
       <line x1="${leftPad}" y1="${yBase}" x2="${width - rightPad}" y2="${yBase}" stroke="rgba(148,163,184,.45)" stroke-width="1"></line>
       <line x1="${leftPad}" y1="${topPad}" x2="${leftPad}" y2="${yBase}" stroke="rgba(148,163,184,.45)" stroke-width="1"></line>
@@ -2216,7 +2216,7 @@ function buildSummaryLineChart(title, labels, values, color, valueSuffix = "", y
   return `
     <div class="summary-graph-card-title">${title}</div>
     ${yAxisLabel ? `<div class="trend-units">${yAxisLabel}</div>` : ""}
-    <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg" role="img" aria-label="${title}">
+    <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" class="summary-chart-svg" role="img" aria-label="${title}">
       ${yGrid}
       <path d="${path}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
       ${circles}
@@ -2388,7 +2388,7 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
       </div>
       ${diffNote ? `<div class="plan-actual-diff">${diffNote}</div>` : ""}
       <div class="trend-units">Units</div>
-      <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg summary-chart-plan-actual" role="img" aria-label="Production trend chart">
+      <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" class="summary-chart-svg summary-chart-plan-actual" role="img" aria-label="Production trend chart">
         <defs>
           <linearGradient id="actualTrendFill" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stop-color="rgba(74,222,128,.35)"></stop>
