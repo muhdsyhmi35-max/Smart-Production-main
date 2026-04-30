@@ -277,6 +277,16 @@ function onSummaryDayTodayClick() {
   showSummaryPage();
 }
 
+function formatIsoDateAsDmy(isoDate) {
+  const m = String(isoDate || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return String(isoDate || "");
+  const y = parseInt(m[1], 10);
+  const mo = parseInt(m[2], 10);
+  const d = parseInt(m[3], 10);
+  if (![y, mo, d].every(Number.isFinite)) return String(isoDate || "");
+  return `${d}/${mo}/${y}`;
+}
+
 /** Parse "MM:SS" (or "M:SS") from table / sheet display into seconds. */
 function parseMmSsToSeconds(text) {
   if (text == null || text === "") return 0;
@@ -2093,7 +2103,7 @@ function showSummaryPage() {
       <button type="button" id="summaryDayTodayBtn" class="summary-today-btn">Today</button>
     </div>
     <div class="summary-grid">
-      <div class="summary-tile"><span>Date</span><strong>${activeDay}</strong></div>
+      <div class="summary-tile"><span>Date</span><strong>${formatIsoDateAsDmy(activeDay)}</strong></div>
       <div class="summary-tile"><span>Plan</span><strong>${plan}</strong></div>
       <div class="summary-tile"><span>Actual</span><strong>${actual}</strong></div>
       <div class="summary-tile"><span>Expected</span><strong>${expected}</strong></div>
