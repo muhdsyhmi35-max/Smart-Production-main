@@ -1776,11 +1776,9 @@ function toggleMenuDropdown(forceOpen) {
   updateViewToggleMenuItem();
   if (typeof forceOpen === "boolean") {
     menu.classList.toggle("open", forceOpen);
-    if (forceOpen) triggerEnterAnimation(menu);
     return;
   }
   menu.classList.toggle("open");
-  if (menu.classList.contains("open")) triggerEnterAnimation(menu);
 }
 
 function openHistoryPanelFromMenu() {
