@@ -1125,6 +1125,13 @@ body.graph-mode{
   flex-direction:column;
 }
 
+.report-chart-grid > .summary-graph-card .summary-chart-svg{
+  flex:1 1 auto;
+  width:100%;
+  height:100%;
+  max-height:none;
+}
+
 .report-bottom-grid{
   display:grid;
   grid-template-columns:1.45fr 1fr 1fr;
