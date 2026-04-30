@@ -547,6 +547,53 @@ body.history-mode #historyPanel.open .history-table-wrap{
   background:rgba(30,41,59,.5);
 }
 
+.history-title-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+}
+
+.history-filter-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:13px;
+  font-weight:600;
+  color:#cbd5e1;
+}
+
+.history-filter-row input[type="date"]{
+  padding:4px 8px;
+  border-radius:6px;
+  border:1px solid rgba(71,85,105,.65);
+  background:rgba(2,6,23,.85);
+  color:#e2e8f0;
+  color-scheme:dark;
+}
+
+.history-filter-row input[type="date"]::-webkit-calendar-picker-indicator{
+  cursor:pointer;
+  filter:invert(1) brightness(1.25);
+  opacity:1;
+}
+
+.history-today-btn{
+  padding:4px 10px;
+  font-size:12px;
+  font-weight:800;
+  border-radius:6px;
+  border:1px solid rgba(56,189,248,.45);
+  background:rgba(30,58,138,.45);
+  color:#93c5fd;
+  cursor:pointer;
+}
+
+.history-today-btn:hover{
+  filter:brightness(1.08);
+}
+
 .history-table-wrap{
   max-height:calc(60vh - 44px);
   overflow:auto;
@@ -658,6 +705,47 @@ body.graph-mode{
   font-size:18px;
   font-weight:700;
   color:#93c5fd;
+}
+
+.graph-filter-row{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+  margin:0 0 10px;
+  color:#94a3b8;
+  font-size:13px;
+  font-weight:600;
+}
+
+.graph-filter-row input[type="date"]{
+  padding:4px 8px;
+  border-radius:6px;
+  border:1px solid rgba(71,85,105,.65);
+  background:rgba(2,6,23,.85);
+  color:#e2e8f0;
+  color-scheme:dark;
+}
+
+.graph-filter-row input[type="date"]::-webkit-calendar-picker-indicator{
+  cursor:pointer;
+  filter:invert(1) brightness(1.25);
+  opacity:1;
+}
+
+.graph-today-btn{
+  padding:4px 10px;
+  font-size:12px;
+  font-weight:800;
+  border-radius:6px;
+  border:1px solid rgba(56,189,248,.45);
+  background:rgba(30,58,138,.45);
+  color:#93c5fd;
+  cursor:pointer;
+}
+
+.graph-today-btn:hover{
+  filter:brightness(1.08);
 }
 
 .summary-graphs{

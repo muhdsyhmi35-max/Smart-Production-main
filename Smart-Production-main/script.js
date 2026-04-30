@@ -37,6 +37,10 @@ let actualCount = 0;
 let downtimeSeconds = 0;
 /** null = rolling local \"today\" for downtime total; else YYYY-MM-DD for a specific day. */
 let downtimeFilterDate = null;
+/** null = today in graph filters; else YYYY-MM-DD. */
+let graphFilterDate = null;
+/** null = today in history filter; else YYYY-MM-DD. */
+let historyFilterDate = null;
 let lastScanTime = null;
 let startTime = null;
 let firstScanAtMs = null;
@@ -194,6 +198,70 @@ function onDowntimeDayTodayClick() {
   syncDowntimeDayPickerUi();
   refreshDowntimeCardFromTable();
   if (!isMonitor) updateLiveStateOnly();
+}
+
+function getActiveGraphDayKey() {
+  return graphFilterDate || toIsoDateLocal(new Date());
+}
+
+function syncGraphDayPickerUi() {
+  const el = document.getElementById("graphDayFilter");
+  if (el) el.value = getActiveGraphDayKey();
+}
+
+function onGraphDayFilterChange() {
+  const el = document.getElementById("graphDayFilter");
+  if (!el) return;
+  const v = (el.value || "").trim().slice(0, 10);
+  const todayK = toIsoDateLocal(new Date());
+  graphFilterDate = v && v !== todayK ? v : null;
+  renderGraphCharts();
+}
+
+function onGraphDayTodayClick() {
+  graphFilterDate = null;
+  syncGraphDayPickerUi();
+  renderGraphCharts();
+}
+
+function getActiveHistoryDayKey() {
+  return historyFilterDate || toIsoDateLocal(new Date());
+}
+
+function syncHistoryDayPickerUi() {
+  const el = document.getElementById("historyDayFilter");
+  if (el) el.value = getActiveHistoryDayKey();
+}
+
+function applyHistoryDateFilter() {
+  const table = document.getElementById("scanTable");
+  if (!table) return;
+  const dayKey = getActiveHistoryDayKey();
+  let visibleNo = 1;
+  Array.from(table.rows).forEach(tr => {
+    const rowDay = tr.dataset.scanDate || parseDisplayDateToIsoKey(tr.cells[1]?.innerText);
+    const show = !!rowDay && rowDay === dayKey;
+    tr.style.display = show ? "" : "none";
+    if (show) {
+      const noCell = tr.cells[0];
+      if (noCell) noCell.innerText = String(visibleNo++);
+    }
+  });
+}
+
+function onHistoryDayFilterChange() {
+  const el = document.getElementById("historyDayFilter");
+  if (!el) return;
+  const v = (el.value || "").trim().slice(0, 10);
+  const todayK = toIsoDateLocal(new Date());
+  historyFilterDate = v && v !== todayK ? v : null;
+  applyHistoryDateFilter();
+}
+
+function onHistoryDayTodayClick() {
+  historyFilterDate = null;
+  syncHistoryDayPickerUi();
+  applyHistoryDateFilter();
 }
 
 /** Parse "MM:SS" (or "M:SS") from table / sheet display into seconds. */
@@ -1253,6 +1321,7 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
     const model = pendingModel;
     const engine = pendingEngine;
     const lot = document.getElementById("lotInput").value || "-";
+    const planForRow = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
 
     const now = new Date();
     const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
@@ -1312,6 +1381,7 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
     }
 
     row.dataset.scanDate = toIsoDateLocal(now);
+    row.dataset.scanPlan = String(planForRow);
     renumberScanTable();
 
     // One completed 4-scan cycle = one actual unit.
@@ -1768,6 +1838,8 @@ function toggleHistoryPanel(forceOpen) {
     if (graphPage) graphPage.classList.remove("open");
     document.body.classList.add("history-mode");
     panel.classList.add("open");
+    syncHistoryDayPickerUi();
+    applyHistoryDateFilter();
     triggerEnterAnimation(panel);
   } else {
     document.body.classList.remove("history-mode");
@@ -1895,13 +1967,22 @@ function buildSummaryBarChart(title, labels, values, color, valueSuffix = "") {
   `;
 }
 
-function buildPlanVsActualChart() {
+function buildPlanVsActualChart(dayKey = getActiveGraphDayKey()) {
   const planRaw = document.getElementById("plan").innerText.trim();
-  let plan = parseInt(planRaw, 10);
+  let plan = getHistoricalPlanForDay(dayKey);
+  if (!Number.isFinite(plan) || plan < 0) {
+    plan = parseInt(planRaw, 10);
+  }
   if (!Number.isFinite(plan) || plan < 0) {
     plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
   }
-  const actual = parseInt(document.getElementById("actual").innerText, 10) || 0;
+  let actual = 0;
+  document.querySelectorAll("#scanTable tr").forEach(row => {
+    const cells = row.querySelectorAll("td");
+    if (!cells.length) return;
+    const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
+    if (rowDay === dayKey) actual += 1;
+  });
 
   if (plan <= 0 && actual <= 0) {
     return `
@@ -1935,7 +2016,7 @@ function buildPlanVsActualChart() {
   }
 
   return `
-    <div class="summary-graph-card-title">Plan vs Actual <span class="plan-actual-sub">${plan > 0 ? `(target ${plan}, done ${actual})` : `(output ${actual})`}</span></div>
+    <div class="summary-graph-card-title">Plan vs Actual (${dayKey}) <span class="plan-actual-sub">${plan > 0 ? `(target ${plan}, done ${actual})` : `(output ${actual})`}</span></div>
     ${diffNote ? `<div class="plan-actual-diff">${diffNote}</div>` : ""}
     <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg summary-chart-plan-actual" role="img" aria-label="Plan versus actual output">
       <line x1="${leftPad}" y1="${yBase}" x2="${width - rightPad}" y2="${yBase}" stroke="rgba(148,163,184,.45)" stroke-width="1"></line>
@@ -1949,7 +2030,20 @@ function buildPlanVsActualChart() {
     </svg>`;
 }
 
-function collectHourlyGraphData() {
+function getHistoricalPlanForDay(dayKey) {
+  const rows = document.querySelectorAll("#scanTable tr");
+  for (const row of rows) {
+    const cells = row.querySelectorAll("td");
+    if (!cells.length) continue;
+    const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
+    if (rowDay !== dayKey) continue;
+    const planVal = parseInt((row.dataset.scanPlan || "").trim(), 10);
+    if (Number.isFinite(planVal) && planVal > 0) return planVal;
+  }
+  return null;
+}
+
+function collectHourlyGraphData(dayKey = getActiveGraphDayKey()) {
   const rows = document.querySelectorAll("#scanTable tr");
   const outputByHour = {};
   const downtimeByHour = {};
@@ -1957,6 +2051,8 @@ function collectHourlyGraphData() {
   rows.forEach(row => {
     const cells = row.querySelectorAll("td");
     if (cells.length === 0) return;
+    const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
+    if (!rowDay || rowDay !== dayKey) return;
     const hour = parseHourFromTimeText(cells[2]?.innerText || "");
     if (hour == null) return;
     outputByHour[hour] = (outputByHour[hour] || 0) + 1;
@@ -1976,17 +2072,27 @@ function collectHourlyGraphData() {
   return { labels, outputVals, downtimeMins };
 }
 
+function renderGraphCharts() {
+  const graphBody = document.getElementById("graphChartsBody");
+  if (!graphBody) return;
+  const activeDay = getActiveGraphDayKey();
+  const { labels, outputVals, downtimeMins } = collectHourlyGraphData(activeDay);
+  const planActualChart = buildPlanVsActualChart(activeDay);
+  const outputChart = buildSummaryBarChart(`Output by Hour (${activeDay})`, labels, outputVals, "#22c55e");
+  const downtimeChart = buildSummaryBarChart(`Downtime by Hour (${activeDay})`, labels, downtimeMins, "#ef4444");
+  graphBody.innerHTML = `
+    <div class="summary-graph-card summary-graph-card-span">${planActualChart}</div>
+    <div class="summary-graph-card">${outputChart}</div>
+    <div class="summary-graph-card">${downtimeChart}</div>
+  `;
+}
+
 function showGraphPageFromMenu() {
   toggleMenuDropdown(false);
   showGraphPage();
 }
 
 function showGraphPage() {
-  const { labels, outputVals, downtimeMins } = collectHourlyGraphData();
-  const planActualChart = buildPlanVsActualChart();
-  const outputChart = buildSummaryBarChart("Output by Hour", labels, outputVals, "#22c55e");
-  const downtimeChart = buildSummaryBarChart("Downtime by Hour (min)", labels, downtimeMins, "#ef4444");
-
   let graphPage = document.getElementById("graphPage");
   if (!graphPage) {
     graphPage = document.createElement("div");
@@ -1997,12 +2103,20 @@ function showGraphPage() {
 
   graphPage.innerHTML = `
     <div class="summary-head">Graph</div>
-    <div class="summary-graphs">
-      <div class="summary-graph-card summary-graph-card-span">${planActualChart}</div>
-      <div class="summary-graph-card">${outputChart}</div>
-      <div class="summary-graph-card">${downtimeChart}</div>
+    <div class="graph-filter-row">
+      <label for="graphDayFilter">Date</label>
+      <input type="date" id="graphDayFilter" title="Select date for graph charts">
+      <button type="button" id="graphDayTodayBtn" class="graph-today-btn">Today</button>
+    </div>
+    <div class="summary-graphs" id="graphChartsBody">
     </div>
   `;
+  syncGraphDayPickerUi();
+  const graphDayFilter = document.getElementById("graphDayFilter");
+  const graphDayTodayBtn = document.getElementById("graphDayTodayBtn");
+  if (graphDayFilter) graphDayFilter.addEventListener("change", onGraphDayFilterChange);
+  if (graphDayTodayBtn) graphDayTodayBtn.addEventListener("click", onGraphDayTodayClick);
+  renderGraphCharts();
 
   document.body.classList.remove("summary-mode");
   document.body.classList.remove("history-mode");
@@ -2352,6 +2466,7 @@ function loadLiveData() {
         return -1;
       };
       const idxLot = getIdx("lot", "lot no", "lotno");
+      const idxPlan = getIdx("daily plan", "plan", "dailyplan", "target");
       const idxModel = getIdx("model");
       const idxChassis = getIdx("chassis");
       const idxEngine = getIdx("engine", "engine no", "engine no.");
@@ -2433,8 +2548,12 @@ function loadLiveData() {
           newRow.dataset.scanDate = Number.isFinite(fullDateTime.getTime())
             ? toIsoDateLocal(fullDateTime)
             : parseDisplayDateToIsoKey(newRow.cells[1]?.innerText);
+          const rawPlan = idxPlan >= 0 ? row[idxPlan] : "";
+          const planVal = parseInt(String(rawPlan ?? "").trim(), 10);
+          newRow.dataset.scanPlan = Number.isFinite(planVal) && planVal > 0 ? String(planVal) : "";
         });
         renumberScanTable();
+        applyHistoryDateFilter();
         syncDowntimeSecondsFromTable();
         refreshDowntimeCardFromTable();
       }
@@ -2477,6 +2596,14 @@ if (downtimeDayFilterEl) {
 }
 if (downtimeDayTodayBtn) {
   downtimeDayTodayBtn.addEventListener("click", onDowntimeDayTodayClick);
+}
+const historyDayFilterEl = document.getElementById("historyDayFilter");
+const historyDayTodayBtn = document.getElementById("historyDayTodayBtn");
+if (historyDayFilterEl) {
+  historyDayFilterEl.addEventListener("change", onHistoryDayFilterChange);
+}
+if (historyDayTodayBtn) {
+  historyDayTodayBtn.addEventListener("click", onHistoryDayTodayClick);
 }
 
 window.onload = async function() {

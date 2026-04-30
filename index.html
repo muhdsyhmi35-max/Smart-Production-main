@@ -98,7 +98,14 @@ Lot:
 </div>
   
 <div id="historyPanel" class="history-panel">
-  <div class="history-panel-title">History</div>
+  <div class="history-panel-title history-title-row">
+    <span>History</span>
+    <div class="history-filter-row">
+      <label for="historyDayFilter">Date</label>
+      <input type="date" id="historyDayFilter" title="Select date for history table">
+      <button type="button" id="historyDayTodayBtn" class="history-today-btn">Today</button>
+    </div>
+  </div>
   <div class="history-table-wrap">
     <table>
       <thead>
