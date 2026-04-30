@@ -219,6 +219,47 @@ body::-webkit-scrollbar{
   color:#f87171;
 }
 
+.downtime-day-filter{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:4px 0 8px;
+  font-size:13px;
+  font-weight:600;
+  color:#94a3b8;
+}
+
+.downtime-day-filter label{
+  white-space:nowrap;
+}
+
+.downtime-day-filter input[type="date"]{
+  padding:4px 8px;
+  font-size:13px;
+  font-weight:700;
+  border-radius:6px;
+  border:1px solid rgba(71,85,105,.65);
+  background:rgba(2,6,23,.85);
+  color:#e2e8f0;
+}
+
+.downtime-today-btn{
+  padding:4px 10px;
+  font-size:12px;
+  font-weight:800;
+  border-radius:6px;
+  border:1px solid rgba(56,189,248,.45);
+  background:rgba(30,58,138,.45);
+  color:#93c5fd;
+  cursor:pointer;
+}
+
+.downtime-today-btn:hover{
+  filter:brightness(1.08);
+}
+
 /* DOWNTIME ALERT */
 .downtime-alert{
   box-shadow:0 0 30px rgba(239,68,68,0.7);

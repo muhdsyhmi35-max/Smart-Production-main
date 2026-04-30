@@ -35,6 +35,8 @@ let timer = null;
 let countdownValue = 0;
 let actualCount = 0;
 let downtimeSeconds = 0;
+/** null = rolling local \"today\" for downtime total; else YYYY-MM-DD for a specific day. */
+let downtimeFilterDate = null;
 let lastScanTime = null;
 let startTime = null;
 let firstScanAtMs = null;
@@ -145,6 +147,55 @@ function format(s) {
   return (m < 10 ? "0" + m : m) + ":" + (sec < 10 ? "0" + sec : sec);
 }
 
+function toIsoDateLocal(d) {
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${mo}-${day}`;
+}
+
+function getActiveDowntimeDayKey() {
+  if (downtimeFilterDate) return downtimeFilterDate;
+  return toIsoDateLocal(new Date());
+}
+
+/** Map table Date cell (e.g. DD/MM/YYYY) to YYYY-MM-DD for filtering. */
+function parseDisplayDateToIsoKey(dateText) {
+  const t = String(dateText || "").trim();
+  if (!t) return null;
+  const dm = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dm) {
+    const d0 = dm[1].padStart(2, "0");
+    const m0 = dm[2].padStart(2, "0");
+    return `${dm[3]}-${m0}-${d0}`;
+  }
+  const ms = Date.parse(t);
+  if (Number.isFinite(ms)) return toIsoDateLocal(new Date(ms));
+  return null;
+}
+
+function syncDowntimeDayPickerUi() {
+  const el = document.getElementById("downtimeDayFilter");
+  if (el) el.value = getActiveDowntimeDayKey();
+}
+
+function onDowntimeDayFilterChange() {
+  const el = document.getElementById("downtimeDayFilter");
+  if (!el) return;
+  const v = (el.value || "").trim().slice(0, 10);
+  const todayK = toIsoDateLocal(new Date());
+  downtimeFilterDate = v && v !== todayK ? v : null;
+  refreshDowntimeCardFromTable();
+  if (!isMonitor) updateLiveStateOnly();
+}
+
+function onDowntimeDayTodayClick() {
+  downtimeFilterDate = null;
+  syncDowntimeDayPickerUi();
+  refreshDowntimeCardFromTable();
+  if (!isMonitor) updateLiveStateOnly();
+}
+
 /** Parse "MM:SS" (or "M:SS") from table / sheet display into seconds. */
 function parseMmSsToSeconds(text) {
   if (text == null || text === "") return 0;
@@ -209,12 +260,15 @@ function parseMmSsToSeconds(text) {
   return 0;
 }
 
-/** Sum downtime directly from currently rendered table rows (Status = DOWN TIME). */
+/** Sum downtime from rendered rows for DOWN TIME on the active downtime day only. */
 function sumBookedDowntimeFromScanTable() {
   let total = 0;
   const table = document.getElementById("scanTable");
   if (!table) return 0;
+  const dayKey = getActiveDowntimeDayKey();
   Array.from(table.rows).forEach(tr => {
+    const rowDay = tr.dataset.scanDate || parseDisplayDateToIsoKey(tr.cells[1]?.innerText);
+    if (!rowDay || rowDay !== dayKey) return;
     const downtimeCell = tr.cells[9];
     const statusCell = tr.cells[8];
     if (!downtimeCell || !statusCell) return;
@@ -251,9 +305,9 @@ function renumberScanTable() {
 }
 
 function refreshDowntimeCardFromTable() {
-  // Monitor: use Firebase downtime so it matches main PC instantly
-  // (Sheet scan table can lag a few seconds behind).
-  if (isMonitor && Number.isFinite(monitorDowntimeOverrideSec) && monitorDowntimeOverrideSec >= 0) {
+  // Monitor: for \"today\" (rolling) use Firebase downtime so it matches main PC instantly
+  // when the sheet table lags; for a past day, sum from the table only.
+  if (isMonitor && downtimeFilterDate === null && Number.isFinite(monitorDowntimeOverrideSec) && monitorDowntimeOverrideSec >= 0) {
     downtimeSeconds = monitorDowntimeOverrideSec;
     document.getElementById("downtime").innerText = format(monitorDowntimeOverrideSec);
     renderDowntimeDebugPanel();
@@ -302,7 +356,10 @@ function renderDowntimeDebugPanel() {
   const lines = [];
   lines.push("Downtime Debug (DOWN TIME rows only)");
 
+  const dayKey = getActiveDowntimeDayKey();
   Array.from(table.rows).forEach((tr, idx) => {
+    const rowDay = tr.dataset.scanDate || parseDisplayDateToIsoKey(tr.cells[1]?.innerText);
+    if (!rowDay || rowDay !== dayKey) return;
     const statusCell = tr.cells[8];
     const downtimeCell = tr.cells[9];
     const status = statusCell ? statusCell.innerText.trim() : "";
@@ -795,6 +852,14 @@ function applyLiveState(state) {
   const delay = parseInt(state.delay, 10) || 0;
   const stateEfficiency = parseInt(state.efficiency, 10) || 0;
   const lotNo = state.lotNo || "";
+  const downtimeDayIn = typeof state.downtimeDay === "string" && state.downtimeDay.trim()
+    ? state.downtimeDay.trim().slice(0, 10)
+    : null;
+  if (isMonitor && downtimeDayIn) {
+    const todayK = toIsoDateLocal(new Date());
+    downtimeFilterDate = downtimeDayIn === todayK ? null : downtimeDayIn;
+    syncDowntimeDayPickerUi();
+  }
   const fbTotalDowntime = Number(state.totalDowntime);
   if (isMonitor && Number.isFinite(fbTotalDowntime) && fbTotalDowntime >= 0) {
     monitorDowntimeOverrideSec = fbTotalDowntime;
@@ -1246,6 +1311,7 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
       downtimeCell.innerText = "";
     }
 
+    row.dataset.scanDate = toIsoDateLocal(now);
     renumberScanTable();
 
     // One completed 4-scan cycle = one actual unit.
@@ -2102,6 +2168,7 @@ function updateLiveStateOnly() {
     countdown: countdownValue,
     bookedDowntime: bookedDowntime,
     totalDowntime: bookedDowntime,
+    downtimeDay: getActiveDowntimeDayKey(),
     expected: expected,
     delay: delay,
     efficiency: efficiency,
@@ -2127,6 +2194,7 @@ function updateLiveStateOnly() {
       status: status,
       countdown: countdownValue,
       totalDowntime: bookedDowntime,
+      downtimeDay: getActiveDowntimeDayKey(),
       expected: expected,
       delay: delay,
       efficiency: efficiency
@@ -2303,7 +2371,13 @@ function loadLiveData() {
 
         table.innerHTML = "";
 
-        scanRows.reverse().forEach(row => {
+        scanRows.sort((a, b) => {
+          const ta = a && a[0] ? new Date(a[0]).getTime() : 0;
+          const tb = b && b[0] ? new Date(b[0]).getTime() : 0;
+          return tb - ta;
+        });
+
+        scanRows.forEach(row => {
           const newRow = table.insertRow();
 
           const fullDateTime = new Date(row[0]);
@@ -2356,6 +2430,9 @@ function loadLiveData() {
           } else {
             downtimeCell.innerText = "";
           }
+          newRow.dataset.scanDate = Number.isFinite(fullDateTime.getTime())
+            ? toIsoDateLocal(fullDateTime)
+            : parseDisplayDateToIsoKey(newRow.cells[1]?.innerText);
         });
         renumberScanTable();
         syncDowntimeSecondsFromTable();
@@ -2393,10 +2470,21 @@ document.getElementById("lotInput").addEventListener("input", () => {
   updateLiveStateOnly();
 });
 
+const downtimeDayFilterEl = document.getElementById("downtimeDayFilter");
+const downtimeDayTodayBtn = document.getElementById("downtimeDayTodayBtn");
+if (downtimeDayFilterEl) {
+  downtimeDayFilterEl.addEventListener("change", onDowntimeDayFilterChange);
+}
+if (downtimeDayTodayBtn) {
+  downtimeDayTodayBtn.addEventListener("click", onDowntimeDayTodayClick);
+}
+
 window.onload = async function() {
   // 🔐 MUST WAIT ACCESS CHECK
   const allowed = await checkAccess();
   if (!allowed) return;
+
+  syncDowntimeDayPickerUi();
 
   updateDateTime();
   setInterval(updateDateTime, 1000);
