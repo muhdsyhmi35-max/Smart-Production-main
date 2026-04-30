@@ -36,6 +36,12 @@
     gap:8px;
     grid-template-rows:minmax(0, 1.05fr) minmax(0, .95fr);
   }
+  .report-kpi-grid{
+    grid-template-columns:repeat(3, minmax(0,1fr));
+  }
+  .report-chart-grid{
+    grid-template-columns:1fr 1fr;
+  }
   .summary-graph-card{
     padding:5px;
   }
@@ -54,6 +60,12 @@
   .summary-graph-card-title,
   .plan-actual-sub{
     font-size:9px;
+  }
+}
+
+@media (max-width: 1200px){
+  .report-kpi-grid{
+    grid-template-columns:repeat(2, minmax(0,1fr));
   }
 }
 
@@ -920,6 +932,21 @@ body.graph-mode{
   font-weight:600;
 }
 
+.report-selects{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.report-selects select{
+  height:30px;
+  border-radius:6px;
+  border:1px solid rgba(71,85,105,.65);
+  background:rgba(2,6,23,.85);
+  color:#cbd5e1;
+  padding:0 8px;
+}
+
 .graph-period-toggle{
   display:flex;
   align-items:center;
@@ -1054,6 +1081,78 @@ body.graph-mode{
   margin-bottom:0;
   flex:1 1 auto;
   min-height:0;
+}
+
+.report-body{
+  display:grid;
+  grid-template-rows:auto auto minmax(0,1fr);
+  gap:8px;
+  flex:1 1 auto;
+  min-height:0;
+}
+
+.report-kpi-grid{
+  display:grid;
+  grid-template-columns:repeat(5, minmax(0,1fr));
+  gap:8px;
+}
+
+.report-kpi{
+  border:1px solid rgba(71,85,105,.45);
+  border-radius:6px;
+  background:rgba(30,41,59,.35);
+  padding:6px 8px;
+}
+
+.report-kpi span{
+  display:block;
+  font-size:10px;
+  color:#94a3b8;
+}
+
+.report-kpi strong{
+  display:inline-block;
+  font-size:26px;
+  line-height:1.1;
+  color:#60a5fa;
+}
+
+.report-kpi strong.neg{ color:#ef4444; }
+.report-kpi strong.pos{ color:#22c55e; }
+
+.report-kpi em{
+  margin-left:4px;
+  font-size:10px;
+  color:#94a3b8;
+  font-style:normal;
+}
+
+.report-chart-grid{
+  display:grid;
+  grid-template-columns:1.3fr 1fr;
+  gap:10px;
+}
+
+.report-table-wrap{
+  border:1px solid rgba(71,85,105,.45);
+  border-radius:6px;
+  background:rgba(30,41,59,.35);
+  padding:6px;
+  overflow:auto;
+}
+
+.report-mini-table{
+  width:100%;
+  border-collapse:collapse;
+  table-layout:fixed;
+}
+
+.report-mini-table th,
+.report-mini-table td{
+  border:1px solid rgba(71,85,105,.5);
+  padding:4px 6px;
+  text-align:center;
+  font-size:11px;
 }
 
 .summary-graph-card{

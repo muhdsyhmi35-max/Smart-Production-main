@@ -2291,15 +2291,71 @@ function renderGraphCharts() {
   const activeDay = getActiveGraphDayKey();
   const range = getActiveGraphRange();
   const rangeLabel = formatIsoRangeAsDdMmYy(range.start, range.end);
-  const { labels, outputVals, downtimeMins, bucketName } = collectHourlyGraphData(activeDay, graphPeriod);
+  const { labels, downtimeMins } = collectHourlyGraphData(activeDay, graphPeriod);
   const periodLabel = graphPeriod === "week" ? "Week" : graphPeriod === "month" ? "Month" : "Day";
+  const periodKeys = getDayKeysBetween(range.start, range.end);
+  const keySet = new Set(periodKeys);
+  const rows = document.querySelectorAll("#scanTable tr");
+  const dayProduced = {};
+  const dayDowntimeSec = {};
+  periodKeys.forEach(k => { dayProduced[k] = 0; dayDowntimeSec[k] = 0; });
+  rows.forEach(row => {
+    const cells = row.querySelectorAll("td");
+    if (!cells.length) return;
+    const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
+    if (!rowDay || !keySet.has(rowDay)) return;
+    dayProduced[rowDay] = (dayProduced[rowDay] || 0) + 1;
+    const statusText = (cells[8]?.innerText || "").trim().toUpperCase();
+    if (statusText === "DOWN TIME") {
+      dayDowntimeSec[rowDay] = (dayDowntimeSec[rowDay] || 0) + parseMmSsToSeconds(cells[9]?.innerText || "");
+    }
+  });
+  const defaultDailyPlan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+  const dayTarget = {};
+  periodKeys.forEach(k => {
+    const p = getHistoricalPlanForDay(k);
+    dayTarget[k] = (Number.isFinite(p) && p > 0) ? p : defaultDailyPlan;
+  });
+  const totalProduced = periodKeys.reduce((s, k) => s + (dayProduced[k] || 0), 0);
+  const totalTarget = periodKeys.reduce((s, k) => s + (dayTarget[k] || 0), 0);
+  const totalDowntimeMin = Math.max(0, Math.round(periodKeys.reduce((s, k) => s + (dayDowntimeSec[k] || 0), 0) / 60));
+  const avgRate = totalProduced > 0 ? (totalProduced / Math.max(periodKeys.length * 8, 1)) : 0;
+  const dailyRows = periodKeys.map(k => {
+    const produced = dayProduced[k] || 0;
+    const target = dayTarget[k] || 0;
+    const balance = produced - target;
+    const ach = target > 0 ? ((produced / target) * 100) : 0;
+    const dtMin = Math.max(0, Math.round((dayDowntimeSec[k] || 0) / 60));
+    return `<tr>
+      <td>${formatIsoDateAsDdMmYy(k)}</td>
+      <td>${target}</td>
+      <td>${produced}</td>
+      <td class="${balance < 0 ? "summary-downtime-red" : "summary-status-scanned"}">${balance > 0 ? "+" : ""}${balance}</td>
+      <td>${ach.toFixed(1)}%</td>
+      <td>${dtMin}</td>
+    </tr>`;
+  }).join("");
   const planActualChart = buildPlanVsActualChart(activeDay, graphPeriod);
-  const outputChart = buildSummaryBarChart(`Output by ${bucketName} (${periodLabel}: ${rangeLabel})`, labels, outputVals, "#22c55e");
-  const downtimeChart = buildSummaryBarChart(`Downtime by ${bucketName} (${periodLabel}: ${rangeLabel})`, labels, downtimeMins, "#ef4444");
+  const downtimeChart = buildSummaryBarChart(`Downtime Trend (${periodLabel}: ${rangeLabel})`, labels, downtimeMins, "#ef4444");
   graphBody.innerHTML = `
-      <div class="summary-graph-card summary-graph-card-span">${planActualChart}</div>
-      <div class="summary-graph-card">${outputChart}</div>
+    <div class="report-kpi-grid">
+      <div class="report-kpi"><span>Total Produced</span><strong>${totalProduced}</strong><em>units</em></div>
+      <div class="report-kpi"><span>Total Target</span><strong>${totalTarget}</strong><em>units</em></div>
+      <div class="report-kpi"><span>Production Balance</span><strong class="${(totalProduced-totalTarget) < 0 ? "neg" : "pos"}">${(totalProduced-totalTarget) > 0 ? "+" : ""}${totalProduced-totalTarget}</strong><em>units</em></div>
+      <div class="report-kpi"><span>Total Downtime</span><strong class="neg">${totalDowntimeMin}</strong><em>min</em></div>
+      <div class="report-kpi"><span>Average Rate</span><strong>${avgRate.toFixed(1)}</strong><em>units/hr</em></div>
+    </div>
+    <div class="report-chart-grid">
+      <div class="summary-graph-card">${planActualChart}</div>
       <div class="summary-graph-card">${downtimeChart}</div>
+    </div>
+    <div class="report-table-wrap">
+      <div class="summary-graph-card-title">Daily Summary</div>
+      <table class="report-mini-table">
+        <thead><tr><th>Date</th><th>Target</th><th>Produced</th><th>Balance</th><th>Achv</th><th>Downtime</th></tr></thead>
+        <tbody>${dailyRows || `<tr><td colspan="6">No data</td></tr>`}</tbody>
+      </table>
+    </div>
   `;
 }
 
@@ -2318,8 +2374,13 @@ function showGraphPage() {
   }
 
   graphPage.innerHTML = `
-    <div class="summary-head">Graph</div>
+    <div class="summary-head">Production Report</div>
     <div class="graph-filter-row">
+      <div class="report-selects">
+        <select><option>Daily Production Report</option></select>
+        <select><option>All Shifts</option></select>
+        <select><option>All Lines</option></select>
+      </div>
       <div class="graph-period-toggle" role="group" aria-label="Graph period">
         <button type="button" id="graphPeriodDayBtn" class="graph-period-btn">Day</button>
         <button type="button" id="graphPeriodWeekBtn" class="graph-period-btn">Week</button>
@@ -2335,7 +2396,7 @@ function showGraphPage() {
         </div>
       </div>
     </div>
-    <div class="summary-graphs" id="graphChartsBody">
+    <div class="report-body" id="graphChartsBody">
     </div>
   `;
   syncGraphRangePickerUi();
