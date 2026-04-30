@@ -295,8 +295,15 @@ function onGraphRangeTodayClick() {
 
 function onGraphPeriodChange(period) {
   graphPeriod = (period === "week" || period === "month") ? period : "day";
+  const anchor = graphRangeStartDate || graphRangeEndDate || getActiveGraphDayKey();
+  graphFilterDate = anchor;
+  const periodKeys = getPeriodDayKeys(anchor, graphPeriod);
+  if (periodKeys.length) {
+    graphRangeStartDate = periodKeys[0];
+    graphRangeEndDate = periodKeys[periodKeys.length - 1];
+  }
   syncGraphPeriodButtonsUi();
-  if (!graphRangeStartDate || !graphRangeEndDate) syncGraphRangePickerUi();
+  syncGraphRangePickerUi();
   renderGraphCharts();
 }
 
