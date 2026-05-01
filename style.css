@@ -1,5 +1,10 @@
+/* Hide fullscreen control while already fullscreen (standard + legacy WebKit). */
 :fullscreen .fullscreen-btn,
-::-webkit-full-screen .fullscreen-btn{
+:-webkit-full-screen .fullscreen-btn{
+  display:none !important;
+}
+
+body.is-fullscreen .fullscreen-btn{
   display:none !important;
 }
 /* Graph page fitting presets for common displays (1366x768, 1920x1080). */

@@ -1874,13 +1874,36 @@ function downloadExcel() {
 
 /* ===== FULL SCREEN ===== */
 
+function syncFullscreenUi() {
+  const fs =
+    document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    document.msFullscreenElement ||
+    null;
+  document.body.classList.toggle("is-fullscreen", !!fs);
+}
+
 function toggleFullScreen() {
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen();
+  const el = document.documentElement;
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    const req =
+      el.requestFullscreen ||
+      el.webkitRequestFullscreen ||
+      el.msRequestFullscreen;
+    if (req) req.call(el);
   } else {
-    document.exitFullscreen();
+    const exit =
+      document.exitFullscreen ||
+      document.webkitExitFullscreen ||
+      document.msExitFullscreen;
+    if (exit) exit.call(document);
   }
 }
+
+document.addEventListener("fullscreenchange", syncFullscreenUi);
+document.addEventListener("webkitfullscreenchange", syncFullscreenUi);
+document.addEventListener("MSFullscreenChange", syncFullscreenUi);
+syncFullscreenUi();
 
 function toggleHistoryPanel(forceOpen) {
   const panel = document.getElementById("historyPanel");
