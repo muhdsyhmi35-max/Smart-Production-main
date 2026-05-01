@@ -669,7 +669,7 @@ tr:nth-child(even){background:#0b1220;}
 }
 
 :root{
-  --menu-panel-width:min(300px, 80vw);
+  --menu-panel-width:min(270px, 78vw);
 }
 
 .header,
@@ -699,6 +699,17 @@ body.menu-open .summary-page,
 body.menu-open .graph-page,
 body.menu-open #historyPanel.open{
   left:calc(20px + var(--menu-panel-width));
+}
+
+body.menu-open .menu-btn{
+  position:fixed;
+  left:22px;
+  top:34px;
+  transform:none;
+}
+
+body.menu-open .menu-btn:hover{
+  transform:translateY(-1px);
 }
 
 .menu-brand{
