@@ -148,16 +148,77 @@ body::-webkit-scrollbar{
 
 /* HEADER */
 .header{
-  font-size:var(--header-size);
-  font-weight:900;
-  text-align:center;
-  padding:18px;
-  padding-left:72px;
-  padding-right:72px;
-  color:var(--blue);
-  letter-spacing:1.6px;
-  text-shadow:0 0 16px rgba(56,189,248,.25);
-  position:relative; /* anchor absolute fullscreen button */
+  position:relative;
+  margin:10px 12px 0;
+  padding:10px 56px;
+  min-height:48px;
+  border:1px solid rgba(71,85,105,.45);
+  border-radius:8px;
+  background:linear-gradient(90deg, rgba(4,10,22,.96), rgba(3,8,18,.98));
+  box-shadow:0 8px 20px rgba(0,0,0,.35);
+  color:#dbeafe;
+}
+
+.header-main{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.header-title-wrap{
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+}
+
+.header-title{
+  font-size:clamp(16px, 1.7vw, 20px);
+  font-weight:800;
+  color:#e2e8f0;
+  letter-spacing:.2px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.header-subtitle{
+  font-size:12px;
+  color:#94a3b8;
+  line-height:1.2;
+}
+
+.header-meta{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.header-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 10px;
+  border-radius:6px;
+  border:1px solid rgba(71,85,105,.5);
+  background:rgba(15,23,42,.78);
+  color:#e2e8f0;
+  font-size:12px;
+  font-weight:700;
+  line-height:1;
+}
+
+.header-pill-accent{
+  border-color:rgba(59,130,246,.45);
+  background:rgba(30,58,138,.45);
+  color:#93c5fd;
+}
+
+.header-pill-icon{
+  font-size:12px;
+  opacity:.9;
 }
 
 .downtime-day-filter{
@@ -240,26 +301,11 @@ body::-webkit-scrollbar{
   line-height:1.35;
 }
 
-/* CLOCK */
-#clock{
-  font-size:var(--clock-size);
-  font-weight:500;
-  color:#22d3ee;
-  text-shadow:none;
-}
-  
-/* DATE */
+#clock,
 #dateDisplay{
-  font-size:30px;
-  color:#94a3b8;
-}
-
-.datetime{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  margin-top:10px;
+  font-size:12px;
+  font-weight:700;
+  color:inherit;
 }
   
 /* CONTROL PANEL */
