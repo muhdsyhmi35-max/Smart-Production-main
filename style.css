@@ -163,7 +163,7 @@ body::-webkit-scrollbar{
   display:flex;
   align-items:center;
   justify-content:space-between;
-  gap:10px;
+  gap:7px;
   padding:0 40px;
 }
 
@@ -653,9 +653,9 @@ tr:nth-child(even){background:#0b1220;}
   background:linear-gradient(180deg, rgba(4,10,22,.98), rgba(3,8,18,.98));
   box-shadow:0 10px 28px rgba(0,0,0,.45);
   z-index:10030;
-  padding:54px 10px 12px;
+  padding:44px 8px 10px;
   flex-direction:column;
-  gap:6px;
+  gap:4px;
   transform:translateX(-108%);
   opacity:0;
   pointer-events:none;
@@ -669,7 +669,7 @@ tr:nth-child(even){background:#0b1220;}
 }
 
 :root{
-  --menu-panel-width:min(270px, 78vw);
+  --menu-panel-width:min(250px, 76vw);
 }
 
 .header,
@@ -701,25 +701,16 @@ body.menu-open #historyPanel.open{
   left:calc(20px + var(--menu-panel-width));
 }
 
-body.menu-open .menu-btn{
-  position:fixed;
-  left:22px;
-  top:34px;
-  transform:none;
-}
-
-body.menu-open .menu-btn:hover{
-  transform:translateY(-1px);
-}
+body.menu-open .menu-btn{ display:none; }
 
 .menu-brand{
   display:flex;
   align-items:center;
   gap:10px;
   width:100%;
-  min-height:52px;
-  margin:-54px 0 10px;
-  padding:9px 12px;
+  min-height:46px;
+  margin:-44px 0 8px;
+  padding:7px 10px;
   border:none;
   border-radius:0;
   background:rgba(17,24,39,1);
@@ -728,14 +719,14 @@ body.menu-open .menu-btn:hover{
 }
 
 .menu-brand-icon{
-  font-size:26px;
+  font-size:22px;
   line-height:1;
   filter:grayscale(1) brightness(2.2);
   flex:0 0 auto;
 }
 
 .menu-brand-text{
-  font-size:13px;
+  font-size:12px;
   line-height:1.05;
   font-weight:800;
   color:#f8fafc;
@@ -757,8 +748,8 @@ body.menu-open .menu-btn:hover{
   color:#cbd5e1;
   border:1px solid rgba(71,85,105,.45);
   border-radius:5px;
-  padding:8px 10px;
-  font-size:15px;
+  padding:7px 9px;
+  font-size:14px;
   font-weight:700;
   cursor:pointer;
   margin:0;
@@ -768,10 +759,10 @@ body.menu-open .menu-btn:hover{
 
 .menu-icon{
   display:inline-flex;
-  width:22px;
+  width:20px;
   justify-content:center;
   opacity:.95;
-  font-size:17px;
+  font-size:15px;
 }
 
 .menu-item:hover{
