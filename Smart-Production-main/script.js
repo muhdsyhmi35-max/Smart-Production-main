@@ -39,7 +39,7 @@ let downtimeSeconds = 0;
 let downtimeFilterDate = null;
 /** null = today in graph filters; else YYYY-MM-DD. */
 let graphFilterDate = null;
-let graphPeriod = "day";
+let graphPeriod = "week";
 let graphRangeStartDate = null;
 let graphRangeEndDate = null;
 /** null = today in history filter; else YYYY-MM-DD. */
@@ -306,7 +306,7 @@ function onGraphRangeTodayClick() {
 }
 
 function onGraphPeriodChange(period) {
-  graphPeriod = (period === "week" || period === "month") ? period : "day";
+  graphPeriod = (period === "week" || period === "month") ? period : "week";
   // Anchor on the latest selected day to avoid landing on empty early dates
   // when toggling Day/Week/Month back-to-back.
   const anchor = graphRangeEndDate || graphRangeStartDate || getActiveGraphDayKey();
@@ -322,13 +322,11 @@ function onGraphPeriodChange(period) {
 }
 
 function syncGraphPeriodButtonsUi() {
-  const dayBtn = document.getElementById("graphPeriodDayBtn");
   const weekBtn = document.getElementById("graphPeriodWeekBtn");
   const monthBtn = document.getElementById("graphPeriodMonthBtn");
-  [dayBtn, weekBtn, monthBtn].forEach(btn => btn && btn.classList.remove("active"));
-  if (graphPeriod === "week" && weekBtn) weekBtn.classList.add("active");
-  else if (graphPeriod === "month" && monthBtn) monthBtn.classList.add("active");
-  else if (dayBtn) dayBtn.classList.add("active");
+  [weekBtn, monthBtn].forEach(btn => btn && btn.classList.remove("active"));
+  if (graphPeriod === "month" && monthBtn) monthBtn.classList.add("active");
+  else if (weekBtn) weekBtn.classList.add("active");
 }
 
 function getWeekStartIso(anchorIso) {
@@ -2045,9 +2043,12 @@ function toggleMenuDropdown(forceOpen) {
   updateViewToggleMenuItem();
   if (typeof forceOpen === "boolean") {
     menu.classList.toggle("open", forceOpen);
+    document.body.classList.toggle("menu-open", forceOpen);
     return;
   }
-  menu.classList.toggle("open");
+  const nextOpen = !menu.classList.contains("open");
+  menu.classList.toggle("open", nextOpen);
+  document.body.classList.toggle("menu-open", nextOpen);
 }
 
 function openHistoryPanelFromMenu() {
@@ -2287,7 +2288,7 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
   const rangeLabel = formatIsoRangeAsDdMmYy(range.start, range.end);
   const dayKeys = getDayKeysBetween(range.start, range.end);
   const daySet = new Set(dayKeys);
-  const periodLabel = period === "week" ? "Week" : period === "month" ? "Month" : "Day";
+  const periodLabel = period === "month" ? "Month" : "Week";
 
   const dailyActualMap = {};
   const rows = document.querySelectorAll("#scanTable tr");
@@ -2542,7 +2543,7 @@ function renderGraphCharts() {
   const range = getActiveGraphRange();
   const rangeLabel = formatIsoRangeAsDdMmYy(range.start, range.end);
   const { labels, downtimeMins } = collectHourlyGraphData(activeDay, graphPeriod);
-  const periodLabel = graphPeriod === "week" ? "Week" : graphPeriod === "month" ? "Month" : "Day";
+  const periodLabel = graphPeriod === "month" ? "Month" : "Week";
   const periodKeys = getDayKeysBetween(range.start, range.end);
   const keySet = new Set(periodKeys);
   const rows = document.querySelectorAll("#scanTable tr");
@@ -2650,7 +2651,6 @@ function showGraphPage() {
     <div class="summary-head">Production Report</div>
     <div class="graph-filter-row">
       <div class="graph-period-toggle" role="group" aria-label="Graph period">
-        <button type="button" id="graphPeriodDayBtn" class="graph-period-btn">Day</button>
         <button type="button" id="graphPeriodWeekBtn" class="graph-period-btn">Week</button>
         <button type="button" id="graphPeriodMonthBtn" class="graph-period-btn">Month</button>
       </div>
@@ -2672,13 +2672,11 @@ function showGraphPage() {
   const graphRangeStart = document.getElementById("graphRangeStart");
   const graphRangeEnd = document.getElementById("graphRangeEnd");
   const graphRangeTodayBtn = document.getElementById("graphRangeTodayBtn");
-  const graphPeriodDayBtn = document.getElementById("graphPeriodDayBtn");
   const graphPeriodWeekBtn = document.getElementById("graphPeriodWeekBtn");
   const graphPeriodMonthBtn = document.getElementById("graphPeriodMonthBtn");
   if (graphRangeStart) graphRangeStart.addEventListener("change", onGraphRangeFilterChange);
   if (graphRangeEnd) graphRangeEnd.addEventListener("change", onGraphRangeFilterChange);
   if (graphRangeTodayBtn) graphRangeTodayBtn.addEventListener("click", onGraphRangeTodayClick);
-  if (graphPeriodDayBtn) graphPeriodDayBtn.addEventListener("click", () => onGraphPeriodChange("day"));
   if (graphPeriodWeekBtn) graphPeriodWeekBtn.addEventListener("click", () => onGraphPeriodChange("week"));
   if (graphPeriodMonthBtn) graphPeriodMonthBtn.addEventListener("click", () => onGraphPeriodChange("month"));
   renderGraphCharts();

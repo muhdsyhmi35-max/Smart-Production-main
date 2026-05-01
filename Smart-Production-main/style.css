@@ -648,6 +648,39 @@ tr:nth-child(even){background:#0b1220;}
   pointer-events:auto;
 }
 
+:root{
+  --menu-panel-width:min(250px, 76vw);
+}
+
+.header,
+.datetime,
+.controls,
+.dashboard,
+.bottom-row{
+  transition:margin-left .24s ease, width .24s ease;
+}
+
+body.menu-open .header,
+body.menu-open .datetime,
+body.menu-open .controls,
+body.menu-open .dashboard,
+body.menu-open .bottom-row{
+  margin-left:var(--menu-panel-width);
+  width:calc(100% - var(--menu-panel-width));
+}
+
+.summary-page,
+.graph-page,
+body.history-mode #historyPanel.open{
+  transition:left .24s ease, right .24s ease, width .24s ease;
+}
+
+body.menu-open .summary-page,
+body.menu-open .graph-page,
+body.menu-open #historyPanel.open{
+  left:calc(20px + var(--menu-panel-width));
+}
+
 .menu-brand{
   display:flex;
   align-items:center;
