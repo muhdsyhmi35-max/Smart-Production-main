@@ -1,3 +1,7 @@
+:fullscreen .fullscreen-btn,
+::-webkit-full-screen .fullscreen-btn{
+  display:none !important;
+}
 /* Graph page fitting presets for common displays (1366x768, 1920x1080). */
 @media (max-height: 820px){
   .graph-page{
@@ -206,12 +210,12 @@ body::-webkit-scrollbar{
   display:inline-flex;
   align-items:center;
   gap:5px;
-  padding:5px 8px;
+  padding:6px 10px;
   border-radius:6px;
   border:1px solid rgba(71,85,105,.5);
   background:rgba(15,23,42,.78);
   color:#e2e8f0;
-  font-size:11px;
+  font-size:12px;
   font-weight:700;
   line-height:1;
 }
@@ -223,7 +227,7 @@ body::-webkit-scrollbar{
 }
 
 .header-pill-icon{
-  font-size:11px;
+  font-size:12px;
   opacity:.9;
 }
 
