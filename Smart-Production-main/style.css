@@ -670,15 +670,15 @@ tr:nth-child(even){background:#0b1220;}
 .menu-dropdown{
   display:flex;
   position:fixed;
-  top:0;
-  left:0;
-  width:min(250px, 76vw);
-  height:100vh;
+  top:10px;
+  left:12px;
+  width:var(--menu-panel-width);
+  height:calc(100vh - 20px);
   border-right:1px solid rgba(71,85,105,.35);
   border-top:none;
   border-left:none;
   border-bottom:none;
-  border-radius:0;
+  border-radius:8px;
   background:linear-gradient(180deg, rgba(4,10,22,.98), rgba(3,8,18,.98));
   box-shadow:0 10px 28px rgba(0,0,0,.45);
   z-index:10030;
@@ -698,7 +698,7 @@ tr:nth-child(even){background:#0b1220;}
 }
 
 :root{
-  --menu-panel-width:min(250px, 76vw);
+  --menu-panel-width:min(300px, 80vw);
 }
 
 .header,
