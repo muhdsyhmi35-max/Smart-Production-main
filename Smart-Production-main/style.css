@@ -552,12 +552,12 @@ th{
   position:absolute;
   right:10px;
   top:50%;
-  width:clamp(20px, 3vw, 30px);
-  height:clamp(20px, 3vw, 30px);
+  width:clamp(28px, 3.8vw, 40px);
+  height:clamp(28px, 3.8vw, 40px);
   padding:0;
   font-size:clamp(10px, 1.5vw, 14px);
-  border:1px solid rgba(148,163,184,0.35);
-  border-radius:clamp(6px, 1vw, 10px);
+  border:none;
+  border-radius:clamp(8px, 1.2vw, 12px);
   background:rgba(15,23,42,0.55);
   color:#93c5fd;
   opacity:0.8;
@@ -569,7 +569,6 @@ th{
 
 .fullscreen-btn:hover{
   opacity:1;
-  border-color:rgba(147,197,253,0.55);
   background:rgba(15,23,42,0.75);
   transform:translateY(calc(-50% - 1px));
 }
@@ -650,14 +649,15 @@ tr:nth-child(even){background:#0b1220;}
   position:absolute;
   left:10px;
   top:50%;
-  width:clamp(20px, 3vw, 30px);
-  height:clamp(20px, 3vw, 30px);
-  border:1px solid rgba(148,163,184,0.35);
-  border-radius:clamp(6px, 1vw, 10px);
+  width:clamp(28px, 3.8vw, 40px);
+  height:clamp(28px, 3.8vw, 40px);
+  border:none;
+  border-radius:clamp(8px, 1.2vw, 12px);
   background:rgba(15,23,42,0.55);
   color:#93c5fd;
-  font-size:clamp(10px, 1.5vw, 14px);
+  font-size:clamp(16px, 2.2vw, 22px);
   line-height:1;
+  font-weight:800;
   opacity:0.8;
   cursor:pointer;
   z-index:10041;
@@ -667,9 +667,9 @@ tr:nth-child(even){background:#0b1220;}
 
 .menu-btn:hover{
   opacity:1;
-  border-color:rgba(147,197,253,0.55);
-  background:rgba(15,23,42,0.75);
-  transform:translateY(calc(-50% - 1px));
+  background:rgba(30,58,138,0.72);
+  box-shadow:0 0 0 2px rgba(96,165,250,.26), 0 8px 18px rgba(2,6,23,.45);
+  transform:translateY(calc(-50% - 1px)) scale(1.04);
 }
 
 .menu-dropdown{
