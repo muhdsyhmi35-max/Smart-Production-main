@@ -102,6 +102,11 @@
   --card-title-size: 25px;
   --clock-size: 70px;
   --header-size: 60px;
+  --ease-smooth:cubic-bezier(.22,.61,.36,1);
+  --ease-soft:cubic-bezier(.25,.46,.45,.94);
+  --dur-fast:.24s;
+  --dur-med:.34s;
+  --dur-slow:.5s;
 
   --bg:#050b18;
   --panel:#0b1220;
@@ -380,7 +385,7 @@ body::-webkit-scrollbar{
   overflow:hidden;
   pointer-events:none;
   transform:translateY(-3px);
-  transition:max-height .18s ease, opacity .18s ease, margin .18s ease, transform .18s ease;
+  transition:max-height var(--dur-fast) var(--ease-soft), opacity var(--dur-fast) var(--ease-soft), margin var(--dur-fast) var(--ease-soft), transform var(--dur-fast) var(--ease-soft);
 }
 
 .downtime-day-filter label{
@@ -474,7 +479,7 @@ th{
   color:#f8fafc;
   text-align:center;
   box-shadow:inset 0 1px 2px rgba(0,0,0,0.65), 0 0 0 1px rgba(15,23,42,0.35);
-  transition:border-color .2s ease, box-shadow .2s ease, background .2s ease;
+  transition:border-color var(--dur-fast) var(--ease-soft), box-shadow var(--dur-fast) var(--ease-soft), background var(--dur-fast) var(--ease-soft);
 }
 
 .controls input:focus{
@@ -503,7 +508,7 @@ th{
   text-transform:uppercase;
   cursor:pointer;
   box-shadow:0 4px 10px rgba(2,6,23,0.3), inset 0 1px 0 rgba(255,255,255,0.12);
-  transition:transform .15s ease, filter .2s ease, box-shadow .2s ease;
+  transition:transform var(--dur-fast) var(--ease-soft), filter var(--dur-fast) var(--ease-soft), box-shadow var(--dur-fast) var(--ease-soft);
 }
 
 .controls button:hover{transform:translateY(-1px);filter:brightness(1.05);}
@@ -557,7 +562,7 @@ th{
   color:#93c5fd;
   opacity:0.8;
   cursor:pointer;
-  transition:opacity .2s ease, border-color .2s ease, background .2s ease, transform .2s ease;
+  transition:opacity var(--dur-fast) var(--ease-soft), border-color var(--dur-fast) var(--ease-soft), background var(--dur-fast) var(--ease-soft), transform var(--dur-fast) var(--ease-soft);
   z-index:10041;
   transform:translateY(-50%);
 }
@@ -657,7 +662,7 @@ tr:nth-child(even){background:#0b1220;}
   cursor:pointer;
   z-index:10041;
   transform:translateY(-50%);
-  transition:opacity .2s ease, border-color .2s ease, background .2s ease, transform .2s ease;
+  transition:opacity var(--dur-fast) var(--ease-soft), border-color var(--dur-fast) var(--ease-soft), background var(--dur-fast) var(--ease-soft), transform var(--dur-fast) var(--ease-soft);
 }
 
 .menu-btn:hover{
@@ -688,7 +693,8 @@ tr:nth-child(even){background:#0b1220;}
   transform:translateX(-108%);
   opacity:0;
   pointer-events:none;
-  transition:transform .24s ease, opacity .2s ease;
+  will-change:transform, opacity;
+  transition:transform var(--dur-med) var(--ease-smooth), opacity var(--dur-fast) var(--ease-soft);
 }
 
 .menu-dropdown.open{
@@ -706,7 +712,7 @@ tr:nth-child(even){background:#0b1220;}
 .controls,
 .dashboard,
 .bottom-row{
-  transition:margin-left .24s ease, width .24s ease;
+  transition:margin-left var(--dur-med) var(--ease-smooth), width var(--dur-med) var(--ease-smooth);
 }
 
 body.menu-open .header,
@@ -721,7 +727,7 @@ body.menu-open .bottom-row{
 .summary-page,
 .graph-page,
 body.history-mode #historyPanel.open{
-  transition:left .24s ease, right .24s ease, width .24s ease;
+  transition:left var(--dur-med) var(--ease-smooth), right var(--dur-med) var(--ease-smooth), width var(--dur-med) var(--ease-smooth);
 }
 
 body.menu-open .summary-page,
@@ -1422,7 +1428,8 @@ body.graph-mode{
 .trend-line{
   stroke-dasharray:1400;
   stroke-dashoffset:1400;
-  animation:trendLineDraw 1s ease-out forwards;
+  will-change:stroke-dashoffset;
+  animation:trendLineDraw 1.15s var(--ease-smooth) forwards;
 }
 
 .trend-line-target{
@@ -1432,7 +1439,8 @@ body.graph-mode{
 .trend-dot{
   opacity:0;
   transform-origin:center;
-  animation:trendDotPop .28s ease-out forwards;
+  will-change:transform, opacity;
+  animation:trendDotPop .38s var(--ease-soft) forwards;
 }
 
 @keyframes trendLineDraw{
@@ -1461,7 +1469,8 @@ body.graph-mode{
   transform-box:fill-box;
   transform-origin:center bottom;
   transform:scaleY(0);
-  animation:summaryBarGrow .8s cubic-bezier(.22,.61,.36,1) forwards;
+  will-change:transform;
+  animation:summaryBarGrow .95s var(--ease-smooth) forwards;
 }
 
 @keyframes summaryBarGrow{
@@ -1470,7 +1479,8 @@ body.graph-mode{
 }
 
 .enter-anim{
-  animation:pageEnter .28s ease-out;
+  will-change:transform, opacity;
+  animation:pageEnter .42s var(--ease-smooth);
 }
 
 @keyframes pageEnter{
@@ -1481,6 +1491,15 @@ body.graph-mode{
   to{
     opacity:1;
     transform:translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration:.01ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+    scroll-behavior:auto !important;
   }
 }
 
