@@ -79,7 +79,7 @@ const APP_ADMIN_SESSION_KEY = "TF2_ADMIN_SESSION_OK";
 /** Change these credentials for your deployment (client-side only; not secret from devtools). */
 const ADMIN_LOGIN = {
   user: "admin",
-  pass: "changeme"
+  pass: "1400"
 };
 
 function getAppRole() {
@@ -998,13 +998,13 @@ function initFirebaseSync() {
       "value",
       snapshot => {
         monitorLiveStateError = null;
-        const liveState = snapshot.val();
+      const liveState = snapshot.val();
         if (!liveState) {
           monitorLiveStateReceived = false;
           updateMonitorDataNotice();
           return;
         }
-        applyLiveState(liveState);
+      applyLiveState(liveState);
       },
       err => {
         monitorLiveStateError = err;
