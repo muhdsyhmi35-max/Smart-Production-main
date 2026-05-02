@@ -107,8 +107,8 @@ body.is-fullscreen .fullscreen-btn{
   }
 }
 :root{
-  --big-number-size: 72px;
-  --card-title-size: 28px;
+  --big-number-size: 50px;
+  --card-title-size: 25px;
   --clock-size: 70px;
   --header-size: 60px;
   --ease-smooth:cubic-bezier(.22,.61,.36,1);
@@ -129,23 +129,11 @@ body.is-fullscreen .fullscreen-btn{
 }
 
 /* BACKGROUND */
-html{
-  height:100%;
-}
-
 body{
   margin:0;
   font-family:'Segoe UI',sans-serif;
   background:#04070f;
   color:var(--text);
-  min-height:100%;
-}
-
-/* Main screen: stack fills viewport below header + controls */
-body:not(.summary-mode):not(.graph-mode):not(.history-mode){
-  min-height:100vh;
-  display:flex;
-  flex-direction:column;
 }
 
 /* Hide scrollbars but keep scrolling functional */
@@ -176,7 +164,6 @@ body::-webkit-scrollbar{
 .header{
   position:relative;
   margin:10px 12px 0;
-  flex-shrink:0;
   padding:12px 56px;
   min-height:54px;
   border:1px solid rgba(71,85,105,.45);
@@ -282,9 +269,8 @@ body::-webkit-scrollbar{
   backdrop-filter:blur(10px);
   border:1px solid rgba(148,163,184,0.2);
   border-radius:6px;
-  margin:12px clamp(14px, 2.5vw, 22px) 10px;
+  margin:20px;
   box-shadow:0 8px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.02);
-  flex:0 0 auto;
 }
 
 /* 🔥 MAKE LINE STATUS WIDE */
@@ -297,7 +283,7 @@ body::-webkit-scrollbar{
   background:linear-gradient(180deg, rgba(8,13,25,0.96), rgba(6,10,20,0.98));
   border:1px solid rgba(71,85,105,0.55);
   border-radius:8px;
-  padding:clamp(12px, 1.8vh, 20px);
+  padding:14px;
   text-align:center;
   box-shadow:
   inset 0 1px 0 rgba(255,255,255,0.03),
@@ -306,10 +292,9 @@ body::-webkit-scrollbar{
   overflow:hidden;
   display:flex;
   flex-direction:column;
-  justify-content:center;
+  justify-content:flex-start;
   align-items:center;
-  min-height:0;
-  height:100%;
+  min-height:90px;
 }
 
 /* GLOW BORDER */
@@ -346,35 +331,12 @@ body::-webkit-scrollbar{
   50%{opacity:0.3;}
 }
 
-/* Dashboard + bottom KPI rows share remaining viewport height */
-.dashboard-shell{
-  flex:1 1 auto;
-  display:flex;
-  flex-direction:column;
-  gap:clamp(10px, 1.5vh, 16px);
-  margin:0 clamp(12px, 2vw, 18px) clamp(10px, 1.8vh, 16px);
-  min-height:0;
-  width:auto;
-}
-
-.dashboard-shell .dashboard{
-  flex:1.12 1 0;
-  min-height:0;
-  margin:0;
-}
-
-.dashboard-shell .bottom-row{
-  flex:1 1 0;
-  min-height:0;
-  margin:0;
-}
-
 /* STATUS BAR (BOTTOM) */
 .bottom-row{
   display:grid;
-  grid-template-columns:repeat(4, minmax(0, 1fr));
-  gap:clamp(12px, 1.6vw, 18px);
-  align-items:stretch;
+  grid-template-columns: repeat(4, 1fr);
+  gap:15px;
+  margin:15px;
 }
 
 .scan-grid{
@@ -389,25 +351,24 @@ body::-webkit-scrollbar{
   flex-direction:column;
   justify-content:center;
   align-items:center;
-  gap:clamp(10px, 1.8vh, 16px);
-  min-height:clamp(96px, 14vh, 160px);
-  flex:1;
+  gap:12px;
+  min-height:92px;
 }
 
 .monitor-only-text{
-  font-size:clamp(20px, 2.8vh, 28px);
+  font-size:22px;
   font-weight:800;
   letter-spacing:.8px;
   color:#cbd5e1;
 }
 
 .monitor-connection-badge{
-  padding:clamp(8px, 1.2vh, 12px) clamp(14px, 2vw, 20px);
+  padding:8px 14px;
   border-radius:8px;
   border:1px solid rgba(56,189,248,.45);
   background:rgba(8,47,73,.35);
   color:#22d3ee;
-  font-size:clamp(16px, 2.2vh, 22px);
+  font-size:18px;
   font-weight:900;
   letter-spacing:.6px;
 }
@@ -569,28 +530,24 @@ th{
 
 .dashboard{
   display:grid;
-  grid-template-columns:repeat(4, minmax(0, 1fr));
-  gap:clamp(12px, 1.6vw, 18px);
-  grid-auto-rows:minmax(0, 1fr);
-  align-content:stretch;
+  grid-template-columns:repeat(4,1fr);
+  gap:15px;
+  margin:15px;
 }
 
 .card h3{
   color:#94a3b8;
   margin:0;
-  margin-bottom:clamp(4px, 0.8vh, 10px);
-  font-size:clamp(17px, 2.5vh, var(--card-title-size));
+  margin-bottom:6px;
+  font-size:clamp(20px, 2.4vh, var(--card-title-size));
   letter-spacing:.4px;
-  flex-shrink:0;
 }
 
 .big-number{
-  font-size:clamp(48px, min(7.5vh, 11vw), var(--big-number-size));
+  font-size:clamp(46px, 5vh, var(--big-number-size));
   font-weight:900;
   font-family:Consolas, "Courier New", monospace;
   letter-spacing:.6px;
-  line-height:1.05;
-  flex-shrink:0;
 }
 
 .bottom{
@@ -762,7 +719,6 @@ tr:nth-child(even){background:#0b1220;}
 .header,
 .datetime,
 .controls,
-.dashboard-shell,
 .dashboard,
 .bottom-row{
   transition:margin-left var(--dur-med) var(--ease-smooth), width var(--dur-med) var(--ease-smooth);
@@ -771,7 +727,8 @@ tr:nth-child(even){background:#0b1220;}
 body.menu-open .header,
 body.menu-open .datetime,
 body.menu-open .controls,
-body.menu-open .dashboard-shell{
+body.menu-open .dashboard,
+body.menu-open .bottom-row{
   margin-left:var(--menu-panel-width);
   width:calc(100% - var(--menu-panel-width));
 }
@@ -980,7 +937,6 @@ body.history-mode #historyPanel.open .history-table-wrap{
 
 body.summary-mode .datetime,
 body.summary-mode .controls,
-body.summary-mode .dashboard-shell,
 body.summary-mode .dashboard,
 body.summary-mode .bottom-row,
 body.summary-mode #historyPanel{
@@ -993,7 +949,6 @@ body.summary-mode{
 
 body.history-mode .datetime,
 body.history-mode .controls,
-body.history-mode .dashboard-shell,
 body.history-mode .dashboard,
 body.history-mode .bottom-row{
   display:none !important;
@@ -1005,7 +960,6 @@ body.history-mode{
 
 body.graph-mode .datetime,
 body.graph-mode .controls,
-body.graph-mode .dashboard-shell,
 body.graph-mode .dashboard,
 body.graph-mode .bottom-row{
   display:none !important;
@@ -1670,33 +1624,27 @@ body.graph-mode{
   padding:clamp(8px, 1.6vh, 14px) clamp(10px, 1.4vw, 18px);
 }
 
-:fullscreen .dashboard-shell,
-:-webkit-full-screen .dashboard-shell{
-  margin:clamp(6px, 1.2vh, 14px) clamp(10px, 1.4vw, 18px) clamp(8px, 1.4vh, 14px);
-  gap:clamp(10px, 1.3vh, 16px);
-}
-
 :fullscreen .dashboard,
 :-webkit-full-screen .dashboard,
 :fullscreen .bottom-row,
 :-webkit-full-screen .bottom-row{
-  margin:0;
+  margin:clamp(8px, 1.5vh, 16px) clamp(10px, 1.4vw, 18px);
   gap:clamp(10px, 1.2vw, 16px);
 }
 
 :fullscreen .card,
 :-webkit-full-screen .card{
-  min-height:0;
+  min-height:clamp(95px, 15vh, 150px);
 }
 
 :fullscreen .card h3,
 :-webkit-full-screen .card h3{
-  font-size:clamp(22px, 2.8vh, 32px);
+  font-size:clamp(22px, 2.5vh, 30px);
 }
 
 :fullscreen .big-number,
 :-webkit-full-screen .big-number{
-  font-size:clamp(52px, min(7vh, 10vw), 80px);
+  font-size:clamp(48px, 5.2vh, 68px);
 }
 
 :fullscreen table,
