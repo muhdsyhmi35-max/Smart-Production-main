@@ -164,7 +164,7 @@ body::-webkit-scrollbar{
 .header{
   position:relative;
   margin:10px 12px 0;
-  padding:12px 56px;
+  padding:12px 48px 12px 12px;
   min-height:54px;
   border:1px solid rgba(71,85,105,.45);
   border-radius:8px;
@@ -178,7 +178,15 @@ body::-webkit-scrollbar{
   align-items:center;
   justify-content:space-between;
   gap:7px;
-  padding:0 40px;
+  padding:0 36px 0 0;
+}
+
+.header-brand{
+  display:flex;
+  align-items:flex-start;
+  gap:clamp(8px, 1.2vw, 14px);
+  min-width:0;
+  flex:1 1 auto;
 }
 
 .header-title-wrap{
@@ -926,35 +934,40 @@ tr:nth-child(even){background:#0b1220;}
 }
 
 .menu-btn{
-  position:absolute;
-  left:10px;
-  top:12px;
-  bottom:12px;
-  width:clamp(36px, 4.2vw, 46px);
+  position:relative;
+  flex:0 0 auto;
+  margin:0;
+  padding:0;
+  width:auto;
+  min-width:0;
   height:auto;
   border:none;
-  border-radius:clamp(8px, 1.2vw, 12px);
-  background:rgba(15,23,42,0.55);
+  border-radius:0;
+  background:transparent;
   color:#93c5fd;
-  font-size:clamp(20px, 2.6vw, 28px);
+  font-size:clamp(18px, 2vw, 24px);
   line-height:1;
   font-weight:800;
-  opacity:0.8;
+  font-family:inherit;
+  opacity:0.92;
   cursor:pointer;
   z-index:10041;
-  display:flex;
-  align-items:center;
-  justify-content:center;
+  display:block;
   box-sizing:border-box;
-  transform:none;
-  transition:opacity var(--dur-fast) var(--ease-soft), border-color var(--dur-fast) var(--ease-soft), background var(--dur-fast) var(--ease-soft), transform var(--dur-fast) var(--ease-soft);
+  transform:translateY(0.06em);
+  -webkit-tap-highlight-color:transparent;
+  transition:opacity var(--dur-fast) var(--ease-soft), color var(--dur-fast) var(--ease-soft);
 }
 
 .menu-btn:hover{
   opacity:1;
-  background:rgba(30,58,138,0.72);
-  box-shadow:0 0 0 2px rgba(96,165,250,.26), 0 8px 18px rgba(2,6,23,.45);
-  transform:translateY(-1px) scale(1.03);
+  color:#bfdbfe;
+}
+
+.menu-btn:focus-visible{
+  outline:2px solid rgba(96,165,250,.55);
+  outline-offset:3px;
+  border-radius:2px;
 }
 
 .menu-dropdown{
@@ -1868,6 +1881,11 @@ body.graph-mode{
 
 :fullscreen .header-title,
 :-webkit-full-screen .header-title{
+  font-size:clamp(20px, 2.6vw, 28px);
+}
+
+:fullscreen .menu-btn,
+:-webkit-full-screen .menu-btn{
   font-size:clamp(20px, 2.6vw, 28px);
 }
 

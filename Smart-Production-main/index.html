@@ -13,7 +13,6 @@
 <body class="role-operator">
 
 <div class="header">
-    <button class="menu-btn" onclick="toggleMenuDropdown()" aria-label="Toggle menu">☰</button>
     <div id="menuDropdown" class="menu-dropdown">
       <div class="menu-brand">
         <div class="menu-brand-icon">🏭</div>
@@ -29,9 +28,12 @@
       <button class="menu-item" id="ramadanToggle" onclick="toggleRamadanFromMenu()"><span class="menu-icon">🌙</span><span>Ramadhan : OFF</span></button>
     </div>
     <div class="header-main">
-      <div class="header-title-wrap">
-        <div class="header-title">TF 2 PRODUCTION MONITORING SYSTEM</div>
-        <div class="header-subtitle">Real-time overview of production</div>
+      <div class="header-brand">
+        <button type="button" class="menu-btn" onclick="toggleMenuDropdown()" aria-label="Toggle menu">☰</button>
+        <div class="header-title-wrap">
+          <div class="header-title">TF 2 PRODUCTION MONITORING SYSTEM</div>
+          <div class="header-subtitle">Real-time overview of production</div>
+        </div>
       </div>
       <div class="header-meta">
         <span class="header-pill"><span class="header-pill-icon">📅</span><span id="dateDisplay"></span></span>
