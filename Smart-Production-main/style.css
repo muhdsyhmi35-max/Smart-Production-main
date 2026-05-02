@@ -107,8 +107,8 @@ body.is-fullscreen .fullscreen-btn{
   }
 }
 :root{
-  --big-number-size: 50px;
-  --card-title-size: 25px;
+  --big-number-size: 76px;
+  --card-title-size: 30px;
   --clock-size: 70px;
   --header-size: 60px;
   --ease-smooth:cubic-bezier(.22,.61,.36,1);
@@ -282,8 +282,8 @@ body::-webkit-scrollbar{
 .card{
   background:linear-gradient(180deg, rgba(8,13,25,0.96), rgba(6,10,20,0.98));
   border:1px solid rgba(71,85,105,0.55);
-  border-radius:8px;
-  padding:14px;
+  border-radius:10px;
+  padding:clamp(16px, 2.2vh, 24px);
   text-align:center;
   box-shadow:
   inset 0 1px 0 rgba(255,255,255,0.03),
@@ -294,7 +294,7 @@ body::-webkit-scrollbar{
   flex-direction:column;
   justify-content:flex-start;
   align-items:center;
-  min-height:90px;
+  min-height:clamp(104px, 14vh, 160px);
 }
 
 /* GLOW BORDER */
@@ -302,7 +302,7 @@ body::-webkit-scrollbar{
   content:"";
   position:absolute;
   inset:0;
-  border-radius:8px;
+  border-radius:10px;
   border:1px solid rgba(56,189,248,0.08);
   pointer-events:none;
 }
@@ -335,8 +335,8 @@ body::-webkit-scrollbar{
 .bottom-row{
   display:grid;
   grid-template-columns: repeat(4, 1fr);
-  gap:15px;
-  margin:15px;
+  gap:clamp(14px, 1.9vw, 20px);
+  margin:clamp(12px, 1.8vh, 18px) clamp(12px, 2vw, 18px);
 }
 
 .scan-grid{
@@ -543,23 +543,24 @@ body.monitor-mode .main-pc-actions{
 .dashboard{
   display:grid;
   grid-template-columns:repeat(4,1fr);
-  gap:15px;
-  margin:15px;
+  gap:clamp(14px, 1.9vw, 20px);
+  margin:clamp(12px, 1.8vh, 18px) clamp(12px, 2vw, 18px);
 }
 
 .card h3{
   color:#94a3b8;
   margin:0;
-  margin-bottom:6px;
-  font-size:clamp(20px, 2.4vh, var(--card-title-size));
+  margin-bottom:clamp(6px, 1vh, 12px);
+  font-size:clamp(22px, 2.9vh, var(--card-title-size));
   letter-spacing:.4px;
 }
 
 .big-number{
-  font-size:clamp(46px, 5vh, var(--big-number-size));
+  font-size:clamp(52px, 6.5vh, var(--big-number-size));
   font-weight:900;
   font-family:Consolas, "Courier New", monospace;
   letter-spacing:.6px;
+  line-height:1.06;
 }
 
 .bottom{
@@ -1640,23 +1641,24 @@ body.graph-mode{
 :-webkit-full-screen .dashboard,
 :fullscreen .bottom-row,
 :-webkit-full-screen .bottom-row{
-  margin:clamp(8px, 1.5vh, 16px) clamp(10px, 1.4vw, 18px);
-  gap:clamp(10px, 1.2vw, 16px);
+  margin:clamp(6px, 1.3vh, 14px) clamp(8px, 1.3vw, 16px);
+  gap:clamp(12px, 1.5vw, 22px);
 }
 
 :fullscreen .card,
 :-webkit-full-screen .card{
-  min-height:clamp(95px, 15vh, 150px);
+  min-height:clamp(108px, 16vh, 170px);
+  padding:clamp(14px, 2vh, 26px);
 }
 
 :fullscreen .card h3,
 :-webkit-full-screen .card h3{
-  font-size:clamp(22px, 2.5vh, 30px);
+  font-size:clamp(24px, 3vh, 34px);
 }
 
 :fullscreen .big-number,
 :-webkit-full-screen .big-number{
-  font-size:clamp(48px, 5.2vh, 68px);
+  font-size:clamp(54px, 6.8vh, 88px);
 }
 
 :fullscreen table,
