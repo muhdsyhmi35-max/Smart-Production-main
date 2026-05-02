@@ -561,6 +561,15 @@ function renumberScanTable() {
   });
 }
 
+/** Heading + number turn red whenever accumulated downtime &gt; 0 (not only live DOWN TIME). */
+function syncDowntimeAccumulatedHighlight() {
+  const card = document.getElementById("downtimeCard");
+  const textEl = document.getElementById("downtime");
+  if (!card || !textEl) return;
+  const sec = parseMmSsToSeconds(String(textEl.innerText || "").trim());
+  card.classList.toggle("downtime-has-value", sec > 0);
+}
+
 function refreshDowntimeCardFromTable() {
   // Monitor: for \"today\" (rolling) use Firebase downtime so it matches main PC instantly
   // when the sheet table lags; for a past day, sum from the table only.
@@ -568,6 +577,7 @@ function refreshDowntimeCardFromTable() {
     downtimeSeconds = monitorDowntimeOverrideSec;
     document.getElementById("downtime").innerText = format(monitorDowntimeOverrideSec);
     renderDowntimeDebugPanel();
+    syncDowntimeAccumulatedHighlight();
     return;
   }
 
@@ -578,6 +588,7 @@ function refreshDowntimeCardFromTable() {
   downtimeSeconds = total;
   document.getElementById("downtime").innerText = format(total);
   renderDowntimeDebugPanel();
+  syncDowntimeAccumulatedHighlight();
 }
 
 function renderDowntimeDebugPanel() {
@@ -1156,6 +1167,7 @@ function applyLiveState(state) {
   } else {
     document.getElementById("downtime").innerText = format(getBookedDowntimeSec());
   }
+  syncDowntimeAccumulatedHighlight();
   if (state.lastScanAtMs) {
     lastScanTime = new Date(Number(state.lastScanAtMs));
   }
@@ -1713,6 +1725,7 @@ function updateDisplay() {
     downtimeCard.classList.remove("downtime-alert", "blink");
     downtimeText.classList.remove("status-red", "blink");
   }
+  syncDowntimeAccumulatedHighlight();
 }
 
 /* ===== DAILY SUMMARY ===== */

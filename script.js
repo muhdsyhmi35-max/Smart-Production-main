@@ -547,6 +547,15 @@ function renumberScanTable() {
   });
 }
 
+/** Heading + number turn red whenever accumulated downtime &gt; 0 (not only live DOWN TIME). */
+function syncDowntimeAccumulatedHighlight() {
+  const card = document.getElementById("downtimeCard");
+  const textEl = document.getElementById("downtime");
+  if (!card || !textEl) return;
+  const sec = parseMmSsToSeconds(String(textEl.innerText || "").trim());
+  card.classList.toggle("downtime-has-value", sec > 0);
+}
+
 function refreshDowntimeCardFromTable() {
   const table = document.getElementById("scanTable");
   const total = table && table.rows.length > 0
@@ -555,6 +564,7 @@ function refreshDowntimeCardFromTable() {
   downtimeSeconds = total;
   document.getElementById("downtime").innerText = format(total);
   renderDowntimeDebugPanel();
+  syncDowntimeAccumulatedHighlight();
 }
 
 function renderDowntimeDebugPanel() {
@@ -1071,6 +1081,7 @@ function applyLiveState(state) {
   startLiveCountdownTicker(countdown, status, state.updatedAt);
   syncDowntimeSecondsFromTable();
   document.getElementById("downtime").innerText = format(getBookedDowntimeSec());
+  syncDowntimeAccumulatedHighlight();
   if (state.lastScanAtMs) {
     lastScanTime = new Date(Number(state.lastScanAtMs));
   }
@@ -1588,6 +1599,7 @@ function updateDisplay() {
     downtimeCard.classList.remove("downtime-alert", "blink");
     downtimeText.classList.remove("status-red", "blink");
   }
+  syncDowntimeAccumulatedHighlight();
 }
 
 /* ===== DAILY SUMMARY ===== */

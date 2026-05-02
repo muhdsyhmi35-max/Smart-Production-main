@@ -451,6 +451,14 @@ body::-webkit-scrollbar{
   background:#2a0b0b !important;
 }
 
+#downtimeCard.downtime-has-value > h3{
+  color:var(--red) !important;
+}
+
+#downtimeCard.downtime-has-value #downtime{
+  color:var(--red) !important;
+}
+
 /* TABLE */
 table{
   background:#020617;
