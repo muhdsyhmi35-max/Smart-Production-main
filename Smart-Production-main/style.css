@@ -1913,65 +1913,6 @@ body.graph-mode{
   font-weight:700;
 }
 
-/* Main PC fullscreen: lock viewport height — no document scroll; dashboard flexes. */
-html:fullscreen,
-html:-webkit-full-screen,
-html:-moz-full-screen{
-  height:100%;
-  overflow:hidden;
-}
-
-html:fullscreen body:not(.summary-mode):not(.history-mode):not(.graph-mode),
-html:-webkit-full-screen body:not(.summary-mode):not(.history-mode):not(.graph-mode),
-html:-moz-full-screen body:not(.summary-mode):not(.history-mode):not(.graph-mode),
-body.is-fullscreen:not(.summary-mode):not(.history-mode):not(.graph-mode){
-  height:100%;
-  max-height:100%;
-  margin:0;
-  overflow:hidden;
-  display:flex;
-  flex-direction:column;
-  box-sizing:border-box;
-}
-
-html:fullscreen body:not(.summary-mode):not(.history-mode):not(.graph-mode) > .header,
-html:-webkit-full-screen body:not(.summary-mode):not(.history-mode):not(.graph-mode) > .header,
-html:-moz-full-screen body:not(.summary-mode):not(.history-mode):not(.graph-mode) > .header,
-body.is-fullscreen:not(.summary-mode):not(.history-mode):not(.graph-mode) > .header{
-  flex:0 0 auto;
-}
-
-html:fullscreen body:not(.summary-mode):not(.history-mode):not(.graph-mode) > .controls,
-html:-webkit-full-screen body:not(.summary-mode):not(.history-mode):not(.graph-mode) > .controls,
-html:-moz-full-screen body:not(.summary-mode):not(.history-mode):not(.graph-mode) > .controls,
-body.is-fullscreen:not(.summary-mode):not(.history-mode):not(.graph-mode) > .controls{
-  flex:0 0 auto;
-}
-
-html:fullscreen body:not(.summary-mode):not(.history-mode):not(.graph-mode) > .dashboard,
-html:-webkit-full-screen body:not(.summary-mode):not(.history-mode):not(.graph-mode) > .dashboard,
-html:-moz-full-screen body:not(.summary-mode):not(.history-mode):not(.graph-mode) > .dashboard,
-body.is-fullscreen:not(.summary-mode):not(.history-mode):not(.graph-mode) > .dashboard{
-  flex:1 1 0;
-  min-height:0;
-  grid-template-rows:repeat(2, minmax(0, 1fr));
-  align-content:stretch;
-}
-
-html:fullscreen body:not(.summary-mode):not(.history-mode):not(.graph-mode) > .bottom-row,
-html:-webkit-full-screen body:not(.summary-mode):not(.history-mode):not(.graph-mode) > .bottom-row,
-html:-moz-full-screen body:not(.summary-mode):not(.history-mode):not(.graph-mode) > .bottom-row,
-body.is-fullscreen:not(.summary-mode):not(.history-mode):not(.graph-mode) > .bottom-row{
-  flex:0 0 auto;
-}
-
-html:fullscreen body.monitor-mode .bottom-row > .card.wide,
-html:-webkit-full-screen body.monitor-mode .bottom-row > .card.wide,
-html:-moz-full-screen body.monitor-mode .bottom-row > .card.wide,
-body.is-fullscreen.monitor-mode .bottom-row > .card.wide{
-  min-height:clamp(100px, 14vh, 168px);
-}
-
 /* Fullscreen layout tuning for TV: keep dashboard on first screen,
    push table below fold, and scale cards/text to viewport. */
 :fullscreen .header,
@@ -2038,22 +1979,10 @@ body.is-fullscreen.monitor-mode .bottom-row > .card.wide{
   row-gap:clamp(12px, 1.5vw, 22px);
 }
 
-:fullscreen .dashboard .card,
-:-webkit-full-screen .dashboard .card{
-  min-height:0;
-  height:100%;
-  max-height:100%;
-  padding:clamp(10px, 1.6vh, 20px);
-  box-sizing:border-box;
-}
-
-:fullscreen .bottom-row .card,
-:-webkit-full-screen .bottom-row .card{
-  min-height:clamp(72px, 10vh, 130px);
-  max-height:none;
-  height:auto;
-  padding:clamp(10px, 1.6vh, 22px);
-  box-sizing:border-box;
+:fullscreen .card,
+:-webkit-full-screen .card{
+  min-height:clamp(108px, 16vh, 170px);
+  padding:clamp(14px, 2vh, 26px);
 }
 
 :fullscreen .card h3,
