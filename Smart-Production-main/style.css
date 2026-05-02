@@ -368,6 +368,27 @@ body::-webkit-scrollbar{
   margin-bottom:0;
 }
 
+/* Same footprint for scan + line status as main PC (monitor sparse content still fills row). */
+.bottom-row > .card.wide{
+  min-height:clamp(272px, 34vh, 440px);
+}
+
+.bottom-row > .card.wide:first-child .scan-grid{
+  flex:1 1 auto;
+  min-height:0;
+}
+
+body.monitor-mode .bottom-row > .card.wide:first-child .scan-grid{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+body.monitor-mode .monitor-status-wrap{
+  min-height:0;
+  width:100%;
+}
+
 .monitor-status-wrap{
   grid-column:1 / -1;
   display:flex;
