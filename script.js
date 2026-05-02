@@ -73,6 +73,162 @@ let monitorLiveStateError = null;
 const syncClientId = localStorage.getItem("SYNC_CLIENT_ID") || ("SYNC-" + Math.random().toString(36).slice(2));
 localStorage.setItem("SYNC_CLIENT_ID", syncClientId);
 
+const APP_ROLE_STORAGE_KEY = "TF2_DASHBOARD_ROLE";
+const APP_ADMIN_SESSION_KEY = "TF2_ADMIN_SESSION_OK";
+
+/** Change these credentials for your deployment (client-side only; not secret from devtools). */
+const ADMIN_LOGIN = {
+  user: "admin",
+  pass: "changeme"
+};
+
+function getAppRole() {
+  try {
+    const v = sessionStorage.getItem(APP_ROLE_STORAGE_KEY);
+    if (v !== "admin") return "operator";
+    if (sessionStorage.getItem(APP_ADMIN_SESSION_KEY) !== "1") {
+      sessionStorage.setItem(APP_ROLE_STORAGE_KEY, "operator");
+      return "operator";
+    }
+    return "admin";
+  } catch {
+    return "operator";
+  }
+}
+
+function isAdminRole() {
+  return getAppRole() === "admin";
+}
+
+function setAppRole(role) {
+  if (role === "admin") return;
+  try {
+    sessionStorage.removeItem(APP_ADMIN_SESSION_KEY);
+    sessionStorage.setItem(APP_ROLE_STORAGE_KEY, "operator");
+  } catch (_) {}
+  applyAppRoleUi();
+}
+
+function grantAdminAfterLogin() {
+  try {
+    sessionStorage.setItem(APP_ADMIN_SESSION_KEY, "1");
+    sessionStorage.setItem(APP_ROLE_STORAGE_KEY, "admin");
+  } catch (_) {}
+  applyAppRoleUi();
+}
+
+function showAdminLoginModal() {
+  const overlay = document.getElementById("adminLoginOverlay");
+  if (!overlay) return;
+  const err = document.getElementById("adminLoginError");
+  if (err) {
+    err.hidden = true;
+    err.textContent = "";
+  }
+  const pass = document.getElementById("adminLoginPass");
+  const user = document.getElementById("adminLoginUser");
+  if (pass) pass.value = "";
+  overlay.classList.add("open");
+  overlay.setAttribute("aria-hidden", "false");
+  requestAnimationFrame(() => (user || pass)?.focus());
+}
+
+function closeAdminLoginModal() {
+  const overlay = document.getElementById("adminLoginOverlay");
+  if (!overlay) return;
+  overlay.classList.remove("open");
+  overlay.setAttribute("aria-hidden", "true");
+  const pass = document.getElementById("adminLoginPass");
+  if (pass) pass.value = "";
+}
+
+function onAdminLoginBackdropClick(event) {
+  if (event.target === event.currentTarget) closeAdminLoginModal();
+}
+
+function submitAdminLogin() {
+  const u = document.getElementById("adminLoginUser")?.value?.trim() || "";
+  const p = document.getElementById("adminLoginPass")?.value || "";
+  const err = document.getElementById("adminLoginError");
+  if (u === ADMIN_LOGIN.user && p === ADMIN_LOGIN.pass) {
+    if (err) {
+      err.hidden = true;
+      err.textContent = "";
+    }
+    closeAdminLoginModal();
+    grantAdminAfterLogin();
+    return;
+  }
+  if (err) {
+    err.textContent = "Invalid user ID or password.";
+    err.hidden = false;
+  }
+}
+
+function syncRoleDropdownAria() {
+  const trigger = document.getElementById("roleTrigger");
+  const dd = document.getElementById("roleDropdown");
+  if (!trigger || !dd) return;
+  trigger.setAttribute("aria-expanded", dd.classList.contains("open") ? "true" : "false");
+}
+
+function applyAppRoleUi() {
+  const admin = isAdminRole();
+  document.body.classList.toggle("role-admin", admin);
+  document.body.classList.toggle("role-operator", !admin);
+  const label = document.getElementById("roleLabel");
+  if (label) label.textContent = admin ? "Admin" : "Operator";
+  document.querySelectorAll(".header-role-option").forEach(btn => {
+    const role = btn.getAttribute("data-role");
+    const sel = (admin && role === "admin") || (!admin && role === "operator");
+    btn.setAttribute("aria-selected", sel ? "true" : "false");
+    btn.classList.toggle("selected", sel);
+  });
+  if (!admin) {
+    toggleMenuDropdown(false);
+    toggleRoleDropdown(false);
+    if (
+      document.body.classList.contains("summary-mode") ||
+      document.body.classList.contains("graph-mode") ||
+      document.body.classList.contains("history-mode")
+    ) {
+      showMainPage();
+    }
+  }
+  syncRoleDropdownAria();
+}
+
+function toggleRoleDropdown(forceOpen) {
+  const dd = document.getElementById("roleDropdown");
+  const trigger = document.getElementById("roleTrigger");
+  if (!dd || !trigger) return;
+  let open;
+  if (typeof forceOpen === "boolean") {
+    open = forceOpen;
+  } else {
+    open = !dd.classList.contains("open");
+  }
+  dd.classList.toggle("open", open);
+  dd.setAttribute("aria-hidden", open ? "false" : "true");
+  syncRoleDropdownAria();
+}
+
+function onRoleTriggerClick(event) {
+  event.stopPropagation();
+  toggleRoleDropdown();
+}
+
+function onRoleOptionClick(event, role) {
+  event.stopPropagation();
+  toggleRoleDropdown(false);
+  if (role === "admin") {
+    if (isAdminRole()) return;
+    showAdminLoginModal();
+    return;
+  }
+  setAppRole("operator");
+}
+
 /* ================= GOOGLE SHEET MIRROR LAYER ================= */
 
 // 🔴 GANTI DENGAN LINK /exec WEB APP ANDA
@@ -1933,6 +2089,7 @@ function toggleHistoryPanel(forceOpen) {
   }
 
   if (open) {
+    if (!isAdminRole()) return;
     document.body.classList.remove("summary-mode");
     const summaryPage = document.getElementById("summaryPage");
     if (summaryPage) summaryPage.classList.remove("open");
@@ -1954,6 +2111,13 @@ function toggleHistoryPanel(forceOpen) {
 function toggleMenuDropdown(forceOpen) {
   const menu = document.getElementById("menuDropdown");
   if (!menu) return;
+  if (!isAdminRole()) {
+    if (typeof forceOpen === "boolean" && !forceOpen) {
+      menu.classList.remove("open");
+      document.body.classList.remove("menu-open");
+    }
+    return;
+  }
   updateViewToggleMenuItem();
   if (typeof forceOpen === "boolean") {
     menu.classList.toggle("open", forceOpen);
@@ -1978,6 +2142,7 @@ function openSummaryFromMenu() {
 }
 
 function toggleRamadanFromMenu() {
+  if (!isAdminRole()) return;
   toggleMenuDropdown(false);
   toggleRamadan();
 }
@@ -2553,6 +2718,10 @@ function showGraphPageFromMenu() {
 }
 
 function showGraphPage() {
+  if (!isAdminRole()) {
+    showMainPage();
+    return;
+  }
   let graphPage = document.getElementById("graphPage");
   if (!graphPage) {
     graphPage = document.createElement("div");
@@ -2608,6 +2777,10 @@ function showGraphPage() {
 }
 
 function showSummaryPage() {
+  if (!isAdminRole()) {
+    showMainPage();
+    return;
+  }
   toggleMenuDropdown(false);
   const activeDay = getActiveSummaryDayKey();
   let plan = getHistoricalPlanForDay(activeDay);
@@ -2724,10 +2897,22 @@ document.addEventListener("click", (event) => {
   if (menu && menu.classList.contains("open") && !menuBtn && !clickedMenu) {
     toggleMenuDropdown(false);
   }
+
+  const roleDd = document.getElementById("roleDropdown");
+  const roleWrap = event.target.closest(".header-role-wrap");
+  if (roleDd && roleDd.classList.contains("open") && !roleWrap) {
+    toggleRoleDropdown(false);
+  }
 });
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
+    const loginOpen = document.getElementById("adminLoginOverlay")?.classList.contains("open");
+    if (loginOpen) {
+      closeAdminLoginModal();
+      return;
+    }
+    toggleRoleDropdown(false);
     toggleMenuDropdown(false);
     if (document.body.classList.contains("history-mode")) {
       showMainPage();
@@ -3142,6 +3327,8 @@ window.onload = async function() {
   // 🔐 MUST WAIT ACCESS CHECK
   const allowed = await checkAccess();
   if (!allowed) return;
+
+  applyAppRoleUi();
 
   syncDowntimeDayPickerUi();
   toggleDowntimeDateFilter(false);

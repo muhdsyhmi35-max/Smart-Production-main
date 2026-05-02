@@ -10,7 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
 </head>
 
-<body>
+<body class="role-operator">
 
 <div class="header">
     <button class="menu-btn" onclick="toggleMenuDropdown()" aria-label="Toggle menu">☰</button>
@@ -36,7 +36,15 @@
       <div class="header-meta">
         <span class="header-pill"><span class="header-pill-icon">📅</span><span id="dateDisplay"></span></span>
         <span class="header-pill"><span class="header-pill-icon">🕒</span><span id="clock"></span></span>
-        <span class="header-pill"><span class="header-pill-icon">👤</span>Operator</span>
+        <div class="header-role-wrap">
+          <button type="button" class="header-pill header-role-trigger" id="roleTrigger" onclick="onRoleTriggerClick(event)" aria-expanded="false" aria-haspopup="listbox" aria-label="Switch role">
+            <span class="header-pill-icon">👤</span><span id="roleLabel">Operator</span><span class="header-role-caret" aria-hidden="true">▾</span>
+          </button>
+          <div class="header-role-dropdown" id="roleDropdown" role="listbox" aria-labelledby="roleTrigger" aria-hidden="true">
+            <button type="button" class="header-role-option" data-role="operator" role="option" onclick="onRoleOptionClick(event, 'operator')">Operator</button>
+            <button type="button" class="header-role-option" data-role="admin" role="option" onclick="onRoleOptionClick(event, 'admin')">Admin</button>
+          </div>
+        </div>
       </div>
     </div>
     <button class="fullscreen-btn" onclick="toggleFullScreen()">⛶</button>
@@ -142,6 +150,27 @@ Lot:
       </thead>
       <tbody id="scanTable"></tbody>
     </table>
+  </div>
+</div>
+
+<div id="adminLoginOverlay" class="admin-login-overlay" aria-hidden="true" onclick="onAdminLoginBackdropClick(event)">
+  <div class="admin-login-dialog" role="dialog" aria-modal="true" aria-labelledby="adminLoginTitle" onclick="event.stopPropagation()">
+    <h2 id="adminLoginTitle" class="admin-login-title">Admin sign in</h2>
+    <p id="adminLoginError" class="admin-login-error" hidden></p>
+    <form class="admin-login-form" onsubmit="event.preventDefault(); submitAdminLogin();">
+      <label class="admin-login-label">
+        <span>User ID</span>
+        <input type="text" id="adminLoginUser" name="username" autocomplete="username" />
+      </label>
+      <label class="admin-login-label">
+        <span>Password</span>
+        <input type="password" id="adminLoginPass" name="password" autocomplete="current-password" />
+      </label>
+      <div class="admin-login-actions">
+        <button type="submit" class="admin-login-submit">Sign in</button>
+        <button type="button" class="admin-login-cancel" onclick="closeAdminLoginModal()">Cancel</button>
+      </div>
+    </form>
   </div>
 </div>
 
