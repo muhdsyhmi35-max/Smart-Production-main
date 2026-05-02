@@ -2837,11 +2837,13 @@ function showSummaryPage() {
   }
 
   summaryPage.innerHTML = `
-    <div class="summary-head">Daily Summary</div>
-    <div class="summary-filter-row">
-      <label for="summaryDayFilter">Date</label>
-      <input type="date" id="summaryDayFilter" title="Select date for daily summary">
-      <button type="button" id="summaryDayTodayBtn" class="summary-today-btn">Today</button>
+    <div class="summary-title-row">
+      <div class="summary-head">Daily Summary</div>
+      <div class="summary-filter-row">
+        <label for="summaryDayFilter">Date</label>
+        <input type="date" id="summaryDayFilter" title="Select date for daily summary">
+        <button type="button" id="summaryDayTodayBtn" class="summary-today-btn">Today</button>
+      </div>
     </div>
     <div class="summary-grid">
       <div class="summary-tile"><span>Date</span><strong>${formatIsoDateAsDmy(activeDay)}</strong></div>

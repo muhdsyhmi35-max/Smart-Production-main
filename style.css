@@ -126,6 +126,9 @@ body.is-fullscreen .fullscreen-btn{
   --green:#22c55e;
   --red:#ef4444;
   --orange:#f97316;
+
+  /* One rhythm for: controls→dashboard, dashboard rows, dashboard→bottom-row */
+  --dashboard-stack-gap:clamp(14px, 1.9vw, 20px);
 }
 
 /* BACKGROUND */
@@ -539,7 +542,10 @@ body.role-operator .menu-btn{
   backdrop-filter:blur(14px);
   border:1px solid rgba(148,163,184,0.2);
   border-radius:8px;
-  margin:clamp(12px, 1.8vh, 18px) clamp(14px, 2vw, 22px);
+  margin-top:clamp(12px, 1.8vh, 18px);
+  margin-bottom:0;
+  margin-left:clamp(14px, 2vw, 22px);
+  margin-right:clamp(14px, 2vw, 22px);
   box-shadow:0 8px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.02);
   box-sizing:border-box;
   min-height:clamp(88px, 11vh, 138px);
@@ -619,9 +625,12 @@ body.role-operator .menu-btn{
 .bottom-row{
   display:grid;
   grid-template-columns:repeat(4, minmax(0, 1fr));
-  column-gap:clamp(14px, 1.9vw, 20px);
-  row-gap:clamp(14px, 1.9vw, 20px);
-  margin:clamp(12px, 1.8vh, 18px) clamp(12px, 2vw, 18px);
+  column-gap:var(--dashboard-stack-gap);
+  row-gap:var(--dashboard-stack-gap);
+  margin-top:var(--dashboard-stack-gap);
+  margin-bottom:clamp(12px, 1.8vh, 18px);
+  margin-left:clamp(12px, 2vw, 18px);
+  margin-right:clamp(12px, 2vw, 18px);
 }
 
 .scan-grid{
@@ -788,9 +797,12 @@ body.monitor-mode .main-pc-actions{
 .dashboard{
   display:grid;
   grid-template-columns:repeat(4, minmax(0, 1fr));
-  column-gap:clamp(14px, 1.9vw, 20px);
-  row-gap:clamp(14px, 1.9vw, 20px);
-  margin:clamp(12px, 1.8vh, 18px) clamp(12px, 2vw, 18px);
+  column-gap:var(--dashboard-stack-gap);
+  row-gap:var(--dashboard-stack-gap);
+  margin-top:var(--dashboard-stack-gap);
+  margin-bottom:0;
+  margin-left:clamp(12px, 2vw, 18px);
+  margin-right:clamp(12px, 2vw, 18px);
 }
 
 .card h3{
@@ -1116,10 +1128,12 @@ body.menu-open .menu-btn{ display:none; }
   max-height:60vh;
   border:1px solid rgba(71,85,105,.55);
   border-radius:8px;
-  background:rgba(8,13,25,.96);
+  background:#000000;
   box-shadow:0 10px 28px rgba(0,0,0,.45);
   overflow:hidden;
   z-index:10020;
+  padding:14px;
+  box-sizing:border-box;
 }
 
 .history-panel.open{
@@ -1137,6 +1151,11 @@ body.history-mode #historyPanel.open{
   max-height:none;
   box-shadow:none;
   z-index:10018;
+  background:#000000;
+  padding:14px;
+  border:1px solid rgba(71,85,105,.55);
+  border-radius:8px;
+  box-sizing:border-box;
 }
 
 body.history-mode #historyPanel.open .history-table-wrap{
@@ -1208,9 +1227,11 @@ body.menu-open.history-mode #historyPanel.open{
 }
 
 .history-table-wrap{
+  flex:1 1 auto;
+  min-height:0;
   max-height:calc(60vh - 44px);
   overflow:auto;
-  margin-top:-1px;
+  margin-top:4px;
 }
 
 .history-panel table{
@@ -1221,6 +1242,7 @@ body.menu-open.history-mode #historyPanel.open{
   border-right:0;
   border-bottom:0;
   border-collapse:collapse;
+  table-layout:fixed;
 }
 
 .history-panel th,
@@ -1300,10 +1322,25 @@ body.graph-mode{
   flex-direction:column;
 }
 
+.summary-title-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-bottom:10px;
+  flex-shrink:0;
+}
+
 .summary-head{
   font-size:20px;
   font-weight:800;
   color:#60a5fa;
+  margin:0;
+  line-height:1.2;
+}
+
+.graph-page > .summary-head{
   margin-bottom:6px;
 }
 
@@ -1440,7 +1477,7 @@ body.graph-mode{
   align-items:center;
   justify-content:flex-end;
   gap:8px;
-  margin:0 0 10px;
+  margin:0;
   color:#94a3b8;
   font-size:13px;
   font-weight:600;
@@ -1913,15 +1950,30 @@ body.graph-mode{
 
 :fullscreen .controls,
 :-webkit-full-screen .controls{
-  margin:clamp(8px, 1.8vh, 18px) clamp(10px, 1.6vw, 24px);
+  margin-top:clamp(8px, 1.8vh, 18px);
+  margin-bottom:0;
+  margin-left:clamp(10px, 1.6vw, 24px);
+  margin-right:clamp(10px, 1.6vw, 24px);
   padding:clamp(12px, 1.9vh, 18px) clamp(14px, 1.8vw, 26px);
 }
 
 :fullscreen .dashboard,
-:-webkit-full-screen .dashboard,
+:-webkit-full-screen .dashboard{
+  margin-top:clamp(12px, 1.5vw, 22px);
+  margin-bottom:0;
+  margin-left:clamp(8px, 1.3vw, 16px);
+  margin-right:clamp(8px, 1.3vw, 16px);
+  grid-template-columns:repeat(4, minmax(0, 1fr));
+  column-gap:clamp(12px, 1.5vw, 22px);
+  row-gap:clamp(12px, 1.5vw, 22px);
+}
+
 :fullscreen .bottom-row,
 :-webkit-full-screen .bottom-row{
-  margin:clamp(6px, 1.3vh, 14px) clamp(8px, 1.3vw, 16px);
+  margin-top:clamp(12px, 1.5vw, 22px);
+  margin-bottom:clamp(6px, 1.3vh, 14px);
+  margin-left:clamp(8px, 1.3vw, 16px);
+  margin-right:clamp(8px, 1.3vw, 16px);
   grid-template-columns:repeat(4, minmax(0, 1fr));
   column-gap:clamp(12px, 1.5vw, 22px);
   row-gap:clamp(12px, 1.5vw, 22px);
