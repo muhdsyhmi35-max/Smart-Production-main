@@ -420,7 +420,18 @@ body::-webkit-scrollbar{
 .scan-grid{
   display:grid;
   grid-template-columns:1fr 1fr;
-  gap:15px;
+  gap:clamp(16px, 2vw, 22px);
+  margin-top:clamp(16px, 2.4vh, 28px);
+  width:100%;
+  max-width:100%;
+}
+
+.bottom-row > .card.wide:first-child{
+  padding-bottom:clamp(18px, 2.8vh, 32px);
+}
+
+.bottom-row > .card.wide:first-child > h3{
+  margin-bottom:0;
 }
 
 .monitor-status-wrap{
@@ -482,11 +493,12 @@ th{
 
 /* ================= CONTROLS SETTINGS ================= */
 .controls input{
-  padding:8px 12px;
+  padding:8px 10px;
   width:76px;
   min-width:76px;
+  max-width:76px;
   height:36px;
-  font-size:clamp(15px, 1.8vh, 17px);
+  font-size:clamp(17px, 2.1vh, 20px);
   font-weight:700;
   border-radius:11px;
   border:1px solid rgba(71,85,105,0.8);
@@ -497,30 +509,75 @@ th{
 }
 
 .controls input#lotInput{
-  width:clamp(96px, 11vw, 132px);
-  min-width:96px;
+  width:76px;
+  min-width:76px;
+  max-width:76px;
 }
 
 .controls button{
-  min-height:42px;
-  padding:10px 20px;
-  font-size:clamp(14px, 1.7vh, 16px);
-  border:none;
-  border-radius:7px !important;
+  min-height:44px;
+  padding:10px 22px;
+  font-size:clamp(13px, 1.65vh, 15px);
+  border-style:solid;
+  border-width:2px;
+  border-radius:4px !important;
   font-weight:800;
-  letter-spacing:.25px;
+  letter-spacing:.12em;
   text-transform:uppercase;
   cursor:pointer;
-  box-shadow:0 6px 14px rgba(2,6,23,0.35), inset 0 1px 0 rgba(255,255,255,0.18);
-  transition:transform var(--dur-fast) var(--ease-soft), filter var(--dur-fast) var(--ease-soft), box-shadow var(--dur-fast) var(--ease-soft);
+  transition:filter var(--dur-fast) var(--ease-soft), box-shadow var(--dur-fast) var(--ease-soft), transform var(--dur-fast) var(--ease-soft);
 }
 
-.controls button:hover{transform:translateY(-1px);filter:brightness(1.05);}
-.controls button:active{transform:translateY(0);}
+.controls button:hover{
+  filter:brightness(1.06);
+}
 
-.start{background:linear-gradient(180deg,#22c55e,#16a34a);color:white;}
-.stop{background:linear-gradient(180deg,#ef4444,#dc2626);color:white;}
-.reset{background:linear-gradient(180deg,#fbbf24,#f59e0b);color:white;}
+.controls button:active{
+  transform:translateY(1px);
+}
+
+.controls .start{
+  color:#ecfdf5;
+  text-shadow:0 1px 1px rgba(0,0,0,.55);
+  background:linear-gradient(180deg,#4ade80 0%,#16a34a 42%,#15803d 100%);
+  border-top-color:rgba(255,255,255,.38);
+  border-left-color:rgba(255,255,255,.22);
+  border-right-color:#064e3b;
+  border-bottom-color:#022c22;
+  box-shadow:
+    inset 0 2px 3px rgba(255,255,255,.18),
+    inset 0 -4px 8px rgba(0,0,0,.35),
+    0 2px 0 rgba(0,0,0,.45);
+}
+
+.controls .stop{
+  color:#fef2f2;
+  text-shadow:0 1px 1px rgba(0,0,0,.55);
+  background:linear-gradient(180deg,#fb7185 0%,#dc2626 45%,#b91c1c 100%);
+  border-top-color:rgba(255,255,255,.35);
+  border-left-color:rgba(255,255,255,.18);
+  border-right-color:#7f1d1d;
+  border-bottom-color:#450a0a;
+  box-shadow:
+    inset 0 2px 3px rgba(255,255,255,.14),
+    inset 0 -4px 8px rgba(0,0,0,.38),
+    0 2px 0 rgba(0,0,0,.45);
+}
+
+.controls .reset{
+  color:#1c1917;
+  text-shadow:0 1px 0 rgba(255,255,255,.22);
+  background:linear-gradient(180deg,#fde047 0%,#eab308 42%,#ca8a04 100%);
+  border-top-color:rgba(255,255,255,.55);
+  border-left-color:rgba(255,255,255,.35);
+  border-right-color:#713f12;
+  border-bottom-color:#422006;
+  box-shadow:
+    inset 0 2px 3px rgba(255,255,255,.28),
+    inset 0 -4px 8px rgba(0,0,0,.28),
+    0 2px 0 rgba(0,0,0,.4);
+}
+
 .summary{background:linear-gradient(180deg,#3b82f6,#2563eb);color:white;}
 
 .control-actions{
@@ -607,14 +664,18 @@ body.monitor-mode .main-pc-actions{
 }
 
 .scan-box{
-  width:300px;
-  padding:10px 12px;
-  font-size:16px;
+  width:100%;
+  max-width:100%;
+  box-sizing:border-box;
+  padding:clamp(12px, 1.8vh, 16px) clamp(12px, 1.6vw, 16px);
+  min-height:clamp(44px, 5.5vh, 52px);
+  font-size:clamp(15px, 1.8vh, 17px);
   border-radius:8px;
-  background:#0a1222;
-  border:1px solid #334155;
-  color:white;
+  background:linear-gradient(180deg,rgba(14,22,38,.98),rgba(8,13,28,.98));
+  border:1px solid rgba(71,85,105,.75);
+  color:#f1f5f9;
   text-align:center;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);
 }
 
 table{
