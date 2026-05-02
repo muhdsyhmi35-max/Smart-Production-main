@@ -1944,7 +1944,7 @@ font-weight: 800;
 }
 .summary-card {
     border-radius: 20px;
-    background: #000000;
+    background: #111827;
     width: 450px;
     margin: 0 auto 50px auto;
     padding: 10px;
@@ -1960,7 +1960,7 @@ padding:14px;
 text-align:center;
 }
 .summary-table th{
-background:#000000;
+background:#1f2937;
 color:#60a5fa;
 font-weight:bold;
 text-align: left;
@@ -1972,7 +1972,7 @@ border-radius: 10px 0 0 10px;
     font-weight: bold;
 }
 .detail-table-container {
-    background: #000000;
+    background: #111827;
     border-radius: 15px;
     padding: 10px;
     overflow: hidden;
@@ -1989,7 +1989,7 @@ border-bottom: 1px solid #1f2937;
 font-size: 14px;
 }
 .detail-table th{
-background:#000000;
+background:#1f2937;
 color:#60a5fa;
 font-weight:bold;
 text-transform: uppercase;
@@ -1998,7 +1998,7 @@ text-transform: uppercase;
     border-bottom: none;
 }
 .detail-table tr:nth-child(even){
-background:#000000;
+background:#0f172a;
 }
 .status-green{
 color:#22c55e !important;
