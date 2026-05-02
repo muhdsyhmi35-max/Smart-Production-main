@@ -70,19 +70,29 @@
 
 <!-- 🔹 ROW 1 -->
 <div class="card"><h3>COUNTDOWN</h3><div class="big-number" id="countdown">00:00</div></div>
-<div class="card"><h3>ACTUAL OUTPUT</h3><div class="big-number status-green" id="actual">0</div></div>
+<div class="card"><h3>DAILY PLAN</h3><div class="big-number" id="plan">0</div></div>
 <div class="card"><h3>EXPECTED OUTPUT</h3><div class="big-number status-blue" id="expected">0</div></div>
 <div class="card"><h3>DELAY / AHEAD</h3><div class="big-number" id="delay">0</div></div>
 
 <!-- 🔹 ROW 2 -->
-<div class="card"><h3>DAILY PLAN</h3><div class="big-number" id="plan">0</div></div>
+<div class="card"><h3>ACTUAL OUTPUT</h3><div class="big-number status-green" id="actual">0</div></div>
 <div class="card"><h3>BALANCE</h3><div class="big-number" id="balance">0</div></div>
 
-<!-- LINE STATUS -->
-<div class="card wide">
-<h3>LINE STATUS</h3>
-<div class="big-number" id="status">READY</div>
+<div class="card" id="downtimeCard">
+<h3>ACCUMULATED DOWNTIME</h3>
+<div class="downtime-day-filter">
+  <label for="downtimeDayFilter">Day</label>
+  <input type="date" id="downtimeDayFilter" title="Downtime total for this calendar day">
+  <button type="button" id="downtimeDayTodayBtn" class="downtime-today-btn">Today</button>
 </div>
+<div class="big-number" id="downtime">00:00</div>
+</div>
+
+<div class="card">
+<h3>EFFICIENCY</h3>
+<div class="big-number" id="efficiency">0%</div>
+</div>
+
 </div>
   
 <div class="bottom-row">
@@ -99,22 +109,12 @@
 
 </div>
 
-<!-- RIGHT: DOWNTIME -->
-<div class="card" id="downtimeCard">
-<h3>ACCUMULATED DOWNTIME</h3>
-<div class="downtime-day-filter">
-  <label for="downtimeDayFilter">Day</label>
-  <input type="date" id="downtimeDayFilter" title="Downtime total for this calendar day">
-  <button type="button" id="downtimeDayTodayBtn" class="downtime-today-btn">Today</button>
-</div>
-<div class="big-number" id="downtime">00:00</div>
+<!-- LINE STATUS (was top row wide; swaps with downtime + efficiency) -->
+<div class="card wide">
+<h3>LINE STATUS</h3>
+<div class="big-number" id="status">READY</div>
 </div>
 
-<div class="card">
-<h3>EFFICIENCY</h3>
-<div class="big-number" id="efficiency">0%</div> 
-</div>
-  
 </div>
   
 <div id="historyPanel" class="history-panel">
