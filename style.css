@@ -499,6 +499,17 @@ th{
 .reset{background:linear-gradient(180deg,#fbbf24,#f59e0b);color:white;}
 .summary{background:linear-gradient(180deg,#3b82f6,#2563eb);color:white;}
 
+.control-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+body.monitor-mode .main-pc-actions{
+  display:none !important;
+}
+
 .dashboard{
   display:grid;
   grid-template-columns:repeat(4,1fr);

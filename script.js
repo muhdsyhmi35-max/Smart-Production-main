@@ -1241,6 +1241,8 @@ function startProduction(shouldSync = true) {
 
 /* STOP */
 function stopProduction(shouldSync = true) {
+  if (isMonitor) return;
+
   hasLocalSession = true;
 
   if (shouldSync) {
@@ -1257,6 +1259,8 @@ function stopProduction(shouldSync = true) {
 
 /* RESET */
 function resetProduction(shouldSync = true) {
+  if (isMonitor) return;
+
   hasLocalSession = true;
 
   if (shouldSync) {

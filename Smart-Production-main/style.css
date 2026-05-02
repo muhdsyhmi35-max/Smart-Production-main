@@ -528,6 +528,10 @@ th{
 .reset{background:linear-gradient(180deg,#fbbf24,#d97706);color:white;}
 .summary{background:linear-gradient(180deg,#3b82f6,#1d4ed8);color:white;}
 
+body.monitor-mode .main-pc-actions{
+  display:none !important;
+}
+
 .dashboard{
   display:grid;
   grid-template-columns:repeat(4,1fr);
