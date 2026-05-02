@@ -1709,7 +1709,6 @@ function updateDisplay() {
     downtimeCard.classList.remove("downtime-alert", "blink");
     downtimeText.classList.remove("status-red", "blink");
   }
-  renderMiniTrend();
 }
 
 /* ===== DAILY SUMMARY ===== */
@@ -2130,7 +2129,6 @@ function showMainPage() {
   if (historyPanel) historyPanel.classList.remove("open");
   triggerEnterAnimation(document.querySelector(".dashboard"));
   triggerEnterAnimation(document.querySelector(".bottom-row"));
-  triggerEnterAnimation(document.querySelector(".mini-trend-row"));
   updateViewToggleMenuItem();
 }
 
@@ -2145,128 +2143,6 @@ function parseHourFromTimeText(timeText) {
   if (ampm === "am" && hour === 12) hour = 0;
   if (hour < 0 || hour > 23) return null;
   return hour;
-}
-
-function collectTodayOutputByHour() {
-  const todayK = toIsoDateLocal(new Date());
-  const hourly = Array(24).fill(0);
-  document.querySelectorAll("#scanTable tr").forEach(row => {
-    const cells = row.querySelectorAll("td");
-    if (cells.length < 3) return;
-    const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
-    if (!rowDay || rowDay !== todayK) return;
-    const hour = parseHourFromTimeText(cells[2]?.innerText || "");
-    if (hour == null) return;
-    hourly[hour] += 1;
-  });
-  const cumulative = Array(24).fill(0);
-  let run = 0;
-  for (let h = 0; h < 24; h++) {
-    run += hourly[h];
-    cumulative[h] = run;
-  }
-  return { hourly, cumulative, total: run };
-}
-
-function buildMiniTrendSvg(cumulative, startH, endH, plan) {
-  const width = 640;
-  const height = 120;
-  const leftPad = 36;
-  const rightPad = 8;
-  const topPad = 8;
-  const bottomPad = 20;
-  const chartW = width - leftPad - rightPad;
-  const chartH = height - topPad - bottomPad;
-  const y0 = topPad + chartH;
-  const hours = [];
-  for (let h = startH; h <= endH; h++) hours.push(h);
-  const slice = hours.map(h => cumulative[h] || 0);
-  const maxVal = Math.max(...slice, plan > 0 ? plan : 0, 1);
-  const n = Math.max(hours.length - 1, 1);
-  const toX = (i) => leftPad + (i / n) * chartW;
-  const toY = (v) => y0 - (v / maxVal) * chartH;
-  const parts = [];
-  for (let t = 0; t <= 3; t++) {
-    const ratio = t / 3;
-    const y = topPad + chartH * ratio;
-    const val = Math.round(maxVal * (1 - ratio));
-    parts.push(
-      "<line x1=\"" + leftPad + "\" y1=\"" + y.toFixed(1) + "\" x2=\"" + (width - rightPad).toFixed(1) + "\" y2=\"" + y.toFixed(1) + "\" stroke=\"rgba(30,64,175,.12)\" stroke-width=\"1\"/>"
-    );
-    parts.push(
-      "<text x=\"" + (leftPad - 5).toFixed(1) + "\" y=\"" + (y + 3).toFixed(1) + "\" text-anchor=\"end\" fill=\"#64748b\" font-size=\"9\">" + val + "</text>"
-    );
-  }
-  if (plan > 0) {
-    const py = toY(Math.min(plan, maxVal));
-    parts.push(
-      "<line x1=\"" + leftPad + "\" y1=\"" + py.toFixed(1) + "\" x2=\"" + (width - rightPad).toFixed(1) + "\" y2=\"" + py.toFixed(1) + "\" stroke=\"rgba(56,189,248,.4)\" stroke-dasharray=\"4 3\" stroke-width=\"1.2\"/>"
-    );
-  }
-  if (slice.length) {
-    let d = "M " + toX(0).toFixed(1) + " " + toY(slice[0]).toFixed(1);
-    for (let i = 1; i < slice.length; i++) {
-      d += " L " + toX(i).toFixed(1) + " " + toY(slice[i]).toFixed(1);
-    }
-    parts.push("<path d=\"" + d + "\" fill=\"none\" stroke=\"#4ade80\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"mini-trend-line\"/>");
-    slice.forEach((v, i) => {
-      parts.push(
-        "<circle cx=\"" + toX(i).toFixed(1) + "\" cy=\"" + toY(v).toFixed(1) + "\" r=\"3\" fill=\"#4ade80\" class=\"mini-trend-dot\"/>"
-      );
-    });
-  }
-  const labelStride = hours.length > 12 ? 2 : 1;
-  hours.forEach((h, i) => {
-    if (i % labelStride === 0 || i === hours.length - 1) {
-      parts.push(
-        "<text x=\"" + toX(i).toFixed(1) + "\" y=\"" + (height - 3) + "\" text-anchor=\"middle\" fill=\"#64748b\" font-size=\"9\">" + h + "</text>"
-      );
-    }
-  });
-  return (
-    "<svg viewBox=\"0 0 " + width + " " + height + "\" class=\"mini-trend-svg\" preserveAspectRatio=\"xMidYMid meet\" role=\"img\" aria-label=\"Today's output trend\">" +
-    parts.join("") +
-    "</svg>"
-  );
-}
-
-function renderMiniTrend() {
-  const mount = document.getElementById("miniTrendMount");
-  const cap = document.getElementById("miniTrendCaption");
-  if (!mount) return;
-  const { hourly, cumulative, total } = collectTodayOutputByHour();
-  const nowH = new Date().getHours();
-  let firstH = -1;
-  let lastH = -1;
-  for (let h = 0; h < 24; h++) {
-    if (hourly[h] > 0) {
-      if (firstH < 0) firstH = h;
-      lastH = h;
-    }
-  }
-  const planIn = document.getElementById("dailyPlanTarget");
-  const plan = planIn ? parseInt(planIn.value, 10) || 0 : 0;
-  if (firstH < 0) {
-    const startH = Math.min(8, nowH);
-    const endH = Math.max(17, nowH);
-    if (cap) {
-      cap.textContent = toIsoDateLocal(new Date()) + " · 0 units";
-    }
-    mount.innerHTML =
-      "<div class=\"mini-trend-empty\">No completions yet today — trend updates as each unit finishes.</div>" +
-      buildMiniTrendSvg(cumulative, startH, endH, plan);
-    return;
-  }
-  let startH = Math.min(firstH, nowH);
-  let endH = Math.max(lastH, nowH);
-  if (endH - startH < 3) {
-    endH = Math.min(23, startH + 4);
-  }
-  mount.innerHTML = buildMiniTrendSvg(cumulative, startH, endH, plan);
-  if (cap) {
-    cap.textContent =
-      "Cumulative by hour · " + total + " units" + (plan > 0 ? " · Plan " + plan : "");
-  }
 }
 
 function buildSummaryBarChart(title, labels, values, color, valueSuffix = "", yAxisLabel = "") {
@@ -3297,10 +3173,7 @@ function loadLiveData() {
       // even when table data payload is unchanged (e.g. timer stopped/target achieved).
       refreshDowntimeCardFromTable();
     })
-    .catch(err => console.log("Monitor load error:", err))
-    .finally(() => {
-      renderMiniTrend();
-    });
+    .catch(err => console.log("Monitor load error:", err));
 }
 
 /* ===== INITIALIZE SYSTEM ===== */

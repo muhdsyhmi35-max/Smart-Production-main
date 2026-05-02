@@ -164,8 +164,8 @@ body::-webkit-scrollbar{
 .header{
   position:relative;
   margin:10px 12px 0;
-  padding:10px 56px;
-  min-height:48px;
+  padding:12px 56px;
+  min-height:54px;
   border:1px solid rgba(71,85,105,.45);
   border-radius:8px;
   background:linear-gradient(90deg, rgba(4,10,22,.96), rgba(3,8,18,.98));
@@ -188,7 +188,7 @@ body::-webkit-scrollbar{
 }
 
 .header-title{
-  font-size:clamp(16px, 1.7vw, 20px);
+  font-size:clamp(18px, 2vw, 24px);
   font-weight:800;
   color:#e2e8f0;
   letter-spacing:.2px;
@@ -198,7 +198,7 @@ body::-webkit-scrollbar{
 }
 
 .header-subtitle{
-  font-size:12px;
+  font-size:13px;
   color:#94a3b8;
   line-height:1.2;
 }
@@ -207,20 +207,20 @@ body::-webkit-scrollbar{
   display:flex;
   align-items:center;
   justify-content:flex-end;
-  gap:6px;
+  gap:8px;
   flex-wrap:wrap;
 }
 
 .header-pill{
   display:inline-flex;
   align-items:center;
-  gap:5px;
-  padding:6px 10px;
-  border-radius:6px;
+  gap:6px;
+  padding:8px 12px;
+  border-radius:8px;
   border:1px solid rgba(71,85,105,.5);
   background:rgba(15,23,42,.78);
   color:#e2e8f0;
-  font-size:12px;
+  font-size:13px;
   font-weight:700;
   line-height:1;
 }
@@ -232,7 +232,7 @@ body::-webkit-scrollbar{
 }
 
 .header-pill-icon{
-  font-size:12px;
+  font-size:14px;
   opacity:.9;
 }
 
@@ -318,7 +318,7 @@ body::-webkit-scrollbar{
 
 #clock,
 #dateDisplay{
-  font-size:12px;
+  font-size:13px;
   font-weight:700;
   color:inherit;
 }
@@ -328,7 +328,7 @@ body::-webkit-scrollbar{
   display:flex;
   justify-content:center;
   align-items:center;
-  gap:12px;
+  gap:14px;
   flex-wrap:wrap;
   padding:14px 16px;
   background:rgba(10,16,30,.92);
@@ -403,77 +403,6 @@ body::-webkit-scrollbar{
   grid-template-columns: repeat(4, 1fr);
   gap:15px;
   margin:15px;
-}
-
-.mini-trend-row{
-  margin:0 15px 15px;
-}
-
-.mini-trend-card{
-  width:100%;
-  min-height:120px;
-}
-
-.mini-trend-head{
-  display:flex;
-  align-items:baseline;
-  justify-content:space-between;
-  gap:12px;
-  flex-wrap:wrap;
-  margin-bottom:4px;
-}
-
-.mini-trend-head h3{
-  margin:0;
-  font-size:clamp(15px, 1.6vh, 18px);
-  color:#94a3b8;
-  letter-spacing:.3px;
-}
-
-.mini-trend-sub{
-  font-size:11px;
-  color:#64748b;
-  font-weight:600;
-  text-align:right;
-}
-
-.mini-trend-chart-wrap{
-  width:100%;
-  min-height:100px;
-}
-
-.mini-trend-svg{
-  width:100%;
-  height:auto;
-  max-height:24vh;
-  display:block;
-}
-
-.mini-trend-empty{
-  font-size:12px;
-  color:#64748b;
-  margin:0 0 6px;
-  font-weight:600;
-}
-
-.mini-trend-line{
-  animation:miniTrendDraw .85s var(--ease-smooth) forwards;
-  stroke-dasharray:800;
-  stroke-dashoffset:800;
-}
-
-@keyframes miniTrendDraw{
-  to{ stroke-dashoffset:0; }
-}
-
-.mini-trend-dot{
-  animation:miniTrendDot .4s var(--ease-soft) forwards;
-  opacity:0;
-  transform-origin:center;
-}
-@keyframes miniTrendDot{
-  from{ opacity:0; transform:scale(.35); }
-  to{ opacity:1; transform:scale(1); }
 }
 
 .scan-grid{
@@ -1630,6 +1559,34 @@ body.graph-mode{
 :fullscreen .header,
 :-webkit-full-screen .header{
   padding:clamp(14px, 2vh, 28px);
+}
+
+:fullscreen .header-title,
+:-webkit-full-screen .header-title{
+  font-size:clamp(20px, 2.6vw, 28px);
+}
+
+:fullscreen .header-subtitle,
+:-webkit-full-screen .header-subtitle{
+  font-size:clamp(13px, 2vh, 17px);
+}
+
+:fullscreen .header-pill,
+:-webkit-full-screen .header-pill{
+  font-size:clamp(13px, 2vh, 16px);
+  padding:clamp(8px, 1.2vh, 14px) clamp(12px, 1.8vw, 18px);
+}
+
+:fullscreen .header-pill-icon,
+:-webkit-full-screen .header-pill-icon{
+  font-size:clamp(14px, 2.2vh, 18px);
+}
+
+:fullscreen #clock,
+:-webkit-full-screen #clock,
+:fullscreen #dateDisplay,
+:-webkit-full-screen #dateDisplay{
+  font-size:clamp(13px, 2vh, 16px);
 }
 
 :fullscreen .controls,
