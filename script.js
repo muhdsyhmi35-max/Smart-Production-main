@@ -67,6 +67,9 @@ let firebaseLiveStateRef = null;
 let isApplyingRemoteCommand = false;
 let hasLocalSession = false;
 let liveCountdownInterval = null;
+let clockInterval = null;
+let liveDataPollInterval = null;
+let liveStatePollInterval = null;
 let monitorFirebaseNetConnected = false;
 let monitorLiveStateReceived = false;
 let monitorLiveStateError = null;
@@ -3336,7 +3339,8 @@ window.onload = async function() {
   toggleDowntimeDateFilter(false);
 
   updateDateTime();
-  setInterval(updateDateTime, 1000);
+  if (clockInterval) clearInterval(clockInterval);
+  clockInterval = setInterval(updateDateTime, 1000);
   initFirebaseSync();
   loadInitialLiveState();
 
@@ -3376,13 +3380,20 @@ window.onload = async function() {
 
     // Scan table rows: Google Sheet source of truth.
     loadLiveData();
-    setInterval(loadLiveData, 3000);
+    if (liveDataPollInterval) clearInterval(liveDataPollInterval);
+    liveDataPollInterval = setInterval(loadLiveData, 3000);
+    if (liveStatePollInterval) {
+      clearInterval(liveStatePollInterval);
+      liveStatePollInterval = null;
+    }
     updateMonitorDataNotice();
   } else {
     // Reload scan history from Sheet after refresh (main screen).
     loadLiveData();
-    setInterval(loadLiveData, 3000);
-    setInterval(updateLiveStateOnly, 2000);
+    if (liveDataPollInterval) clearInterval(liveDataPollInterval);
+    liveDataPollInterval = setInterval(loadLiveData, 3000);
+    if (liveStatePollInterval) clearInterval(liveStatePollInterval);
+    liveStatePollInterval = setInterval(updateLiveStateOnly, 2000);
   }
   updateViewToggleMenuItem();
 };
