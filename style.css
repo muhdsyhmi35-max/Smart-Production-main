@@ -361,7 +361,7 @@ body::-webkit-scrollbar{
   background:linear-gradient(180deg, rgba(8,13,25,0.96), rgba(6,10,20,0.98));
   border:1px solid rgba(71,85,105,0.55);
   border-radius:10px;
-  padding:clamp(16px, 2.2vh, 24px);
+  padding:clamp(14px, 1.9vh, 22px);
   text-align:center;
   box-shadow:
   inset 0 1px 0 rgba(255,255,255,0.03),
@@ -372,7 +372,7 @@ body::-webkit-scrollbar{
   flex-direction:column;
   justify-content:flex-start;
   align-items:center;
-  min-height:clamp(104px, 14vh, 160px);
+  min-height:clamp(88px, 11vh, 138px);
 }
 
 /* GLOW BORDER */
@@ -434,8 +434,8 @@ body::-webkit-scrollbar{
   margin-bottom:0;
 }
 
-.bottom-row > .card.wide{
-  min-height:clamp(272px, 34vh, 440px);
+body.monitor-mode .bottom-row > .card.wide{
+  min-height:clamp(168px, 20vh, 260px);
 }
 
 .bottom-row > .card.wide:first-child .scan-grid{
