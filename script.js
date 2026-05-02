@@ -744,7 +744,7 @@ function renderDowntimeDebugPanel() {
       "padding:10px",
       "border-radius:8px",
       "border:1px solid rgba(148,163,184,.4)",
-      "background:rgba(2,6,23,.92)",
+      "background:#000000",
       "color:#cbd5e1",
       "font:12px/1.4 Consolas, monospace",
       "white-space:pre-wrap"
@@ -1805,7 +1805,7 @@ function openSummary() {
 body{
 margin:0;
 font-family:'Segoe UI',sans-serif;
-background:#0b1220;
+background:#000000;
 color:#e5e7eb;
 padding:40px;
 }
@@ -1818,7 +1818,7 @@ font-weight: 800;
 }
 .summary-card {
     border-radius: 20px;
-    background: #111827;
+    background: #000000;
     width: 450px;
     margin: 0 auto 50px auto;
     padding: 10px;
@@ -1834,7 +1834,7 @@ padding:14px;
 text-align:center;
 }
 .summary-table th{
-background:#1f2937;
+background:#000000;
 color:#60a5fa;
 font-weight:bold;
 text-align: left;
@@ -1846,7 +1846,7 @@ border-radius: 10px 0 0 10px;
     font-weight: bold;
 }
 .detail-table-container {
-    background: #111827;
+    background: #000000;
     border-radius: 15px;
     padding: 10px;
     overflow: hidden;
@@ -1863,7 +1863,7 @@ border-bottom: 1px solid #1f2937;
 font-size: 14px;
 }
 .detail-table th{
-background:#1f2937;
+background:#000000;
 color:#60a5fa;
 font-weight:bold;
 text-transform: uppercase;
@@ -1872,7 +1872,7 @@ text-transform: uppercase;
     border-bottom: none;
 }
 .detail-table tr:nth-child(even){
-background:#0f172a;
+background:#000000;
 }
 .status-green{
 color:#22c55e !important;
