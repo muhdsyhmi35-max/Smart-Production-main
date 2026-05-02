@@ -535,6 +535,7 @@ body.role-operator .menu-btn{
   margin:clamp(12px, 1.8vh, 18px) clamp(14px, 2vw, 22px);
   box-shadow:0 8px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.02);
   box-sizing:border-box;
+  min-height:clamp(88px, 11vh, 138px);
 }
 
 .controls-fields{
@@ -850,9 +851,9 @@ body.monitor-mode .main-pc-actions{
   width:100%;
   max-width:100%;
   box-sizing:border-box;
-  padding:clamp(12px, 1.8vh, 16px) clamp(12px, 1.6vw, 16px);
-  min-height:clamp(44px, 5.5vh, 52px);
-  font-size:clamp(15px, 1.8vh, 17px);
+  padding:clamp(14px, 2vh, 18px) clamp(12px, 1.6vw, 16px);
+  min-height:clamp(50px, 6vh, 58px);
+  font-size:clamp(17px, 2.1vh, 20px);
   border-radius:8px;
   background:linear-gradient(180deg,rgba(14,22,38,.98),rgba(8,13,28,.98));
   border:1px solid rgba(71,85,105,.75);
@@ -927,20 +928,25 @@ tr:nth-child(even){background:#0b1220;}
 .menu-btn{
   position:absolute;
   left:10px;
-  top:50%;
-  width:clamp(28px, 3.8vw, 40px);
-  height:clamp(28px, 3.8vw, 40px);
+  top:12px;
+  bottom:12px;
+  width:clamp(36px, 4.2vw, 46px);
+  height:auto;
   border:none;
   border-radius:clamp(8px, 1.2vw, 12px);
   background:rgba(15,23,42,0.55);
   color:#93c5fd;
-  font-size:clamp(16px, 2.2vw, 22px);
+  font-size:clamp(20px, 2.6vw, 28px);
   line-height:1;
   font-weight:800;
   opacity:0.8;
   cursor:pointer;
   z-index:10041;
-  transform:translateY(-50%);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-sizing:border-box;
+  transform:none;
   transition:opacity var(--dur-fast) var(--ease-soft), border-color var(--dur-fast) var(--ease-soft), background var(--dur-fast) var(--ease-soft), transform var(--dur-fast) var(--ease-soft);
 }
 
@@ -948,7 +954,7 @@ tr:nth-child(even){background:#0b1220;}
   opacity:1;
   background:rgba(30,58,138,0.72);
   box-shadow:0 0 0 2px rgba(96,165,250,.26), 0 8px 18px rgba(2,6,23,.45);
-  transform:translateY(calc(-50% - 1px)) scale(1.04);
+  transform:translateY(-1px) scale(1.03);
 }
 
 .menu-dropdown{
