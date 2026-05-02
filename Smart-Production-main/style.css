@@ -459,6 +459,11 @@ body.role-operator .menu-btn{
 
 #downtimeCard{
   cursor:default;
+  max-width:100%;
+}
+
+#downtimeCard .downtime-day-filter{
+  max-width:100%;
 }
 
 #downtimeCard.show-date-filter .downtime-day-filter{
@@ -572,6 +577,7 @@ body.role-operator .menu-btn{
   flex-direction:column;
   justify-content:flex-start;
   align-items:center;
+  min-width:0;
   min-height:clamp(88px, 11vh, 138px);
 }
 
@@ -612,8 +618,9 @@ body.role-operator .menu-btn{
 /* STATUS BAR (BOTTOM) */
 .bottom-row{
   display:grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap:clamp(14px, 1.9vw, 20px);
+  grid-template-columns:repeat(4, minmax(0, 1fr));
+  column-gap:clamp(14px, 1.9vw, 20px);
+  row-gap:clamp(14px, 1.9vw, 20px);
   margin:clamp(12px, 1.8vh, 18px) clamp(12px, 2vw, 18px);
 }
 
@@ -780,8 +787,9 @@ body.monitor-mode .main-pc-actions{
 
 .dashboard{
   display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:clamp(14px, 1.9vw, 20px);
+  grid-template-columns:repeat(4, minmax(0, 1fr));
+  column-gap:clamp(14px, 1.9vw, 20px);
+  row-gap:clamp(14px, 1.9vw, 20px);
   margin:clamp(12px, 1.8vh, 18px) clamp(12px, 2vw, 18px);
 }
 
@@ -1135,6 +1143,12 @@ body.history-mode #historyPanel.open .history-table-wrap{
   flex:1 1 auto;
   min-height:0;
   max-height:none;
+}
+
+/* History fills the viewport; when the nav drawer is open, inset from the panel edge (not under it). */
+body.menu-open.history-mode #historyPanel.open{
+  left:calc(20px + var(--menu-panel-width));
+  right:20px;
 }
 
 .history-panel-title{
@@ -1908,7 +1922,9 @@ body.graph-mode{
 :fullscreen .bottom-row,
 :-webkit-full-screen .bottom-row{
   margin:clamp(6px, 1.3vh, 14px) clamp(8px, 1.3vw, 16px);
-  gap:clamp(12px, 1.5vw, 22px);
+  grid-template-columns:repeat(4, minmax(0, 1fr));
+  column-gap:clamp(12px, 1.5vw, 22px);
+  row-gap:clamp(12px, 1.5vw, 22px);
 }
 
 :fullscreen .card,
