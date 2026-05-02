@@ -58,12 +58,6 @@
 <input type="number" id="lotInput" placeholder="Lot No">
 </label>
 
-<div class="control-actions">
-<button class="start" onclick="startProduction()">Start</button>
-<button class="stop" onclick="stopProduction()">Stop</button>
-<button class="reset" onclick="resetProduction()">Reset</button>
-</div>
-
 </div>
 
 <div class="dashboard">
@@ -115,6 +109,16 @@
 <div class="big-number" id="efficiency">0%</div> 
 </div>
   
+</div>
+
+<div class="mini-trend-row">
+  <div class="card mini-trend-card">
+    <div class="mini-trend-head">
+      <h3>OUTPUT TREND (TODAY)</h3>
+      <span class="mini-trend-sub" id="miniTrendCaption"></span>
+    </div>
+    <div class="mini-trend-chart-wrap" id="miniTrendMount"></div>
+  </div>
 </div>
   
 <div id="historyPanel" class="history-panel">

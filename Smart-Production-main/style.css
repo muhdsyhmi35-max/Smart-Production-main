@@ -339,6 +339,77 @@ body::-webkit-scrollbar{
   margin:15px;
 }
 
+.mini-trend-row{
+  margin:0 15px 15px;
+}
+
+.mini-trend-card{
+  width:100%;
+  min-height:120px;
+}
+
+.mini-trend-head{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-bottom:4px;
+}
+
+.mini-trend-head h3{
+  margin:0;
+  font-size:clamp(15px, 1.6vh, 18px);
+  color:#94a3b8;
+  letter-spacing:.3px;
+}
+
+.mini-trend-sub{
+  font-size:11px;
+  color:#64748b;
+  font-weight:600;
+  text-align:right;
+}
+
+.mini-trend-chart-wrap{
+  width:100%;
+  min-height:100px;
+}
+
+.mini-trend-svg{
+  width:100%;
+  height:auto;
+  max-height:24vh;
+  display:block;
+}
+
+.mini-trend-empty{
+  font-size:12px;
+  color:#64748b;
+  margin:0 0 6px;
+  font-weight:600;
+}
+
+.mini-trend-line{
+  animation:miniTrendDraw .85s var(--ease-smooth) forwards;
+  stroke-dasharray:800;
+  stroke-dashoffset:800;
+}
+
+@keyframes miniTrendDraw{
+  to{ stroke-dashoffset:0; }
+}
+
+.mini-trend-dot{
+  animation:miniTrendDot .4s var(--ease-soft) forwards;
+  opacity:0;
+  transform-origin:center;
+}
+@keyframes miniTrendDot{
+  from{ opacity:0; transform:scale(.35); }
+  to{ opacity:1; transform:scale(1); }
+}
+
 .scan-grid{
   display:grid;
   grid-template-columns:1fr 1fr;
