@@ -326,17 +326,29 @@ body::-webkit-scrollbar{
 /* CONTROL PANEL */
 .controls{
   display:flex;
-  justify-content:center;
+  justify-content:space-between;
   align-items:center;
-  gap:14px;
+  gap:clamp(12px, 2vw, 24px);
   flex-wrap:wrap;
-  padding:14px 16px;
+  padding:clamp(14px, 2vh, 20px) clamp(18px, 2.6vw, 32px);
   background:rgba(10,16,30,.92);
   backdrop-filter:blur(14px);
   border:1px solid rgba(148,163,184,0.2);
-  border-radius:6px;
-  margin:20px;
+  border-radius:8px;
+  margin:clamp(12px, 1.8vh, 18px) clamp(14px, 2vw, 22px);
   box-shadow:0 8px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.02);
+  box-sizing:border-box;
+}
+
+.controls-fields{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:clamp(10px, 1.8vw, 22px);
+  justify-content:flex-start;
+  font-size:clamp(17px, 2vh, 21px);
+  font-weight:600;
+  color:#cbd5e1;
 }
 
 /* 🔥 MAKE LINE STATUS WIDE */
@@ -470,10 +482,11 @@ th{
 
 /* ================= CONTROLS SETTINGS ================= */
 .controls input{
-  padding:6px 10px;
-  width:66px;
-  height:28px;
-  font-size:14px;
+  padding:8px 12px;
+  width:76px;
+  min-width:76px;
+  height:36px;
+  font-size:clamp(15px, 1.8vh, 17px);
   font-weight:700;
   border-radius:11px;
   border:1px solid rgba(71,85,105,0.8);
@@ -483,20 +496,23 @@ th{
   transition:border-color var(--dur-fast) var(--ease-soft), box-shadow var(--dur-fast) var(--ease-soft), background var(--dur-fast) var(--ease-soft);
 }
 
+.controls input#lotInput{
+  width:clamp(96px, 11vw, 132px);
+  min-width:96px;
+}
+
 .controls button{
-  padding:8px 16px;
-  font-size:14px;
+  min-height:42px;
+  padding:10px 20px;
+  font-size:clamp(14px, 1.7vh, 16px);
   border:none;
-  border-radius:4px !important;
-  font-weight:700;
-  letter-spacing:.2px;
+  border-radius:7px !important;
+  font-weight:800;
+  letter-spacing:.25px;
+  text-transform:uppercase;
   cursor:pointer;
   box-shadow:0 6px 14px rgba(2,6,23,0.35), inset 0 1px 0 rgba(255,255,255,0.18);
   transition:transform var(--dur-fast) var(--ease-soft), filter var(--dur-fast) var(--ease-soft), box-shadow var(--dur-fast) var(--ease-soft);
-}
-
-.controls{
-  font-size:16px;
 }
 
 .controls button:hover{transform:translateY(-1px);filter:brightness(1.05);}
@@ -510,8 +526,9 @@ th{
 .control-actions{
   display:flex;
   align-items:center;
-  gap:10px;
+  gap:clamp(10px, 1.5vw, 16px);
   flex-wrap:wrap;
+  flex-shrink:0;
 }
 
 body.monitor-mode .main-pc-actions{
@@ -1612,7 +1629,7 @@ body.graph-mode{
 :fullscreen .controls,
 :-webkit-full-screen .controls{
   margin:clamp(8px, 1.8vh, 18px) clamp(10px, 1.6vw, 24px);
-  padding:clamp(8px, 1.6vh, 14px) clamp(10px, 1.4vw, 18px);
+  padding:clamp(12px, 1.9vh, 18px) clamp(14px, 1.8vw, 26px);
 }
 
 :fullscreen .dashboard,
