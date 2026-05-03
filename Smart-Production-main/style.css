@@ -1981,8 +1981,8 @@ body.graph-mode{
 
 :fullscreen .bottom-row,
 :-webkit-full-screen .bottom-row{
-  margin-top:clamp(12px, 1.5vw, 22px);
-  margin-bottom:clamp(6px, 1.3vh, 14px);
+  margin-top:clamp(8px, 1.2vw, 18px);
+  margin-bottom:clamp(4px, 0.9vh, 10px);
   margin-left:clamp(8px, 1.3vw, 16px);
   margin-right:clamp(8px, 1.3vw, 16px);
   grid-template-columns:repeat(4, minmax(0, 1fr));
@@ -1990,10 +1990,41 @@ body.graph-mode{
   row-gap:clamp(12px, 1.5vw, 22px);
 }
 
-:fullscreen .card,
-:-webkit-full-screen .card{
-  min-height:clamp(108px, 16vh, 170px);
-  padding:clamp(14px, 2vh, 26px);
+/* Dashboard metric cards can stay tall; bottom-row must stay inside the viewport. */
+:fullscreen .dashboard .card,
+:-webkit-full-screen .dashboard .card{
+  min-height:clamp(96px, 13vh, 160px);
+  padding:clamp(12px, 1.7vh, 24px);
+}
+
+:fullscreen .bottom-row .card,
+:-webkit-full-screen .bottom-row .card{
+  min-height:0;
+  padding:clamp(10px, 1.5vh, 20px);
+}
+
+/* Monitor mode uses a large min-height on wide bottom cards — undo in fullscreen so rows are not clipped. */
+:fullscreen body.monitor-mode .bottom-row > .card.wide,
+:-webkit-full-screen body.monitor-mode .bottom-row > .card.wide{
+  min-height:0;
+}
+
+:fullscreen .bottom-row > .card.wide:first-child,
+:-webkit-full-screen .bottom-row > .card.wide:first-child{
+  padding-bottom:clamp(10px, 1.4vh, 22px);
+}
+
+:fullscreen .bottom-row .scan-grid,
+:-webkit-full-screen .bottom-row .scan-grid{
+  gap:clamp(8px, 1.2vw, 16px);
+  margin-top:clamp(8px, 1.2vh, 18px);
+}
+
+:fullscreen .bottom-row .scan-box,
+:-webkit-full-screen .bottom-row .scan-box{
+  min-height:clamp(40px, 4.8vh, 54px);
+  padding:clamp(10px, 1.4vh, 15px) clamp(10px, 1.4vw, 15px);
+  font-size:clamp(14px, 1.6vh, 18px);
 }
 
 :fullscreen .card h3,
@@ -2001,12 +2032,45 @@ body.graph-mode{
   font-size:clamp(24px, 3vh, 34px);
 }
 
+:fullscreen .bottom-row .card h3,
+:-webkit-full-screen .bottom-row .card h3{
+  font-size:clamp(18px, 2.2vh, 28px);
+  margin-bottom:clamp(4px, 0.8vh, 10px);
+}
+
 :fullscreen .big-number,
 :-webkit-full-screen .big-number{
   font-size:clamp(54px, 6.8vh, 88px);
 }
 
+:fullscreen .bottom-row .big-number,
+:-webkit-full-screen .bottom-row .big-number{
+  font-size:clamp(28px, 3.8vh, 64px);
+  line-height:1.08;
+}
+
 :fullscreen table,
 :-webkit-full-screen table{
   margin:clamp(110px, 22vh, 260px) auto 24px;
+}
+
+/* Short viewports: keep SCAN INPUT / LINE STATUS fully visible (windowed or non-fullscreen). */
+@media (max-height: 900px){
+  body:not(.summary-mode):not(.history-mode):not(.graph-mode) .bottom-row{
+    margin-top:clamp(8px, 1.2vw, 16px);
+    margin-bottom:clamp(6px, 1vh, 14px);
+  }
+  body:not(.summary-mode):not(.history-mode):not(.graph-mode) .bottom-row > .card.wide:first-child{
+    padding-bottom:clamp(12px, 2vh, 24px);
+  }
+  body:not(.summary-mode):not(.history-mode):not(.graph-mode) .bottom-row .scan-grid{
+    gap:clamp(10px, 1.5vw, 18px);
+    margin-top:clamp(10px, 1.6vh, 22px);
+  }
+  body:not(.summary-mode):not(.history-mode):not(.graph-mode) .bottom-row .big-number{
+    font-size:clamp(30px, 4.5vh, 68px);
+  }
+  body.monitor-mode:not(.summary-mode):not(.history-mode):not(.graph-mode) .bottom-row > .card.wide{
+    min-height:clamp(120px, 16vh, 220px);
+  }
 }
