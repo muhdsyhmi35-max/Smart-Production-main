@@ -439,75 +439,9 @@ body.role-operator .menu-btn{
   background:rgba(255,255,255,.06);
 }
 
-.downtime-day-filter{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  flex-wrap:wrap;
-  gap:8px;
-  margin:0;
-  font-size:13px;
-  font-weight:600;
-  color:#94a3b8;
-  max-height:0;
-  opacity:0;
-  overflow:hidden;
-  pointer-events:none;
-  transform:translateY(-3px);
-  transition:max-height var(--dur-fast) var(--ease-soft), opacity var(--dur-fast) var(--ease-soft), margin var(--dur-fast) var(--ease-soft), transform var(--dur-fast) var(--ease-soft);
-}
-
-.downtime-day-filter label{
-  white-space:nowrap;
-}
-
 #downtimeCard{
   cursor:default;
   max-width:100%;
-}
-
-#downtimeCard .downtime-day-filter{
-  max-width:100%;
-}
-
-#downtimeCard.show-date-filter .downtime-day-filter{
-  margin:4px 0 8px;
-  max-height:42px;
-  opacity:.95;
-  pointer-events:auto;
-  transform:translateY(0);
-}
-
-.downtime-day-filter input[type="date"]{
-  padding:4px 8px;
-  font-size:13px;
-  font-weight:700;
-  border-radius:6px;
-  border:1px solid rgba(71,85,105,.65);
-  background:rgba(2,6,23,.85);
-  color:#e2e8f0;
-  color-scheme:dark;
-}
-
-.downtime-day-filter input[type="date"]::-webkit-calendar-picker-indicator{
-  cursor:pointer;
-  filter:invert(1) brightness(1.25);
-  opacity:1;
-}
-
-.downtime-today-btn{
-  padding:4px 10px;
-  font-size:12px;
-  font-weight:800;
-  border-radius:6px;
-  border:1px solid rgba(56,189,248,.45);
-  background:rgba(30,58,138,.45);
-  color:#93c5fd;
-  cursor:pointer;
-}
-
-.downtime-today-btn:hover{
-  filter:brightness(1.08);
 }
 
 .monitor-data-notice{

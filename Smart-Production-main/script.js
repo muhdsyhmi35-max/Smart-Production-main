@@ -55,7 +55,6 @@ let graphRangeEndDate = null;
 let historyFilterDate = null;
 /** null = today in summary filter; else YYYY-MM-DD. */
 let summaryFilterDate = null;
-let downtimeFilterExpanded = false;
 let lastScanTime = null;
 let startTime = null;
 let firstScanAtMs = null;
@@ -355,34 +354,6 @@ function parseDisplayDateToIsoKey(dateText) {
 function syncDowntimeDayPickerUi() {
   const el = document.getElementById("downtimeDayFilter");
   if (el) el.value = getActiveDowntimeDayKey();
-}
-
-function onDowntimeDayFilterChange() {
-  const el = document.getElementById("downtimeDayFilter");
-  if (!el) return;
-  const v = (el.value || "").trim().slice(0, 10);
-  const todayK = toIsoDateLocal(new Date());
-  downtimeFilterDate = v && v !== todayK ? v : null;
-  refreshDowntimeCardFromTable();
-  if (!isMonitor) updateLiveStateOnly();
-}
-
-function onDowntimeDayTodayClick() {
-  downtimeFilterDate = null;
-  syncDowntimeDayPickerUi();
-  refreshDowntimeCardFromTable();
-  if (!isMonitor) updateLiveStateOnly();
-}
-
-function toggleDowntimeDateFilter(forceOpen) {
-  const card = document.getElementById("downtimeCard");
-  if (!card) return;
-  if (typeof forceOpen === "boolean") {
-    downtimeFilterExpanded = forceOpen;
-  } else {
-    downtimeFilterExpanded = !downtimeFilterExpanded;
-  }
-  card.classList.toggle("show-date-filter", downtimeFilterExpanded);
 }
 
 function getActiveGraphDayKey() {
@@ -3451,18 +3422,6 @@ document.getElementById("lotInput").addEventListener("input", () => {
   updateLiveStateOnly();
 });
 
-const downtimeDayFilterEl = document.getElementById("downtimeDayFilter");
-const downtimeDayTodayBtn = document.getElementById("downtimeDayTodayBtn");
-if (downtimeDayFilterEl) {
-  downtimeDayFilterEl.addEventListener("change", onDowntimeDayFilterChange);
-}
-if (downtimeDayTodayBtn) {
-  downtimeDayTodayBtn.addEventListener("click", onDowntimeDayTodayClick);
-}
-const downtimeCard = document.getElementById("downtimeCard");
-if (downtimeCard) {
-  downtimeCard.addEventListener("dblclick", () => toggleDowntimeDateFilter());
-}
 const historyDayFilterEl = document.getElementById("historyDayFilter");
 const historyDayTodayBtn = document.getElementById("historyDayTodayBtn");
 if (historyDayFilterEl) {
@@ -3480,7 +3439,6 @@ window.onload = async function() {
   applyAppRoleUi();
 
   syncDowntimeDayPickerUi();
-  toggleDowntimeDateFilter(false);
 
   updateDateTime();
   if (clockInterval) clearInterval(clockInterval);
