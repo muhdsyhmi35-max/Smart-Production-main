@@ -25,6 +25,15 @@ const SETTINGS = {
         { start: 750, end: 860 }
       ]
     }
+  },
+
+  /**
+   * PRODUCTION TREND: default target per day when a date has no saved plan in the table
+   * was the same for every calendar day (including Sat/Sun). Set zeroTargetOnInactiveWeekends
+   * to use 0 target on weekend days that have no scans and no per-day plan.
+   */
+  productionTrend: {
+    zeroTargetOnInactiveWeekends: true
   }
 };
 
@@ -2372,6 +2381,36 @@ function getPlanActualForPeriod(anchorDay, period = "day") {
   return { plan, actual };
 }
 
+/** True for local Saturday/Sunday (from ISO date key YYYY-MM-DD). */
+function isWeekendIsoDay(dayKey) {
+  const d = new Date(`${dayKey}T12:00:00`);
+  const dow = d.getDay();
+  return dow === 0 || dow === 6;
+}
+
+/**
+ * Per-day target for Production Report KPIs, tables, and PRODUCTION TREND (same rules).
+ * Weekend with no scans and no saved plan → 0 unless SETTINGS.productionTrend says otherwise.
+ */
+function computeDayTargetsForReport(dayKeys, dailyActualMap, fallbackDayPlan) {
+  const zWeekend = SETTINGS.productionTrend?.zeroTargetOnInactiveWeekends !== false;
+  const dayTarget = {};
+  dayKeys.forEach(k => {
+    const hist = getHistoricalPlanForDay(k);
+    const dayActual = dailyActualMap[k] || 0;
+    if (Number.isFinite(hist) && hist > 0) {
+      dayTarget[k] = hist;
+    } else if (dayActual > 0) {
+      dayTarget[k] = fallbackDayPlan;
+    } else if (zWeekend && isWeekendIsoDay(k)) {
+      dayTarget[k] = 0;
+    } else {
+      dayTarget[k] = fallbackDayPlan;
+    }
+  });
+  return dayTarget;
+}
+
 function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphPeriod) {
   const range = getActiveGraphRange();
   const rangeLabel = formatIsoRangeAsDdMmYy(range.start, range.end);
@@ -2389,33 +2428,24 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
     dailyActualMap[rowDay] = (dailyActualMap[rowDay] || 0) + 1;
   });
 
-  const totalDailyPlan = dayKeys.reduce((sum, key) => {
-    const hist = getHistoricalPlanForDay(key);
-    if (Number.isFinite(hist) && hist > 0) return sum + hist;
-    return sum;
-  }, 0);
   let fallbackDayPlan = parseInt(document.getElementById("plan").innerText.trim(), 10);
   if (!Number.isFinite(fallbackDayPlan) || fallbackDayPlan <= 0) {
     fallbackDayPlan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
   }
-  const dayTarget = {};
-  dayKeys.forEach(k => {
-    const hist = getHistoricalPlanForDay(k);
-    dayTarget[k] = (Number.isFinite(hist) && hist > 0) ? hist : fallbackDayPlan;
-  });
-  const totalPlan = totalDailyPlan > 0 ? totalDailyPlan : Math.max(0, fallbackDayPlan * Math.max(dayKeys.length, 1));
+  const dayTarget = computeDayTargetsForReport(dayKeys, dailyActualMap, fallbackDayPlan);
+  const totalPlan = dayKeys.reduce((sum, key) => sum + (dayTarget[key] || 0), 0);
 
   // Use per-day values (not cumulative) for both Actual and Target.
   const actualSeries = dayKeys.map(k => dailyActualMap[k] || 0);
   const targetSeries = dayKeys.map(k => dayTarget[k] || 0);
 
-  const finalActual = actualSeries[actualSeries.length - 1] || 0;
-  const diff = finalActual - totalPlan;
+  const totalActual = actualSeries.reduce((a, b) => a + b, 0);
+  const diff = totalActual - totalPlan;
   const diffNote = totalPlan > 0
     ? (diff === 0 ? "On target" : diff > 0 ? `Ahead by ${diff}` : `Behind by ${Math.abs(diff)}`)
     : "";
 
-  if (totalPlan <= 0 && finalActual <= 0) {
+  if (totalPlan <= 0 && totalActual <= 0) {
     return `
       <div class="summary-graph-card-title">Plan vs Actual</div>
       <div class="summary-graph-empty">No daily plan or actual output yet</div>`;
@@ -2650,12 +2680,11 @@ function renderGraphCharts() {
       dayDowntimeSec[rowDay] = (dayDowntimeSec[rowDay] || 0) + parseMmSsToSeconds(cells[9]?.innerText || "");
     }
   });
-  const defaultDailyPlan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
-  const dayTarget = {};
-  periodKeys.forEach(k => {
-    const p = getHistoricalPlanForDay(k);
-    dayTarget[k] = (Number.isFinite(p) && p > 0) ? p : defaultDailyPlan;
-  });
+  let fallbackDayPlan = parseInt(document.getElementById("plan").innerText.trim(), 10);
+  if (!Number.isFinite(fallbackDayPlan) || fallbackDayPlan <= 0) {
+    fallbackDayPlan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+  }
+  const dayTarget = computeDayTargetsForReport(periodKeys, dayProduced, fallbackDayPlan);
   const totalProduced = periodKeys.reduce((s, k) => s + (dayProduced[k] || 0), 0);
   const totalTarget = periodKeys.reduce((s, k) => s + (dayTarget[k] || 0), 0);
   const totalDowntimeMin = Math.max(0, Math.round(periodKeys.reduce((s, k) => s + (dayDowntimeSec[k] || 0), 0) / 60));
