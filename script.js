@@ -90,7 +90,7 @@ const APP_ADMIN_SESSION_KEY = "TF2_ADMIN_SESSION_OK";
 
 /** Change these credentials for your deployment (client-side only; not secret from devtools). */
 const ADMIN_LOGIN = {
-  user: "admin123",
+  user: "admin",
   pass: "1400"
 };
 
