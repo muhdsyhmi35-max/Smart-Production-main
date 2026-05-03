@@ -28,11 +28,12 @@ const SETTINGS = {
   },
 
   /**
-   * PRODUCTION TREND: default target per day when a date has no saved plan in the table
-   * was the same for every calendar day (including Sat/Sun). Set zeroTargetOnInactiveWeekends
-   * to use 0 target on weekend days that have no scans and no per-day plan.
+   * PRODUCTION TREND / report totals: when to draw a blue Target bar without a per-day plan in history.
+   * Default: no scans + no saved plan → target 0 (Daily Plan is not copied onto blank weekdays).
+   * Legacy: set implicitDailyPlanOnInactiveWeekdays true to assume Daily Plan on inactive weekdays.
    */
   productionTrend: {
+    implicitDailyPlanOnInactiveWeekdays: false,
     zeroTargetOnInactiveWeekends: true
   }
 };
@@ -2389,10 +2390,13 @@ function isWeekendIsoDay(dayKey) {
 }
 
 /**
- * Per-day target for Production Report KPIs, tables, and PRODUCTION TREND (same rules).
- * Weekend with no scans and no saved plan → 0 unless SETTINGS.productionTrend says otherwise.
+ * Per-day target for Production Report KPIs, tables, and PRODUCTION TREND.
+ * Saved plan on a row → that number. Day has scans → compare to Daily Plan (fallback).
+ * Otherwise → 0 unless legacy implicit weekday plan is enabled in SETTINGS.
  */
 function computeDayTargetsForReport(dayKeys, dailyActualMap, fallbackDayPlan) {
+  const legacyImplicitWeekday =
+    SETTINGS.productionTrend?.implicitDailyPlanOnInactiveWeekdays === true;
   const zWeekend = SETTINGS.productionTrend?.zeroTargetOnInactiveWeekends !== false;
   const dayTarget = {};
   dayKeys.forEach(k => {
@@ -2402,10 +2406,14 @@ function computeDayTargetsForReport(dayKeys, dailyActualMap, fallbackDayPlan) {
       dayTarget[k] = hist;
     } else if (dayActual > 0) {
       dayTarget[k] = fallbackDayPlan;
-    } else if (zWeekend && isWeekendIsoDay(k)) {
-      dayTarget[k] = 0;
+    } else if (legacyImplicitWeekday) {
+      if (isWeekendIsoDay(k) && zWeekend) {
+        dayTarget[k] = 0;
+      } else {
+        dayTarget[k] = fallbackDayPlan;
+      }
     } else {
-      dayTarget[k] = fallbackDayPlan;
+      dayTarget[k] = 0;
     }
   });
   return dayTarget;
