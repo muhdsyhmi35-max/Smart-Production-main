@@ -939,7 +939,7 @@ tr:nth-child(even){background:#0b1220;}
   background:#000000;
   box-shadow:0 10px 28px rgba(0,0,0,.45);
   z-index:10030;
-  padding:44px 8px max(28px, calc(12px + env(safe-area-inset-bottom, 0px)));
+  padding:44px 8px max(14px, calc(6px + env(safe-area-inset-bottom, 0px)));
   flex-direction:column;
   gap:4px;
   transform:translateX(-108%);
@@ -958,23 +958,23 @@ tr:nth-child(even){background:#0b1220;}
 .menu-dropdown-footer{
   margin-top:auto;
   flex-shrink:0;
-  padding:12px 10px 8px;
-  border-top:1px solid rgba(71,85,105,.45);
+  padding:10px 10px 2px;
+  border-top:1px solid rgba(71,85,105,.22);
 }
 
 .menu-footer-line{
-  font-size:12px;
-  line-height:1.5;
-  font-weight:600;
-  color:#cbd5e1;
+  font-size:11px;
+  line-height:1.45;
+  font-weight:500;
+  color:rgba(148,163,184,.58);
   text-align:center;
-  letter-spacing:.02em;
+  letter-spacing:.01em;
 }
 
 .menu-footer-line:last-child{
-  margin-top:4px;
-  color:#93c5fd;
-  font-weight:700;
+  margin-top:3px;
+  color:rgba(148,163,184,.45);
+  font-weight:500;
 }
 
 :root{
