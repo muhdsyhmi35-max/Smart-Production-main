@@ -953,6 +953,22 @@ tr:nth-child(even){background:#0b1220;}
   pointer-events:auto;
 }
 
+.menu-dropdown-footer{
+  margin-top:auto;
+  flex-shrink:0;
+  padding:14px 10px 8px;
+  border-top:1px solid rgba(71,85,105,.35);
+}
+
+.menu-footer-line{
+  font-size:11px;
+  line-height:1.45;
+  font-weight:600;
+  color:#64748b;
+  text-align:center;
+  letter-spacing:.02em;
+}
+
 :root{
   --menu-panel-width:min(250px, 76vw);
 }
@@ -1080,12 +1096,15 @@ body.menu-open .menu-btn{ display:none; }
 }
 
 .history-panel.open{
-  display:block;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
 }
 
 body.history-mode #historyPanel.open{
   display:flex;
   flex-direction:column;
+  gap:10px;
   top:clamp(96px, 14vh, 150px);
   left:20px;
   right:20px;
@@ -1174,7 +1193,10 @@ body.menu-open.history-mode #historyPanel.open{
   min-height:0;
   max-height:calc(60vh - 44px);
   overflow:auto;
-  margin-top:4px;
+  margin:0;
+  padding-top:0;
+  background:#000000;
+  border-radius:6px;
 }
 
 .history-panel table{
@@ -1244,6 +1266,7 @@ body.graph-mode{
 .summary-page.open{
   display:flex;
   flex-direction:column;
+  gap:10px;
 }
 
 .graph-page{
@@ -1271,7 +1294,7 @@ body.graph-mode{
   justify-content:space-between;
   gap:12px;
   flex-wrap:wrap;
-  margin-bottom:10px;
+  margin-bottom:0;
   flex-shrink:0;
 }
 
@@ -1291,7 +1314,7 @@ body.graph-mode{
   display:grid;
   grid-template-columns:repeat(4, minmax(0,1fr));
   gap:10px;
-  margin-bottom:0;
+  margin:0;
   flex:0 0 auto;
 }
 
@@ -1818,7 +1841,10 @@ body.graph-mode{
   flex:1 1 auto;
   min-height:0;
   overflow:auto;
-  margin-top:4px;
+  margin:0;
+  padding-top:0;
+  background:#000000;
+  border-radius:6px;
 }
 
 .summary-page table{
@@ -1836,15 +1862,19 @@ body.graph-mode{
 .summary-table-wrap thead th{
   position:sticky;
   top:0;
-  z-index:6;
+  z-index:8;
   background:#1e293b;
+  box-shadow:0 2px 0 rgba(15,23,42,.98), 0 4px 8px rgba(0,0,0,.35);
+  background-clip:padding-box;
 }
 
 .history-table-wrap thead th{
   position:sticky;
   top:0;
-  z-index:6;
+  z-index:8;
   background:#1e293b;
+  box-shadow:0 2px 0 rgba(15,23,42,.98), 0 4px 8px rgba(0,0,0,.35);
+  background-clip:padding-box;
 }
 
 .summary-status-scanned{
