@@ -2235,13 +2235,20 @@ function buildSummaryBarChart(title, labels, values, color, valueSuffix = "", yA
     `;
   }).join("");
   const yTicks = 4;
+  const useDecimalYLabels = maxVal > 0 && maxVal < 15;
   const yGrid = Array.from({ length: yTicks + 1 }, (_, i) => {
     const ratio = i / yTicks;
     const y = topPad + chartH * ratio;
-    const val = Math.round(maxVal * (1 - ratio));
+    const rawVal = maxVal * (1 - ratio);
+    let label;
+    if (useDecimalYLabels) {
+      label = String(Math.round(rawVal * 10) / 10).replace(/\.0$/, "");
+    } else {
+      label = String(Math.round(rawVal));
+    }
     return `
       <line x1="${leftPad}" y1="${y.toFixed(2)}" x2="${(width - rightPad).toFixed(2)}" y2="${y.toFixed(2)}" stroke="rgba(148,163,184,.16)" stroke-width="1"></line>
-      <text x="${(leftPad - 6).toFixed(2)}" y="${(y + 4).toFixed(2)}" text-anchor="end" fill="#94a3b8" font-size="9">${val}</text>
+      <text x="${(leftPad - 6).toFixed(2)}" y="${(y + 4).toFixed(2)}" text-anchor="end" fill="#94a3b8" font-size="9">${label}</text>
     `;
   }).join("");
 
@@ -2670,7 +2677,6 @@ function renderGraphCharts() {
   }).join("");
   const planActualChart = buildPlanVsActualChart(activeDay, graphPeriod);
   const downtimeChart = buildSummaryBarChart(`DOWNTIME TREND (${periodLabel}: ${rangeLabel})`, labels, downtimeMins, "#ef4444", "", "Minutes");
-  const daysCount = Math.max(periodKeys.length, 1);
   const hourlyProduced = {};
   rows.forEach(row => {
     const cells = row.querySelectorAll("td");
@@ -2683,8 +2689,9 @@ function renderGraphCharts() {
   });
   const activeHours = Object.keys(hourlyProduced).map(v => parseInt(v, 10)).filter(Number.isFinite).sort((a, b) => a - b);
   const prodHourLabels = activeHours.map(h => `${String(h).padStart(2, "0")}:00`);
-  const prodHourValues = activeHours.map(h => Number((hourlyProduced[h] / daysCount).toFixed(1)));
-  const prodHourChart = buildSummaryBarChart(`PRODUCTION BY HOUR (${periodLabel}: ${rangeLabel})`, prodHourLabels, prodHourValues, "#3b82f6", "", "Units");
+  /** Total scans in each clock-hour across the whole date range (not an average — avoids fractional “units”). */
+  const prodHourValues = activeHours.map(h => hourlyProduced[h] || 0);
+  const prodHourChart = buildSummaryBarChart(`PRODUCTION BY HOUR (${periodLabel}: ${rangeLabel})`, prodHourLabels, prodHourValues, "#3b82f6", "", "Units (total)");
   const oeeLabels = periodKeys.map(k => {
     const d = new Date(`${k}T00:00:00`);
     return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
