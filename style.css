@@ -1104,13 +1104,13 @@ body.menu-open .menu-btn{ display:none; }
 .history-panel.open{
   display:flex;
   flex-direction:column;
-  gap:10px;
+  gap:0;
 }
 
 body.history-mode #historyPanel.open{
   display:flex;
   flex-direction:column;
-  gap:10px;
+  gap:0;
   top:clamp(96px, 14vh, 150px);
   left:20px;
   right:20px;
@@ -1130,6 +1130,13 @@ body.history-mode #historyPanel.open .history-table-wrap{
   flex:1 1 auto;
   min-height:0;
   max-height:none;
+}
+
+/* Flush header + table: flex gap caused a strip where tbody text looked “bleeding through”. */
+#historyPanel .summary-title-row{
+  margin-bottom:0;
+  padding-bottom:6px;
+  flex-shrink:0;
 }
 
 /* History fills the viewport; when the nav drawer is open, inset from the panel edge (not under it). */
@@ -1199,10 +1206,13 @@ body.menu-open.history-mode #historyPanel.open{
   min-height:0;
   max-height:calc(60vh - 44px);
   overflow:auto;
+  overflow-x:auto;
   margin:0;
-  padding-top:0;
+  padding:0;
   background:#000000;
-  border-radius:6px;
+  border-radius:0;
+  border-top:1px solid rgba(71,85,105,.45);
+  isolation:isolate;
 }
 
 .history-panel table{
@@ -1877,10 +1887,15 @@ body.graph-mode{
 .history-table-wrap thead th{
   position:sticky;
   top:0;
-  z-index:8;
+  z-index:9;
   background:#1e293b;
-  box-shadow:0 2px 0 rgba(15,23,42,.98), 0 4px 8px rgba(0,0,0,.35);
+  box-shadow:0 3px 0 #1e293b, 0 6px 12px rgba(0,0,0,.45);
   background-clip:padding-box;
+}
+
+.history-table-wrap thead{
+  position:relative;
+  z-index:2;
 }
 
 .summary-status-scanned{
