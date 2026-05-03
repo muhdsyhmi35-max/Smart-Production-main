@@ -2821,7 +2821,7 @@ function renderGraphCharts() {
     if (target <= 0) return 0;
     return Number(Math.max(0, Math.min(100, (produced / target) * 100)).toFixed(1));
   });
-  const oeeChart = buildSummaryLineChart(`OEE TREND (${periodLabel}: ${rangeLabel})`, oeeLabels, oeeValues, "#a855f7", "%", "%");
+  const oeeChart = buildSummaryLineChart(`EFFICIENCY TREND (${periodLabel}: ${rangeLabel})`, oeeLabels, oeeValues, "#a855f7", "%", "%");
   graphBody.innerHTML = `
     <div class="report-kpi-grid">
       <div class="report-kpi"><span>Total Produced</span><strong>${totalProduced}</strong><em>units</em></div>
