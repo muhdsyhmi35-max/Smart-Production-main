@@ -913,6 +913,21 @@ function updateOvertimeMenuLabel() {
   btn.innerHTML = `<span class="menu-icon">⏱</span><span>Overtime:${endText}</span>`;
 }
 
+function parseOvertimeEndTimeInput(raw) {
+  const t = String(raw || "").trim().toLowerCase();
+  if (!t || t === "0" || t === "off") return null;
+  const m = t.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return NaN;
+  const hh = parseInt(m[1], 10);
+  const mm = parseInt(m[2], 10);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return NaN;
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return NaN;
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hh, mm, 0, 0);
+  if (end.getTime() <= now.getTime()) return NaN;
+  return end.getTime();
+}
+
 function ensureOvertimeMenuItem() {
   const menu = document.getElementById("menuDropdown");
   if (!menu || document.getElementById("overtimeMenuItem")) return;
@@ -933,14 +948,18 @@ function ensureOvertimeMenuItem() {
 function toggleOvertimeFromMenu() {
   if (!isAdminRole()) return;
   toggleMenuDropdown(false);
-  const current = isOvertimeActive(new Date())
-    ? Math.max(1, Math.ceil((overtimeUntilMs - Date.now()) / 60000))
-    : 0;
-  const input = prompt("Overtime minutes from now (0 to disable):", String(current));
+  const now = new Date();
+  const current = isOvertimeActive(now)
+    ? new Date(overtimeUntilMs).toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit", hour12: false })
+    : "OFF";
+  const input = prompt("Set overtime end time (HH:MM, 24h). Type OFF to disable:", current);
   if (input == null) return;
-  const mins = parseInt(String(input).trim(), 10);
-  if (!Number.isFinite(mins) || mins < 0) return;
-  overtimeUntilMs = mins === 0 ? null : (Date.now() + (mins * 60000));
+  const next = parseOvertimeEndTimeInput(input);
+  if (Number.isNaN(next)) {
+    alert("Invalid time. Use HH:MM in 24-hour format and pick a future time.");
+    return;
+  }
+  overtimeUntilMs = next;
   updateOvertimeMenuLabel();
   applyShiftScheduleTick();
 }
