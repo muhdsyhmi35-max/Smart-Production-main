@@ -3131,16 +3131,32 @@ function looksLikeDurationToken(raw) {
 function pickBestDowntimeValue(row, primaryIdx, candidateIdxs, legacyLayout) {
   if (legacyLayout) return row[7] || "";
 
-  // In header-based layouts, trust the explicit downtime-event column first.
-  // This keeps dashboard values aligned with Google Sheet event values.
-  if (primaryIdx >= 0) {
-    const primaryRaw = row[primaryIdx];
-    return primaryRaw == null ? "" : primaryRaw;
-  }
+  // In some sheet layouts there are multiple "downtime" columns
+  // (event + cumulative). Prefer the smallest positive duration-like
+  // value because event downtime must not exceed cumulative totals.
+  const orderedIdxs = [];
+  if (primaryIdx >= 0) orderedIdxs.push(primaryIdx);
+  candidateIdxs.forEach(i => {
+    if (i < 0) return;
+    if (!orderedIdxs.includes(i)) orderedIdxs.push(i);
+  });
 
-  // If no explicit primary index exists, use first non-empty downtime-like candidate.
-  for (const i of candidateIdxs) {
-    if (i < 0) continue;
+  let bestRaw = "";
+  let bestSec = Number.POSITIVE_INFINITY;
+  for (const i of orderedIdxs) {
+    const raw = row[i];
+    if (raw == null || String(raw).trim() === "") continue;
+    if (!looksLikeDurationToken(raw)) continue;
+    const sec = parseMmSsToSeconds(String(raw));
+    if (sec > 0 && sec < bestSec) {
+      bestSec = sec;
+      bestRaw = raw;
+    }
+  }
+  if (bestRaw !== "") return bestRaw;
+
+  // If parsing can't determine duration tokens, still fallback to first non-empty.
+  for (const i of orderedIdxs) {
     const raw = row[i];
     if (raw == null || String(raw).trim() === "") continue;
     return raw;
@@ -3148,8 +3164,8 @@ function pickBestDowntimeValue(row, primaryIdx, candidateIdxs, legacyLayout) {
 
   // Last fallback only when headers are unusable.
   // Keep "smallest duration-looking token" behavior for legacy payloads.
-  let bestRaw = "";
-  let bestSec = Number.POSITIVE_INFINITY;
+  bestRaw = "";
+  bestSec = Number.POSITIVE_INFINITY;
   row.forEach(raw => {
     if (raw == null || String(raw).trim() === "") return;
     if (!looksLikeDurationToken(raw)) return;
