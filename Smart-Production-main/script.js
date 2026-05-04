@@ -618,8 +618,15 @@ function parseMmSsToSeconds(text) {
       // Convert by subtracting serial-zero anchor in UTC (captures historical timezone offset).
       const serialZeroUtcMs = Date.parse("1899-12-29T17:04:35.000Z");
       if (Number.isFinite(serialZeroUtcMs)) {
-        const sec = Math.round((dt.getTime() - serialZeroUtcMs) / 1000);
-        return Math.max(sec, 0);
+        const shiftedSec = Math.round((dt.getTime() - serialZeroUtcMs) / 1000);
+        if (shiftedSec <= 0) return 0;
+        // Some legacy payloads encode elapsed seconds as minute ticks from the anchor.
+        // Example: 1899-12-30T01:55:35Z => shifted 31860, real duration 531s (8:51).
+        if (shiftedSec % 60 === 0) {
+          const collapsed = Math.floor(shiftedSec / 60);
+          if (collapsed >= 0 && collapsed <= 12 * 3600) return collapsed;
+        }
+        return shiftedSec;
       }
     }
   }
