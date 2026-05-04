@@ -1243,11 +1243,19 @@ function submitOvertimeModal() {
 function ensureOvertimeMenuItem() {
   const menu = document.getElementById("menuDropdown");
   if (!menu) return;
+  const main = document.getElementById("mainPageMenuItem");
+  const graph = document.getElementById("graphMenuItem");
+  const daily = document.getElementById("dailySummaryMenuItem");
   const history = document.getElementById("historyMenuItem");
   const ramadan = document.getElementById("ramadanToggle");
-  if (ramadan && history && ramadan.previousElementSibling !== history) {
-    history.parentNode.insertBefore(ramadan, history.nextSibling);
+
+  if (main && graph && graph.previousElementSibling !== main) {
+    main.parentNode.insertBefore(graph, main.nextSibling);
   }
+  if (graph && daily && daily.previousElementSibling !== graph) {
+    graph.parentNode.insertBefore(daily, graph.nextSibling);
+  }
+
   let btn = document.getElementById("overtimeMenuItem");
   if (!btn) {
     btn = document.createElement("button");
@@ -1257,9 +1265,14 @@ function ensureOvertimeMenuItem() {
     btn.onclick = () => toggleOvertimeFromMenu();
     menu.appendChild(btn);
   }
-  const anchor = document.getElementById("ramadanToggle") || history;
-  if (anchor && anchor.parentNode && btn.previousElementSibling !== anchor) {
-    anchor.parentNode.insertBefore(btn, anchor.nextSibling);
+  if (daily && btn.previousElementSibling !== daily) {
+    daily.parentNode.insertBefore(btn, daily.nextSibling);
+  }
+  if (btn && ramadan && ramadan.previousElementSibling !== btn) {
+    btn.parentNode.insertBefore(ramadan, btn.nextSibling);
+  }
+  if (ramadan && history && history.previousElementSibling !== ramadan) {
+    ramadan.parentNode.insertBefore(history, ramadan.nextSibling);
   }
   updateOvertimeMenuLabel();
 }
