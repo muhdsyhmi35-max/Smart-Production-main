@@ -53,6 +53,8 @@ let graphRangeEndDate = null;
 let historyFilterDate = null;
 let summaryFilterDate = null;
 let lastScanTime = null;
+/** Wall-clock ms of last completed key scan; never shifted for breaks (used for downtime + countdown). */
+let lastScanWallMs = null;
 let startTime = null;
 let firstScanAtMs = null;
 let isDowntime = false;
@@ -68,7 +70,6 @@ let duplicateLock = false;
 let lastUpdateTime = 0;
 let lastTableData = "";
 let efficiencyPercent = 0;
-let breakPauseStartMs = null;
 const DEBUG_DOWNTIME = false;
 let firebaseDb = null;
 let firebaseCommandRef = null;
@@ -833,31 +834,45 @@ async function checkAccess() {
 
 /* ===== RAMADAN + BREAK ===== */
 
+function getBreakWindowsForLocalDate(d) {
+  const day = d.getDay();
+  if (ramadanMode) {
+    return day === 5 ? SETTINGS.breakTime.ramadan.friday : SETTINGS.breakTime.ramadan.weekday;
+  }
+  return day === 5 ? SETTINGS.breakTime.normal.friday : SETTINGS.breakTime.normal.weekday;
+}
+
+/** Seconds of scheduled break in [startMs, endMs] (local calendar, matches isBreakTime minute windows). */
+function scheduledBreakOverlapSec(startMs, endMs) {
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return 0;
+  let totalMs = 0;
+  let cursor = startMs;
+  let guard = 0;
+  while (cursor < endMs && guard++ < 14) {
+    const dayStart = new Date(cursor);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayStartMs = dayStart.getTime();
+    const nextDayMs = dayStartMs + 86400000;
+    if (dayStartMs >= endMs) break;
+    const windows = getBreakWindowsForLocalDate(dayStart);
+    for (const w of windows) {
+      const segStart = dayStartMs + w.start * 60000;
+      const segEnd = dayStartMs + w.end * 60000;
+      const lo = Math.max(startMs, segStart);
+      const hi = Math.min(endMs, segEnd);
+      if (hi > lo) totalMs += hi - lo;
+    }
+    cursor = nextDayMs;
+  }
+  return Math.floor(totalMs / 1000);
+}
+
 function isBreakTime() {
   const now = new Date();
   const current = now.getHours() * 60 + now.getMinutes();
-  const day = now.getDay();
-
-  let breaks = [];
-
-  if (ramadanMode) {
-    if (day === 5) {
-      breaks = SETTINGS.breakTime.ramadan.friday;
-    } else {
-      breaks = SETTINGS.breakTime.ramadan.weekday;
-    }
-  } else if (day === 5) {
-    breaks = SETTINGS.breakTime.normal.friday;
-  } else {
-    breaks = SETTINGS.breakTime.normal.weekday;
+  for (const b of getBreakWindowsForLocalDate(now)) {
+    if (current >= b.start && current < b.end) return true;
   }
-
-  for (const b of breaks) {
-    if (current >= b.start && current < b.end) {
-      return true;
-    }
-  }
-
   return false;
 }
 
@@ -1082,7 +1097,10 @@ function restoreProductionTimerFromLiveState(status, countdown, expected, synced
   let elapsedInCycle = Math.max(cycleTimeSec - adjustedCountdown, 0);
 
   if (syncedLastScanAtMs) {
-    const elapsedSinceLastScanSec = Math.max(Math.floor((nowMs - Number(syncedLastScanAtMs)) / 1000), 0);
+    const lastMs = Number(syncedLastScanAtMs);
+    const wallSec = Math.max(Math.floor((nowMs - lastMs) / 1000), 0);
+    const breakSec = scheduledBreakOverlapSec(lastMs, nowMs);
+    const elapsedSinceLastScanSec = Math.max(0, wallSec - breakSec);
     adjustedCountdown = Math.max(cycleTimeSec - elapsedSinceLastScanSec, 0);
     elapsedInCycle = Math.max(cycleTimeSec - adjustedCountdown, 0);
   } else {
@@ -1106,6 +1124,7 @@ function restoreProductionTimerFromLiveState(status, countdown, expected, synced
 
   if (actualCount > 0) {
     lastScanTime = syncedLastScanAtMs ? new Date(Number(syncedLastScanAtMs)) : reconstructedBaseTime;
+    lastScanWallMs = syncedLastScanAtMs ? Number(syncedLastScanAtMs) : reconstructedBaseTime.getTime();
   }
 
   // Downtime is booked on each completed 4-scan (same as the scan table). Offline gap is
@@ -1223,7 +1242,9 @@ function applyLiveState(state) {
   document.getElementById("downtime").innerText = format(getBookedDowntimeSec());
   syncDowntimeAccumulatedHighlight();
   if (state.lastScanAtMs) {
-    lastScanTime = new Date(Number(state.lastScanAtMs));
+    const ls = Number(state.lastScanAtMs);
+    lastScanTime = new Date(ls);
+    lastScanWallMs = ls;
   }
   restoreProductionTimerFromLiveState(status, countdown, expected, state.firstScanAtMs, state.updatedAt, state.lastScanAtMs);
 
@@ -1348,36 +1369,16 @@ function startProduction(shouldSync = true) {
   }
 
   timer = setInterval(() => {
-    if (isBreakTime()) {
-      if (breakPauseStartMs == null) {
-        breakPauseStartMs = Date.now();
-      }
-      setStatus("BREAK TIME", "status-orange");
+    const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
+    const nowMs = Date.now();
+    const baseMs = lastScanWallMs != null ? lastScanWallMs : (startTime ? startTime.getTime() : null);
+    if (baseMs == null) {
       updateDisplay();
       return;
     }
-
-    if (breakPauseStartMs != null) {
-      // Consume this break marker once to avoid any accidental double add.
-      const breakStartMs = breakPauseStartMs;
-      breakPauseStartMs = null;
-      const breakPausedMs = Math.max(Date.now() - breakStartMs, 0);
-      if (lastScanTime) {
-        lastScanTime = new Date(lastScanTime.getTime() + breakPausedMs);
-      } else if (startTime) {
-        startTime = new Date(startTime.getTime() + breakPausedMs);
-      }
-    }
-
-    const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
-
-    // 🔥 USE REAL TIME (FIXED)
-    const now = new Date();
-
-    // use startTime if no scan yet
-    const baseTime = lastScanTime || startTime;
-
-    const diff = Math.floor((now - baseTime) / 1000);
+    const wallSec = Math.floor((nowMs - baseMs) / 1000);
+    const breakSec = scheduledBreakOverlapSec(baseMs, nowMs);
+    const diff = Math.max(0, wallSec - breakSec);
     countdownValue = Math.max(cycleTimeSec - diff, 0);
 
     if (countdownValue === 0) {
@@ -1402,7 +1403,6 @@ function stopProduction(shouldSync = true) {
 
   clearInterval(timer);
   timer = null;
-  breakPauseStartMs = null;
   setStatus("PAUSED", "status-orange");
   updateDisplay();
   updateLiveStateOnly();
@@ -1424,10 +1424,10 @@ function resetProduction(shouldSync = true) {
   actualCount = 0;
   downtimeSeconds = 0;
   lastScanTime = null;
+  lastScanWallMs = null;
   startTime = null;
   firstScanAtMs = null;
   efficiencyPercent = 0;
-  breakPauseStartMs = null;
   pendingChassis = "";
   pendingModel = "";
   pendingEngine = "";
@@ -1548,10 +1548,15 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
     const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
     let downtimeEvent = "";
 
-    if (lastScanTime) {
-      const diffSec = Math.floor((now - lastScanTime) / 1000);
-      if (diffSec > cycleTimeSec) {
-        const actualDowntime = diffSec - cycleTimeSec;
+    if (lastScanWallMs != null) {
+      const t0 = lastScanWallMs;
+      const t1 = now.getTime();
+      const wallSec = Math.floor((t1 - t0) / 1000);
+      const breakSec = scheduledBreakOverlapSec(t0, t1);
+      const idleSecExBreak = Math.max(0, wallSec - breakSec);
+      // Still treat as a "late" row only when idle (ex break) exceeds one cycle; value stored is full idle, not idle minus cycle.
+      if (idleSecExBreak > cycleTimeSec) {
+        const actualDowntime = idleSecExBreak;
 
         // Count downtime only before target (or when plan is open-ended 0).
         if (plan === 0 || (actualCount + 1) <= plan) {
@@ -1570,6 +1575,7 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
     }
 
     lastScanTime = now;
+    lastScanWallMs = now.getTime();
     if (!firstScanAtMs) {
       firstScanAtMs = now.getTime();
     }
@@ -3019,7 +3025,7 @@ function updateLiveStateOnly() {
     delay: delay,
     efficiency: efficiency,
     firstScanAtMs: firstScanAtMs,
-    lastScanAtMs: lastScanTime ? lastScanTime.getTime() : null
+    lastScanAtMs: lastScanWallMs != null ? lastScanWallMs : null
   });
 }
 
