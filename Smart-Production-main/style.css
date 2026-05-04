@@ -561,10 +561,35 @@ body.role-operator .menu-btn{
 .status-orange{color:var(--orange);}
 .status-purple{color:#a855f7;}
 
-/* Ramadhan menu: hidden until factory icon is double-clicked */
-.menu-item.menu-ramadan-hidden{
-  display:none !important;
+/* Ramadhan menu: collapses smoothly; double-click factory icon toggles .menu-ramadan-hidden */
+#ramadanToggle{
+  max-height:120px;
+  opacity:1;
+  transform:translateY(0);
+  overflow:hidden;
+  transition:
+    max-height 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.28s ease,
+    padding 0.28s ease,
+    margin 0.28s ease,
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.2s ease;
+  will-change:max-height, opacity, transform;
 }
+
+#ramadanToggle.menu-ramadan-hidden{
+  max-height:0;
+  min-height:0;
+  opacity:0;
+  transform:translateY(-8px);
+  padding-top:0;
+  padding-bottom:0;
+  margin-top:0;
+  margin-bottom:0;
+  border-color:transparent;
+  pointer-events:none;
+}
+
 
 /* RUNNING GLOW */
 .pulse{
