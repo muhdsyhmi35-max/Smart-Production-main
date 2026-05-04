@@ -50,6 +50,8 @@ let graphFilterDate = null;
 let graphPeriod = "week";
 let graphRangeStartDate = null;
 let graphRangeEndDate = null;
+/** When true (set only by "Today" on Production Report), production/downtime/efficiency trend charts use clock hours. */
+let graphTodayHourlyTrends = false;
 let historyFilterDate = null;
 let summaryFilterDate = null;
 let lastScanTime = null;
@@ -431,6 +433,7 @@ function commitGraphRangeFromPickerInputs() {
   graphRangeStartDate = keys[0];
   graphRangeEndDate = keys[keys.length - 1];
   graphFilterDate = graphRangeStartDate;
+  graphTodayHourlyTrends = false;
   syncGraphRangePickerUi();
   renderGraphCharts();
 }
@@ -444,11 +447,13 @@ function onGraphRangeTodayClick() {
   graphRangeStartDate = today;
   graphRangeEndDate = today;
   graphFilterDate = today;
+  graphTodayHourlyTrends = true;
   syncGraphRangePickerUi();
   renderGraphCharts();
 }
 
 function onGraphPeriodChange(period) {
+  graphTodayHourlyTrends = false;
   graphPeriod = (period === "week" || period === "month") ? period : "week";
   // Anchor on the latest selected day to avoid landing on empty early dates
   // when toggling Day/Week/Month back-to-back.
@@ -2410,10 +2415,192 @@ function computeDayTargetsForReport(dayKeys, dailyActualMap, fallbackDayPlan) {
   return dayTarget;
 }
 
+/** Plan vs actual by clock hour (only when graphTodayHourlyTrends + single day). */
+function buildPlanVsActualHourlyChart(oneDayIso, period, rangeLabel) {
+  const rows = document.querySelectorAll("#scanTable tr");
+  const outputByHour = {};
+  const downtimeByHour = {};
+  rows.forEach(row => {
+    const cells = row.querySelectorAll("td");
+    if (!cells.length) return;
+    const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
+    if (rowDay !== oneDayIso) return;
+    const hour = parseHourFromTimeText(cells[2]?.innerText || "");
+    if (hour == null) return;
+    outputByHour[hour] = (outputByHour[hour] || 0) + 1;
+    const statusText = (cells[8]?.innerText || "").trim().toUpperCase();
+    if (statusText === "DOWN TIME") {
+      const ds = parseMmSsToSeconds(cells[9]?.innerText || "");
+      if (ds > 0) downtimeByHour[hour] = (downtimeByHour[hour] || 0) + ds;
+    }
+  });
+  const hourKeys = Array.from(new Set([
+    ...Object.keys(outputByHour),
+    ...Object.keys(downtimeByHour)
+  ].map(v => parseInt(v, 10)).filter(Number.isFinite))).sort((a, b) => a - b);
+  const periodLabel = "Today (hourly)";
+
+  let fallbackDayPlan = parseInt(document.getElementById("plan").innerText.trim(), 10);
+  if (!Number.isFinite(fallbackDayPlan) || fallbackDayPlan <= 0) {
+    fallbackDayPlan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+  }
+  const totalActual = Object.keys(outputByHour).reduce((s, hk) => s + (outputByHour[hk] || 0), 0);
+  const dayTargetMap = computeDayTargetsForReport([oneDayIso], { [oneDayIso]: totalActual }, fallbackDayPlan);
+  const totalPlan = dayTargetMap[oneDayIso] || 0;
+  const WORKING_HOURS_PLAN = 8;
+  const hourlyPlan = totalPlan > 0 ? totalPlan / WORKING_HOURS_PLAN : 0;
+  const actualSeries = hourKeys.map(h => outputByHour[h] || 0);
+  const targetSeries = hourKeys.map(() => hourlyPlan);
+  const diff = totalActual - totalPlan;
+  const diffNote = totalPlan > 0
+    ? (diff === 0 ? "On target" : diff > 0 ? `Ahead by ${diff}` : `Behind by ${Math.abs(diff)}`)
+    : "";
+
+  if (!hourKeys.length && totalPlan <= 0 && totalActual <= 0) {
+    return `
+      <div class="summary-graph-card-title">Plan vs Actual</div>
+      <div class="summary-graph-empty">No daily plan or actual output yet</div>`;
+  }
+  if (!hourKeys.length) {
+    return `
+      <div class="trend-header">
+        <div class="trend-title-wrap trend-title-wrap-compact">
+          <div class="trend-title trend-title-small">PRODUCTION TREND</div>
+          <div class="trend-subtitle">${periodLabel}: ${rangeLabel}</div>
+        </div>
+      </div>
+      <div class="summary-graph-empty">No scans for this day</div>`;
+  }
+
+  const width = 500;
+  const height = 170;
+  const leftPad = 36;
+  const rightPad = 12;
+  const topPad = 14;
+  const bottomPad = 28;
+  const chartW = width - leftPad - rightPad;
+  const chartH = height - topPad - bottomPad;
+  const seriesMax = Math.max(0, ...actualSeries, ...targetSeries, hourlyPlan || 0);
+  let yTickStep;
+  let maxVal;
+  if (seriesMax <= 0) {
+    yTickStep = 5;
+    maxVal = 10;
+  } else if (seriesMax <= 5) {
+    yTickStep = 1;
+    maxVal = Math.max(5, Math.ceil(seriesMax));
+  } else if (seriesMax <= 12) {
+    yTickStep = 2;
+    maxVal = Math.ceil(seriesMax / yTickStep) * yTickStep;
+  } else if (seriesMax <= 60) {
+    yTickStep = 10;
+    maxVal = Math.ceil(seriesMax / yTickStep) * yTickStep;
+  } else if (seriesMax <= 150) {
+    yTickStep = 20;
+    maxVal = Math.ceil(seriesMax / yTickStep) * yTickStep;
+  } else {
+    yTickStep = 50;
+    maxVal = Math.ceil(seriesMax / yTickStep) * yTickStep;
+  }
+  const xStep = hourKeys.length <= 1 ? chartW : (chartW / (hourKeys.length - 1));
+  const yBase = topPad + chartH;
+  const toY = (v) => yBase - ((v / maxVal) * chartH);
+  const formatNum = (n) => Number(n || 0).toLocaleString();
+
+  const actualPoints = hourKeys.map((_, i) => ({
+    x: leftPad + (xStep * i),
+    y: toY(actualSeries[i] || 0),
+    value: actualSeries[i] || 0
+  }));
+  const targetPoints = hourKeys.map((_, i) => ({
+    x: leftPad + (xStep * i),
+    y: toY(targetSeries[i] || 0),
+    value: targetSeries[i] || 0
+  }));
+  const actualPath = actualPoints.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+  const targetBarW = Math.max(Math.min((xStep || 12) * 0.34, 16), 6);
+  const targetBarOffsetX = Math.min((xStep || 0) * 0.18, 9);
+  const targetBars = targetPoints.map((p, i) => {
+    const barH = Math.max(yBase - p.y, targetSeries[i] > 0 ? 2 : 0);
+    const x = p.x - (targetBarW / 2) + targetBarOffsetX;
+    const y = yBase - barH;
+    const hTxt = `${String(hourKeys[i]).padStart(2, "0")}:00`;
+    const vTxt = formatNum(targetSeries[i] || 0);
+    return `<rect class="summary-bar" style="animation-delay:${i * 35}ms" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${targetBarW.toFixed(2)}" height="${barH.toFixed(2)}" rx="2" fill="#3b82f6" opacity=".92"><title>Target / hr\n${hTxt}: ${vTxt}</title></rect>`;
+  }).join("");
+  const areaPath = actualPoints.length
+    ? `${actualPath} L ${actualPoints[actualPoints.length - 1].x.toFixed(2)} ${yBase.toFixed(2)} L ${actualPoints[0].x.toFixed(2)} ${yBase.toFixed(2)} Z`
+    : "";
+  const yTickValues = [];
+  for (let v = 0; v <= maxVal + 1e-9; v += yTickStep) {
+    yTickValues.push(Math.round(v * 100) / 100);
+  }
+  const gridLines = yTickValues.map(v => {
+    const ratio = 1 - (v / maxVal);
+    const y = topPad + (chartH * ratio);
+    return `
+      <line x1="${leftPad}" y1="${y.toFixed(2)}" x2="${(width - rightPad).toFixed(2)}" y2="${y.toFixed(2)}" stroke="rgba(30,64,175,.2)" stroke-width="1"></line>
+      <text x="${(leftPad - 8).toFixed(2)}" y="${(y + 4).toFixed(2)}" text-anchor="end" fill="#94a3b8" font-size="10">${formatNum(v)}</text>
+    `;
+  }).join("");
+  const axisStroke = "rgba(148,163,184,.72)";
+  const axisLines = `
+    <line x1="${leftPad}" y1="${topPad.toFixed(2)}" x2="${leftPad}" y2="${yBase.toFixed(2)}" stroke="${axisStroke}" stroke-width="2" stroke-linecap="round"></line>
+    <line x1="${leftPad}" y1="${yBase.toFixed(2)}" x2="${(width - rightPad).toFixed(2)}" y2="${yBase.toFixed(2)}" stroke="${axisStroke}" stroke-width="2" stroke-linecap="round"></line>
+  `;
+  const labelStride = hourKeys.length > 24 ? 3 : hourKeys.length > 16 ? 2 : 1;
+  const xLabels = hourKeys.map((h, i) => {
+    if (i % labelStride !== 0 && i !== hourKeys.length - 1) return "";
+    const label = `${String(h).padStart(2, "0")}:00`;
+    const x = leftPad + (xStep * i);
+    return `<text x="${x.toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>`;
+  }).join("");
+  const actualDots = actualPoints.map((p, i) => {
+    const hTxt = `${String(hourKeys[i]).padStart(2, "0")}:00`;
+    const vTxt = formatNum(p.value);
+    return `<circle class="trend-dot" style="animation-delay:${i * 45}ms" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="4.2" fill="#4ade80"><title>Actual\n${hTxt}: ${vTxt}</title></circle>`;
+  }).join("");
+
+  return `
+      <div class="trend-header">
+        <div class="trend-title-wrap trend-title-wrap-compact">
+          <div class="trend-title trend-title-small">PRODUCTION TREND</div>
+          <div class="trend-subtitle">${periodLabel}: ${rangeLabel}</div>
+        </div>
+        <div class="trend-legend-stack">
+          <div class="trend-legend">
+            <span class="trend-legend-item"><i class="trend-swatch trend-swatch-actual"></i>Actual</span>
+            <span class="trend-legend-item"><i class="trend-swatch trend-swatch-target"></i>Target / hr (plan ÷ 8)</span>
+          </div>
+          ${diffNote ? `<div class="plan-actual-diff">${diffNote}</div>` : ""}
+        </div>
+      </div>
+      <div class="trend-units">Units</div>
+      <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg summary-chart-plan-actual" role="img" aria-label="Production trend by hour">
+        <defs>
+          <linearGradient id="actualTrendFillHourly" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stop-color="rgba(74,222,128,.35)"></stop>
+            <stop offset="100%" stop-color="rgba(74,222,128,0)"></stop>
+          </linearGradient>
+        </defs>
+        ${gridLines}
+        ${axisLines}
+        ${areaPath ? `<path d="${areaPath}" fill="url(#actualTrendFillHourly)"></path>` : ""}
+        ${targetBars}
+        <path class="trend-line trend-line-actual" d="${actualPath}" fill="none" stroke="#4ade80" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"></path>
+        ${actualDots}
+        ${xLabels}
+      </svg>
+  `;
+}
+
 function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphPeriod) {
   const range = getActiveGraphRange();
   const rangeLabel = formatIsoRangeAsDdMmYy(range.start, range.end);
   const dayKeys = getDayKeysBetween(range.start, range.end);
+  if (dayKeys.length === 1 && graphTodayHourlyTrends) {
+    return buildPlanVsActualHourlyChart(dayKeys[0], period, rangeLabel);
+  }
   const daySet = new Set(dayKeys);
   const periodLabel = period === "month" ? "Month" : "Week";
 
@@ -2509,11 +2696,11 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
   const areaPath = actualPoints.length
     ? `${actualPath} L ${actualPoints[actualPoints.length - 1].x.toFixed(2)} ${yBase.toFixed(2)} L ${actualPoints[0].x.toFixed(2)} ${yBase.toFixed(2)} Z`
     : "";
-  const yTickValues = [];
+  const yTickValuesDay = [];
   for (let v = 0; v <= maxVal + 1e-9; v += yTickStep) {
-    yTickValues.push(Math.round(v * 100) / 100);
+    yTickValuesDay.push(Math.round(v * 100) / 100);
   }
-  const gridLines = yTickValues.map(v => {
+  const gridLines = yTickValuesDay.map(v => {
     const ratio = 1 - (v / maxVal);
     const y = topPad + (chartH * ratio);
     return `
@@ -2594,7 +2781,7 @@ function collectHourlyGraphData(dayKey = getActiveGraphDayKey(), period = graphP
   const outputByBucket = {};
   const downtimeByBucket = {};
 
-  if (periodKeys.length === 1) {
+  if (periodKeys.length === 1 && graphTodayHourlyTrends) {
     const oneDay = periodKeys[0];
     rows.forEach(row => {
       const cells = row.querySelectorAll("td");
@@ -2660,9 +2847,12 @@ function renderGraphCharts() {
   const activeDay = getActiveGraphDayKey();
   const range = getActiveGraphRange();
   const rangeLabel = formatIsoRangeAsDdMmYy(range.start, range.end);
-  const { labels, downtimeMins } = collectHourlyGraphData(activeDay, graphPeriod);
-  const periodLabel = graphPeriod === "month" ? "Month" : "Week";
   const periodKeys = getDayKeysBetween(range.start, range.end);
+  const periodLabel =
+    graphTodayHourlyTrends && periodKeys.length === 1
+      ? "Today (hourly)"
+      : (graphPeriod === "month" ? "Month" : "Week");
+  const { labels, downtimeMins, outputVals: hourlyOutputVals } = collectHourlyGraphData(activeDay, graphPeriod);
   const keySet = new Set(periodKeys);
   const rows = document.querySelectorAll("#scanTable tr");
   const dayProduced = {};
@@ -2720,17 +2910,30 @@ function renderGraphCharts() {
   /** Total scans in each clock-hour across the whole date range (not an average — avoids fractional “units”). */
   const prodHourValues = activeHours.map(h => hourlyProduced[h] || 0);
   const prodHourChart = buildSummaryBarChart(`PRODUCTION BY HOUR (${periodLabel}: ${rangeLabel})`, prodHourLabels, prodHourValues, "#3b82f6", "", "Units (total)");
-  const oeeLabels = periodKeys.map(k => {
-    const d = new Date(`${k}T00:00:00`);
-    return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
-  });
-  const oeeValues = periodKeys.map(k => {
-    const target = dayTarget[k] || 0;
-    const produced = dayProduced[k] || 0;
-    if (target <= 0) return 0;
-    return Number(Math.max(0, Math.min(100, (produced / target) * 100)).toFixed(1));
-  });
-  const oeeChart = buildSummaryLineChart(`EFFICIENCY TREND (${periodLabel}: ${rangeLabel})`, oeeLabels, oeeValues, "#a855f7", "%", "%");
+  const WORKING_HOURS_PLAN = 8;
+  let oeeChart;
+  if (graphTodayHourlyTrends && periodKeys.length === 1 && hourlyOutputVals && hourlyOutputVals.length) {
+    const oneD = periodKeys[0];
+    const dayT = dayTarget[oneD] || 0;
+    const hourlyPlan = dayT > 0 ? dayT / WORKING_HOURS_PLAN : 0;
+    const oeeValues = hourlyOutputVals.map(a => {
+      if (hourlyPlan <= 0) return 0;
+      return Number(Math.max(0, Math.min(100, (a / hourlyPlan) * 100)).toFixed(1));
+    });
+    oeeChart = buildSummaryLineChart(`EFFICIENCY TREND (${periodLabel}: ${rangeLabel})`, labels, oeeValues, "#a855f7", "%", "%");
+  } else {
+    const oeeLabels = periodKeys.map(k => {
+      const d = new Date(`${k}T00:00:00`);
+      return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    });
+    const oeeValues = periodKeys.map(k => {
+      const target = dayTarget[k] || 0;
+      const produced = dayProduced[k] || 0;
+      if (target <= 0) return 0;
+      return Number(Math.max(0, Math.min(100, (produced / target) * 100)).toFixed(1));
+    });
+    oeeChart = buildSummaryLineChart(`EFFICIENCY TREND (${periodLabel}: ${rangeLabel})`, oeeLabels, oeeValues, "#a855f7", "%", "%");
+  }
   graphBody.innerHTML = `
     <div class="report-kpi-grid">
       <div class="report-kpi"><span>Total Produced</span><strong>${totalProduced}</strong><em>units</em></div>
@@ -2768,6 +2971,7 @@ function showGraphPage() {
     document.body.appendChild(graphPage);
   }
 
+  graphTodayHourlyTrends = false;
   graphPage.innerHTML = `
     <div class="summary-head">Production Report</div>
     <div class="graph-filter-row">
