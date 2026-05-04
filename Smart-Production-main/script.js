@@ -1116,7 +1116,6 @@ function closeShiftScheduleModal() {
 }
 
 function openShiftScheduleFromMenu() {
-  if (!isAdminRole()) return;
   toggleMenuDropdown(false);
   openShiftScheduleModal();
 }
@@ -1149,9 +1148,8 @@ function bindClockShiftShortcut() {
   const clockEl = document.getElementById("clock");
   if (!clockEl || clockEl.dataset.shiftShortcutBound === "1") return;
   clockEl.dataset.shiftShortcutBound = "1";
-  clockEl.title = "Double-click (Admin) to edit shift";
+  clockEl.title = "Double-click to edit shift";
   clockEl.addEventListener("dblclick", () => {
-    if (!isAdminRole()) return;
     openShiftScheduleModal();
   });
 }
