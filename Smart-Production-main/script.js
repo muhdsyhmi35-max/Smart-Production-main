@@ -1174,22 +1174,24 @@ function submitOvertimeModal() {
 
 function ensureOvertimeMenuItem() {
   const menu = document.getElementById("menuDropdown");
-  if (!menu || document.getElementById("overtimeMenuItem")) return;
-  const shift = document.getElementById("shiftScheduleMenuItem");
+  if (!menu) return;
+  const history = document.getElementById("historyMenuItem");
   const ramadan = document.getElementById("ramadanToggle");
-  if (ramadan && shift && ramadan.previousElementSibling !== shift) {
-    ramadan.parentNode.insertBefore(ramadan, shift.nextSibling);
+  if (ramadan && history && ramadan.previousElementSibling !== history) {
+    history.parentNode.insertBefore(ramadan, history.nextSibling);
   }
-  const anchor = document.getElementById("ramadanToggle");
-  const btn = document.createElement("button");
-  btn.className = "menu-item";
-  btn.id = "overtimeMenuItem";
-  btn.type = "button";
-  btn.onclick = () => toggleOvertimeFromMenu();
-  if (anchor && anchor.parentNode) {
-    anchor.parentNode.insertBefore(btn, anchor.nextSibling);
-  } else {
+  let btn = document.getElementById("overtimeMenuItem");
+  if (!btn) {
+    btn = document.createElement("button");
+    btn.className = "menu-item";
+    btn.id = "overtimeMenuItem";
+    btn.type = "button";
+    btn.onclick = () => toggleOvertimeFromMenu();
     menu.appendChild(btn);
+  }
+  const anchor = document.getElementById("ramadanToggle") || history;
+  if (anchor && anchor.parentNode && btn.previousElementSibling !== anchor) {
+    anchor.parentNode.insertBefore(btn, anchor.nextSibling);
   }
   updateOvertimeMenuLabel();
 }
