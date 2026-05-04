@@ -4006,6 +4006,7 @@ window.onload = async function() {
 
     document.getElementById("cycleTarget").readOnly = true;
     document.getElementById("dailyPlanTarget").readOnly = true;
+    document.getElementById("lotInput").readOnly = true;
 
     // Dashboard cards/status: Firebase realtime listener source of truth
     // (attached in initFirebaseSync). Avoid duplicate polling reads.

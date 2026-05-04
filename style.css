@@ -707,6 +707,17 @@ th{
   max-width:76px;
 }
 
+body.monitor-mode .controls input#lotInput{
+  appearance:textfield;
+  -moz-appearance:textfield;
+}
+
+body.monitor-mode .controls input#lotInput::-webkit-outer-spin-button,
+body.monitor-mode .controls input#lotInput::-webkit-inner-spin-button{
+  -webkit-appearance:none;
+  margin:0;
+}
+
 .controls button{
   display:inline-flex;
   align-items:center;
