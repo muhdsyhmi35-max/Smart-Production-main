@@ -705,20 +705,12 @@ function syncDowntimeAccumulatedHighlight() {
 }
 
 function refreshDowntimeCardFromTable() {
-  // Monitor: for \"today\" (rolling) use Firebase downtime so it matches main PC instantly
-  // when the sheet table lags; for a past day, sum from the table only.
-  if (isMonitor && downtimeFilterDate === null && Number.isFinite(monitorDowntimeOverrideSec) && monitorDowntimeOverrideSec >= 0) {
-    downtimeSeconds = monitorDowntimeOverrideSec;
-    document.getElementById("downtime").innerText = format(monitorDowntimeOverrideSec);
-    renderDowntimeDebugPanel();
-    syncDowntimeAccumulatedHighlight();
-    return;
-  }
-
   const table = document.getElementById("scanTable");
   const total = table && table.rows.length > 0
     ? sumBookedDowntimeFromScanTable()
-    : 0;
+    : (Number.isFinite(monitorDowntimeOverrideSec) && monitorDowntimeOverrideSec >= 0
+      ? monitorDowntimeOverrideSec
+      : 0);
   downtimeSeconds = total;
   document.getElementById("downtime").innerText = format(total);
   renderDowntimeDebugPanel();
@@ -1296,11 +1288,8 @@ function applyLiveState(state) {
   }
   startLiveCountdownTicker(countdown, status, state.updatedAt);
   syncDowntimeSecondsFromTable();
-  if (isMonitor && Number.isFinite(monitorDowntimeOverrideSec) && monitorDowntimeOverrideSec >= 0) {
-    document.getElementById("downtime").innerText = format(monitorDowntimeOverrideSec);
-  } else {
-    document.getElementById("downtime").innerText = format(getBookedDowntimeSec());
-  }
+  // Keep card aligned to rendered table values when rows are present.
+  refreshDowntimeCardFromTable();
   syncDowntimeAccumulatedHighlight();
   if (state.lastScanAtMs) {
     lastScanTime = new Date(Number(state.lastScanAtMs));
