@@ -3272,6 +3272,25 @@ function pickBestDowntimeValue(row, primaryIdx, candidateIdxs, legacyLayout) {
       bestRaw = raw;
     }
   }
+  const pickSmallestFromRow = () => {
+    let rowBestRaw = "";
+    let rowBestSec = Number.POSITIVE_INFINITY;
+    row.forEach(raw => {
+      if (raw == null || String(raw).trim() === "") return;
+      if (!looksLikeDurationToken(raw)) return;
+      const sec = parseMmSsToSeconds(String(raw));
+      if (sec > 0 && sec < rowBestSec) {
+        rowBestSec = sec;
+        rowBestRaw = raw;
+      }
+    });
+    return { rowBestRaw, rowBestSec };
+  };
+
+  // If a smaller valid token exists elsewhere in the row, prefer it.
+  // This covers sheet layouts where event downtime header is unusual.
+  const { rowBestRaw, rowBestSec } = pickSmallestFromRow();
+  if (rowBestRaw !== "" && rowBestSec < bestSec) return rowBestRaw;
   if (bestRaw !== "") return bestRaw;
 
   // If parsing can't determine duration tokens, still fallback to first non-empty.
@@ -3281,6 +3300,8 @@ function pickBestDowntimeValue(row, primaryIdx, candidateIdxs, legacyLayout) {
     return raw;
   }
 
+  // Last fallback when downtime headers are unusable.
+  if (rowBestRaw !== "") return rowBestRaw;
   return "";
 }
 
