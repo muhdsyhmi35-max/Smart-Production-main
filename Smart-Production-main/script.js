@@ -3250,18 +3250,32 @@ function looksLikeDurationToken(raw) {
 function pickBestDowntimeValue(row, primaryIdx, candidateIdxs, legacyLayout) {
   if (legacyLayout) return row[7] || "";
 
-  // In header-based layouts, trust the explicit downtime-event column first.
-  // This keeps monitor values exactly aligned with Google Sheet and prevents
-  // accidental picks from time/date columns when payload shape changes.
-  if (primaryIdx >= 0) {
-    const primaryRaw = row[primaryIdx];
-    return primaryRaw == null ? "" : primaryRaw;
-  }
+  // In some sheet layouts there are multiple "downtime" columns
+  // (event + cumulative). Prefer the smallest positive duration-like
+  // value because event downtime must not exceed cumulative totals.
+  const orderedIdxs = [];
+  if (primaryIdx >= 0) orderedIdxs.push(primaryIdx);
+  candidateIdxs.forEach(i => {
+    if (i < 0) return;
+    if (!orderedIdxs.includes(i)) orderedIdxs.push(i);
+  });
 
-  // If there is no explicit primary index, use the first non-empty downtime-like
-  // candidate column (already filtered to avoid total/accumulator headers).
-  for (const i of candidateIdxs) {
-    if (i < 0) continue;
+  let bestRaw = "";
+  let bestSec = Number.POSITIVE_INFINITY;
+  for (const i of orderedIdxs) {
+    const raw = row[i];
+    if (raw == null || String(raw).trim() === "") continue;
+    if (!looksLikeDurationToken(raw)) continue;
+    const sec = parseMmSsToSeconds(String(raw));
+    if (sec > 0 && sec < bestSec) {
+      bestSec = sec;
+      bestRaw = raw;
+    }
+  }
+  if (bestRaw !== "") return bestRaw;
+
+  // If parsing can't determine duration tokens, still fallback to first non-empty.
+  for (const i of orderedIdxs) {
     const raw = row[i];
     if (raw == null || String(raw).trim() === "") continue;
     return raw;
