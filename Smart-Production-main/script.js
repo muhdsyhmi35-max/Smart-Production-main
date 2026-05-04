@@ -929,6 +929,90 @@ function parseOvertimeEndTimeInput(raw) {
   return end.getTime();
 }
 
+function ensureOvertimeModal() {
+  if (document.getElementById("overtimeOverlay")) return;
+  const overlay = document.createElement("div");
+  overlay.id = "overtimeOverlay";
+  overlay.className = "admin-login-overlay";
+  overlay.setAttribute("aria-hidden", "true");
+  overlay.onclick = function(event) {
+    if (event.target === overlay) closeOvertimeModal();
+  };
+  overlay.innerHTML = `
+    <div class="admin-login-dialog" role="dialog" aria-modal="true" aria-labelledby="overtimeTitle" onclick="event.stopPropagation()">
+      <h2 id="overtimeTitle" class="admin-login-title">Set Overtime End Time</h2>
+      <p id="overtimeError" class="admin-login-error" hidden></p>
+      <form class="admin-login-form" onsubmit="event.preventDefault(); submitOvertimeModal();">
+        <label class="admin-login-label">
+          <span>End time (24-hour)</span>
+          <input type="time" id="overtimeEndTimeInput" step="60" />
+        </label>
+        <div class="admin-login-actions">
+          <button type="submit" class="admin-login-submit">Save</button>
+          <button type="button" class="admin-login-cancel" onclick="disableOvertimeFromModal()">Disable</button>
+          <button type="button" class="admin-login-cancel" onclick="closeOvertimeModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function openOvertimeModal() {
+  ensureOvertimeModal();
+  const overlay = document.getElementById("overtimeOverlay");
+  const input = document.getElementById("overtimeEndTimeInput");
+  const err = document.getElementById("overtimeError");
+  if (!overlay || !input) return;
+  if (err) {
+    err.hidden = true;
+    err.textContent = "";
+  }
+  if (isOvertimeActive(new Date())) {
+    input.value = new Date(overtimeUntilMs).toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit", hour12: false });
+  } else {
+    input.value = "";
+  }
+  overlay.classList.add("open");
+  overlay.setAttribute("aria-hidden", "false");
+  requestAnimationFrame(() => input.focus());
+}
+
+function closeOvertimeModal() {
+  const overlay = document.getElementById("overtimeOverlay");
+  if (!overlay) return;
+  overlay.classList.remove("open");
+  overlay.setAttribute("aria-hidden", "true");
+}
+
+function showOvertimeError(message) {
+  const err = document.getElementById("overtimeError");
+  if (!err) return;
+  err.textContent = message;
+  err.hidden = false;
+}
+
+function disableOvertimeFromModal() {
+  overtimeUntilMs = null;
+  updateOvertimeMenuLabel();
+  closeOvertimeModal();
+  applyShiftScheduleTick();
+}
+
+function submitOvertimeModal() {
+  const input = document.getElementById("overtimeEndTimeInput");
+  if (!input) return;
+  const next = parseOvertimeEndTimeInput(input.value || "");
+  if (Number.isNaN(next)) {
+    showOvertimeError("Please select a future time.");
+    return;
+  }
+  overtimeUntilMs = next;
+  updateOvertimeMenuLabel();
+  closeOvertimeModal();
+  applyShiftScheduleTick();
+}
+
 function ensureOvertimeMenuItem() {
   const menu = document.getElementById("menuDropdown");
   if (!menu || document.getElementById("overtimeMenuItem")) return;
@@ -949,20 +1033,7 @@ function ensureOvertimeMenuItem() {
 function toggleOvertimeFromMenu() {
   if (!isAdminRole()) return;
   toggleMenuDropdown(false);
-  const now = new Date();
-  const current = isOvertimeActive(now)
-    ? new Date(overtimeUntilMs).toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit", hour12: false })
-    : "OFF";
-  const input = prompt("Set overtime end time (HH:MM, 24h). Type OFF to disable:", current);
-  if (input == null) return;
-  const next = parseOvertimeEndTimeInput(input);
-  if (Number.isNaN(next)) {
-    alert("Invalid time. Use HH:MM in 24-hour format and pick a future time.");
-    return;
-  }
-  overtimeUntilMs = next;
-  updateOvertimeMenuLabel();
-  applyShiftScheduleTick();
+  openOvertimeModal();
 }
 
 /* ================= STRICT GLOBAL LOCK ================= */
@@ -3645,6 +3716,7 @@ window.onload = async function() {
 
   applyAppRoleUi();
   ensureOvertimeMenuItem();
+  ensureOvertimeModal();
   updateOvertimeMenuLabel();
 
   syncDowntimeDayPickerUi();
