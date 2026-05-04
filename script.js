@@ -614,13 +614,14 @@ function parseMmSsToSeconds(text) {
   // Extract hh:mm:ss directly from the string to avoid timezone shifts.
   const sheetDateLike = t.includes("1899") || t.includes("1900");
   if (sheetDateLike) {
-    const timeMatch = t.match(/T(\d{2}):(\d{2}):(\d{2})/);
-    if (timeMatch) {
-      const m = parseInt(timeMatch[2], 10);
-      const s = parseInt(timeMatch[3], 10);
-      if ([m, s].every(Number.isFinite)) {
-        // Treat Sheet 1899/1900 artifacts as duration MM:SS (ignore hour timezone offsets).
-        return Math.max((m * 60) + s, 0);
+    const dt = new Date(t);
+    if (Number.isFinite(dt.getTime())) {
+      // Excel/Sheets duration serials around 1899/1900 can be emitted as UTC timestamps.
+      // Convert by subtracting serial-zero anchor in UTC (captures historical timezone offset).
+      const serialZeroUtcMs = Date.parse("1899-12-29T17:04:35.000Z");
+      if (Number.isFinite(serialZeroUtcMs)) {
+        const sec = Math.round((dt.getTime() - serialZeroUtcMs) / 1000);
+        return Math.max(sec, 0);
       }
     }
   }
