@@ -1554,9 +1554,9 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
       const wallSec = Math.floor((t1 - t0) / 1000);
       const breakSec = scheduledBreakOverlapSec(t0, t1);
       const idleSecExBreak = Math.max(0, wallSec - breakSec);
-      // Still treat as a "late" row only when idle (ex break) exceeds one cycle; value stored is full idle, not idle minus cycle.
+      // Match Excel logic: booked downtime is only the amount beyond one cycle.
       if (idleSecExBreak > cycleTimeSec) {
-        const actualDowntime = idleSecExBreak;
+        const actualDowntime = idleSecExBreak - cycleTimeSec;
 
         // Count downtime only before target (or when plan is open-ended 0).
         if (plan === 0 || (actualCount + 1) <= plan) {
