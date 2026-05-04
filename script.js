@@ -92,6 +92,7 @@ let shiftScheduleInterval = null;
 let overtimeUntilMs = null;
 let activeShiftDayKey = null;
 let wipCarryMarkedDayKey = null;
+let wipShortfallMarkedDayKey = null;
 const syncClientId = localStorage.getItem("SYNC_CLIENT_ID") || ("SYNC-" + Math.random().toString(36).slice(2));
 localStorage.setItem("SYNC_CLIENT_ID", syncClientId);
 
@@ -865,11 +866,65 @@ function addWipCarryRow(dateObj = new Date()) {
   );
 }
 
+function hasTodayProductionEvidence(dayKey) {
+  if (actualCount > 0) return true;
+  const table = document.getElementById("scanTable");
+  if (!table || !table.rows || table.rows.length === 0) return false;
+  return Array.from(table.rows).some(tr => {
+    const rowDay = tr.dataset.scanDate || parseDisplayDateToIsoKey(tr.cells[1]?.innerText);
+    if (rowDay !== dayKey) return false;
+    const status = String(tr.cells[8]?.innerText || "").trim();
+    return status && status !== "WIP_CARRY";
+  });
+}
+
+function addWipShortfallRow(dateObj = new Date()) {
+  const dayKey = toIsoDateLocal(dateObj);
+  if (wipShortfallMarkedDayKey === dayKey) return;
+  if (!hasTodayProductionEvidence(dayKey)) return;
+
+  const plan = parseInt(document.getElementById("dailyPlanTarget")?.value, 10) || 0;
+  const remaining = Math.max(plan - actualCount, 0);
+  if (remaining <= 0) return;
+
+  const table = document.getElementById("scanTable");
+  if (!table) return;
+  const lot = document.getElementById("lotInput")?.value || "-";
+  const row = table.insertRow(0);
+  row.insertCell(0).innerText = "";
+  row.insertCell(1).innerText = dateObj.toLocaleDateString();
+  row.insertCell(2).innerText = dateObj.toLocaleTimeString();
+  row.insertCell(3).innerText = lot;
+  row.insertCell(4).innerText = "TARGET";
+  row.insertCell(5).innerText = "UNFINISHED UNIT";
+  row.insertCell(6).innerText = "-";
+  row.insertCell(7).innerText = `SHORTFALL ${remaining}`;
+  const statusCell = row.insertCell(8);
+  statusCell.innerText = "WIP_CARRY";
+  statusCell.className = "status-orange";
+  row.insertCell(9).innerText = "";
+  row.dataset.scanDate = dayKey;
+  row.dataset.scanPlan = String(plan);
+  renumberScanTable();
+  wipShortfallMarkedDayKey = dayKey;
+
+  sendToSheet(
+    "UNFINISHED UNIT",
+    "TARGET",
+    "-",
+    `SHORTFALL ${remaining}`,
+    lot,
+    "WIP_CARRY",
+    ""
+  );
+}
+
 function resetDailyCountersForNewShiftDay(dayKey) {
   if (!dayKey) return;
   if (activeShiftDayKey === dayKey) return;
   activeShiftDayKey = dayKey;
   wipCarryMarkedDayKey = null;
+  wipShortfallMarkedDayKey = null;
   actualCount = 0;
   downtimeSeconds = 0;
   firstScanAtMs = null;
@@ -891,10 +946,12 @@ function applyShiftScheduleTick() {
   if (!canRun) {
     if (timer) {
       addWipCarryRow(now);
+      addWipShortfallRow(now);
       stopProduction(false);
     } else if (hasPendingIncompleteUnit()) {
       addWipCarryRow(now);
     }
+    addWipShortfallRow(now);
     setOffShiftStatus();
     updateDisplay();
     updateLiveStateOnly();
