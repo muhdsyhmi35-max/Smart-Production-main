@@ -1145,6 +1145,17 @@ function submitShiftScheduleModal() {
   applyShiftScheduleTick();
 }
 
+function bindClockShiftShortcut() {
+  const clockEl = document.getElementById("clock");
+  if (!clockEl || clockEl.dataset.shiftShortcutBound === "1") return;
+  clockEl.dataset.shiftShortcutBound = "1";
+  clockEl.title = "Double-click (Admin) to edit shift";
+  clockEl.addEventListener("dblclick", () => {
+    if (!isAdminRole()) return;
+    openShiftScheduleModal();
+  });
+}
+
 function ensureOvertimeModal() {
   if (document.getElementById("overtimeOverlay")) return;
   const overlay = document.createElement("div");
@@ -3939,9 +3950,8 @@ window.onload = async function() {
 
   applyAppRoleUi();
   loadShiftScheduleFromStorage();
-  ensureShiftMenuItem();
   ensureShiftScheduleModal();
-  updateShiftMenuLabel();
+  bindClockShiftShortcut();
   ensureOvertimeMenuItem();
   ensureOvertimeModal();
   updateOvertimeMenuLabel();
