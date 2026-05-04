@@ -3191,6 +3191,48 @@ function pickBestDowntimeValue(row, primaryIdx, candidateIdxs, legacyLayout) {
   return "";
 }
 
+function isSheetDateLikeDowntimeToken(raw) {
+  const t = String(raw || "").trim();
+  return t.includes("1899") || t.includes("1900");
+}
+
+function buildDerivedDowntimeByRowKey(scanRows, idxStatusByHeader, idxStatus, idxKey, legacyLayout) {
+  const byKey = new Map();
+  if (!Array.isArray(scanRows) || scanRows.length === 0) return byKey;
+
+  const rowsAsc = [...scanRows].sort((a, b) => {
+    const ta = a && a[0] ? new Date(a[0]).getTime() : 0;
+    const tb = b && b[0] ? new Date(b[0]).getTime() : 0;
+    return ta - tb;
+  });
+
+  const cycleSec = (parseFloat(document.getElementById("cycleTarget")?.value) || SETTINGS.defaultCycle || 16) * 60;
+  let prevTs = null;
+
+  rowsAsc.forEach(row => {
+    const ts = row && row[0] ? new Date(row[0]).getTime() : NaN;
+    if (!Number.isFinite(ts)) return;
+
+    const statusText = legacyLayout ? (row[6] || "") : idxStatus >= 0 ? (row[idxStatus] || "") : "";
+    const keyText = legacyLayout ? (row[5] || "") : idxKey >= 0 ? (row[idxKey] || "") : "";
+    const rowKey = `${String(row[0] || "")}|${String(keyText || "")}`;
+
+    let derived = "";
+    if (statusText === "DOWN TIME" && Number.isFinite(prevTs)) {
+      const wallSec = Math.floor((ts - prevTs) / 1000);
+      const breakSec = scheduledBreakOverlapSec(prevTs, ts);
+      const idleSecExBreak = Math.max(0, wallSec - breakSec);
+      const actualDowntime = idleSecExBreak > cycleSec ? (idleSecExBreak - cycleSec) : 0;
+      if (actualDowntime > 0) derived = format(actualDowntime);
+    }
+
+    byKey.set(rowKey, derived);
+    prevTs = ts;
+  });
+
+  return byKey;
+}
+
 // Ambil data untuk MONITOR PC
 function loadLiveData() {
   fetch(API_URL, { cache: "no-store" })
@@ -3230,6 +3272,7 @@ function loadLiveData() {
       const idxDowntime = resolveDowntimeEventColumnIndex(scanHeader);
       const downtimeCandidateIdxs = resolveDowntimeCandidateIndices(scanHeader);
       const legacyLayout = idxStatusByHeader < 0 && idxStatus < 0;
+      const derivedDowntimeByRowKey = buildDerivedDowntimeByRowKey(scanRows, idxStatusByHeader, idxStatus, idxKey, legacyLayout);
       const table = document.getElementById("scanTable");
 
       // Convert to string for comparison
@@ -3293,7 +3336,13 @@ function loadLiveData() {
 
           if (statusText === "DOWN TIME") {
             const rawDowntime = pickBestDowntimeValue(row, idxDowntime, downtimeCandidateIdxs, legacyLayout);
-            const cleaned = cleanDowntime(rawDowntime);
+            let cleaned = cleanDowntime(rawDowntime);
+            if (isSheetDateLikeDowntimeToken(rawDowntime)) {
+              const keyText = legacyLayout ? (row[5] || "") : idxKey >= 0 ? (row[idxKey] || "") : "";
+              const rowKey = `${String(row[0] || "")}|${String(keyText || "")}`;
+              const derived = derivedDowntimeByRowKey.get(rowKey) || "";
+              if (derived) cleaned = derived;
+            }
             downtimeCell.innerText = cleaned;
             downtimeCell.className = "status-red";
           } else {
