@@ -34,6 +34,11 @@ const SETTINGS = {
   productionTrend: {
     implicitDailyPlanOnInactiveWeekdays: false,
     zeroTargetOnInactiveWeekends: true
+  },
+  shiftSchedule: {
+    startMinute: (8 * 60),      // 08:00
+    endMinute: (17 * 60) + 30,  // 17:30
+    enableAutoWindow: true
   }
 };
 
@@ -89,6 +94,10 @@ let monitorFirebaseNetConnected = false;
 let monitorLiveStateReceived = false;
 let monitorLiveStateError = null;
 let initialLiveStateLoaded = false;
+let shiftScheduleInterval = null;
+let overtimeUntilMs = null;
+let activeShiftDayKey = null;
+let wipCarryMarkedDayKey = null;
 const firebaseSessionStartedAt = Date.now();
 const LOCAL_LIVE_STATE_KEY = "TF2_LIVE_STATE_SNAPSHOT";
 const syncClientId = localStorage.getItem("SYNC_CLIENT_ID") || ("SYNC-" + Math.random().toString(36).slice(2));
@@ -790,6 +799,153 @@ function updateDateTime() {
     now.toLocaleTimeString("en-MY");
 }
 
+function getLocalMinuteOfDay(d = new Date()) {
+  return (d.getHours() * 60) + d.getMinutes();
+}
+
+function isWithinShiftWindow(d = new Date()) {
+  if (!SETTINGS.shiftSchedule.enableAutoWindow) return true;
+  const minute = getLocalMinuteOfDay(d);
+  return minute >= SETTINGS.shiftSchedule.startMinute && minute < SETTINGS.shiftSchedule.endMinute;
+}
+
+function isOvertimeActive(d = new Date()) {
+  return Number.isFinite(overtimeUntilMs) && d.getTime() < overtimeUntilMs;
+}
+
+function canRunProductionNow(d = new Date()) {
+  return isWithinShiftWindow(d) || isOvertimeActive(d);
+}
+
+function hasPendingIncompleteUnit() {
+  return !!(pendingChassis || pendingModel || pendingEngine || pendingKey);
+}
+
+function setOffShiftStatus() {
+  const text = isOvertimeActive(new Date()) ? "OVERTIME" : "OFF SHIFT";
+  const cls = isOvertimeActive(new Date()) ? "status-orange" : "status-blue";
+  setStatus(text, cls);
+}
+
+function addWipCarryRow(dateObj = new Date()) {
+  if (!hasPendingIncompleteUnit()) return;
+  const dayKey = toIsoDateLocal(dateObj);
+  if (wipCarryMarkedDayKey === dayKey) return;
+
+  const table = document.getElementById("scanTable");
+  if (!table) return;
+
+  const lot = document.getElementById("lotInput")?.value || "-";
+  const row = table.insertRow(0);
+  row.insertCell(0).innerText = "";
+  row.insertCell(1).innerText = dateObj.toLocaleDateString();
+  row.insertCell(2).innerText = dateObj.toLocaleTimeString();
+  row.insertCell(3).innerText = lot;
+  row.insertCell(4).innerText = pendingModel || "-";
+  row.insertCell(5).innerText = pendingChassis || "-";
+  row.insertCell(6).innerText = pendingEngine || "-";
+  row.insertCell(7).innerText = pendingKey || "-";
+  const statusCell = row.insertCell(8);
+  statusCell.innerText = "WIP_CARRY";
+  statusCell.className = "status-orange";
+  row.insertCell(9).innerText = "";
+  row.dataset.scanDate = toIsoDateLocal(dateObj);
+  row.dataset.scanPlan = String(parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0);
+  renumberScanTable();
+  wipCarryMarkedDayKey = dayKey;
+
+  sendToSheet(
+    pendingChassis || "-",
+    pendingModel || "-",
+    pendingEngine || "-",
+    pendingKey || "-",
+    lot,
+    "WIP_CARRY",
+    ""
+  );
+}
+
+function resetDailyCountersForNewShiftDay(dayKey) {
+  if (!dayKey) return;
+  if (activeShiftDayKey === dayKey) return;
+  activeShiftDayKey = dayKey;
+  wipCarryMarkedDayKey = null;
+  actualCount = 0;
+  downtimeSeconds = 0;
+  firstScanAtMs = null;
+  countdownValue = (parseFloat(document.getElementById("cycleTarget").value) || SETTINGS.defaultCycle) * 60;
+}
+
+function applyShiftScheduleTick() {
+  if (isMonitor || !SETTINGS.shiftSchedule.enableAutoWindow) return;
+  const now = new Date();
+  const inWindow = isWithinShiftWindow(now);
+  const overtime = isOvertimeActive(now);
+  const canRun = inWindow || overtime;
+  const dayKey = toIsoDateLocal(now);
+
+  if (inWindow) {
+    resetDailyCountersForNewShiftDay(dayKey);
+  }
+
+  if (!canRun) {
+    if (timer) {
+      addWipCarryRow(now);
+      stopProduction(false);
+    } else if (hasPendingIncompleteUnit()) {
+      addWipCarryRow(now);
+    }
+    setOffShiftStatus();
+    updateDisplay();
+    updateLiveStateOnly();
+    return;
+  }
+
+  if (!timer && document.getElementById("status")?.innerText?.trim() !== "PAUSED") {
+    startProduction(false);
+  }
+}
+
+function updateOvertimeMenuLabel() {
+  const btn = document.getElementById("overtimeMenuItem");
+  if (!btn) return;
+  const active = isOvertimeActive(new Date());
+  const endText = active ? ` until ${new Date(overtimeUntilMs).toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" })}` : " OFF";
+  btn.innerHTML = `<span class="menu-icon">⏱</span><span>Overtime:${endText}</span>`;
+}
+
+function ensureOvertimeMenuItem() {
+  const menu = document.getElementById("menuDropdown");
+  if (!menu || document.getElementById("overtimeMenuItem")) return;
+  const ramadan = document.getElementById("ramadanToggle");
+  const btn = document.createElement("button");
+  btn.className = "menu-item";
+  btn.id = "overtimeMenuItem";
+  btn.type = "button";
+  btn.onclick = () => toggleOvertimeFromMenu();
+  if (ramadan && ramadan.parentNode) {
+    ramadan.parentNode.insertBefore(btn, ramadan.nextSibling);
+  } else {
+    menu.appendChild(btn);
+  }
+  updateOvertimeMenuLabel();
+}
+
+function toggleOvertimeFromMenu() {
+  if (!isAdminRole()) return;
+  toggleMenuDropdown(false);
+  const current = isOvertimeActive(new Date())
+    ? Math.max(1, Math.ceil((overtimeUntilMs - Date.now()) / 60000))
+    : 0;
+  const input = prompt("Overtime minutes from now (0 to disable):", String(current));
+  if (input == null) return;
+  const mins = parseInt(String(input).trim(), 10);
+  if (!Number.isFinite(mins) || mins < 0) return;
+  overtimeUntilMs = mins === 0 ? null : (Date.now() + (mins * 60000));
+  updateOvertimeMenuLabel();
+  applyShiftScheduleTick();
+}
+
 /* ================= STRICT GLOBAL LOCK ================= */
 
 async function checkAccess() {
@@ -1415,6 +1571,10 @@ function applyRemoteCommand(action) {
 function startProduction(shouldSync = true) {
   if (isMonitor) return;
   if (timer) return;
+  if (!canRunProductionNow(new Date()) && !isAdminRole()) {
+    setOffShiftStatus();
+    return;
+  }
 
   hasLocalSession = true;
 
@@ -1623,6 +1783,11 @@ document.getElementById("engineInput").addEventListener("keydown", function(e) {
 
 document.getElementById("keyInput").addEventListener("keydown", function(e) {
   if (e.key === "Enter" && this.value.trim() !== "") {
+    if (!canRunProductionNow(new Date()) && !isAdminRole()) {
+      setOffShiftStatus();
+      this.value = "";
+      return;
+    }
     if (pendingChassis === "" || pendingModel === "" || pendingEngine === "") return;
 
     const key = this.value.trim();
@@ -3386,6 +3551,7 @@ function loadLiveData() {
 
           if (statusText === "SCANNED") statusCell.className = "status-green";
           if (statusText === "DOWN TIME") statusCell.className = "status-red";
+          if (statusText === "WIP_CARRY") statusCell.className = "status-orange";
 
           const downtimeCell = newRow.insertCell(9);
 
@@ -3394,6 +3560,9 @@ function loadLiveData() {
             const cleaned = cleanDowntime(rawDowntime);
             downtimeCell.innerText = cleaned;
             downtimeCell.className = "status-red";
+          } else if (statusText === "WIP_CARRY") {
+            downtimeCell.innerText = "";
+            downtimeCell.className = "status-orange";
           } else {
             downtimeCell.innerText = "";
           }
@@ -3456,6 +3625,8 @@ window.onload = async function() {
   if (!allowed) return;
 
   applyAppRoleUi();
+  ensureOvertimeMenuItem();
+  updateOvertimeMenuLabel();
 
   syncDowntimeDayPickerUi();
 
@@ -3526,6 +3697,9 @@ window.onload = async function() {
       if (!initialLiveStateLoaded && !hasLocalSession) return;
       updateLiveStateOnly();
     }, 2000);
+    applyShiftScheduleTick();
+    if (shiftScheduleInterval) clearInterval(shiftScheduleInterval);
+    shiftScheduleInterval = setInterval(applyShiftScheduleTick, 30000);
   }
   updateViewToggleMenuItem();
 };
