@@ -97,6 +97,7 @@ localStorage.setItem("SYNC_CLIENT_ID", syncClientId);
 
 const APP_ROLE_STORAGE_KEY = "TF2_DASHBOARD_ROLE";
 const APP_ADMIN_SESSION_KEY = "TF2_ADMIN_SESSION_OK";
+const SHIFT_SCHEDULE_STORAGE_KEY = "TF2_SHIFT_SCHEDULE";
 
 /** Change these credentials for your deployment (client-side only; not secret from devtools). */
 const ADMIN_LOGIN = {
@@ -928,6 +929,164 @@ function parseOvertimeEndTimeInput(raw) {
   return end.getTime();
 }
 
+function minuteToTimeString(minute) {
+  const hh = Math.floor(minute / 60) % 24;
+  const mm = minute % 60;
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
+
+function parseTimeToMinute(raw) {
+  const m = String(raw || "").trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return NaN;
+  const hh = parseInt(m[1], 10);
+  const mm = parseInt(m[2], 10);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return NaN;
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return NaN;
+  return (hh * 60) + mm;
+}
+
+function loadShiftScheduleFromStorage() {
+  try {
+    const raw = localStorage.getItem(SHIFT_SCHEDULE_STORAGE_KEY);
+    if (!raw) return;
+    const cfg = JSON.parse(raw);
+    const start = parseInt(cfg.startMinute, 10);
+    const end = parseInt(cfg.endMinute, 10);
+    if (Number.isFinite(start) && start >= 0 && start < 1440) SETTINGS.shiftSchedule.startMinute = start;
+    if (Number.isFinite(end) && end > 0 && end <= 1440) SETTINGS.shiftSchedule.endMinute = end;
+    if (typeof cfg.enableAutoWindow === "boolean") SETTINGS.shiftSchedule.enableAutoWindow = cfg.enableAutoWindow;
+  } catch (_) {}
+}
+
+function saveShiftScheduleToStorage() {
+  try {
+    localStorage.setItem(SHIFT_SCHEDULE_STORAGE_KEY, JSON.stringify({
+      startMinute: SETTINGS.shiftSchedule.startMinute,
+      endMinute: SETTINGS.shiftSchedule.endMinute,
+      enableAutoWindow: SETTINGS.shiftSchedule.enableAutoWindow
+    }));
+  } catch (_) {}
+}
+
+function updateShiftMenuLabel() {
+  const btn = document.getElementById("shiftScheduleMenuItem");
+  if (!btn) return;
+  const on = SETTINGS.shiftSchedule.enableAutoWindow;
+  const text = on
+    ? `${minuteToTimeString(SETTINGS.shiftSchedule.startMinute)}-${minuteToTimeString(SETTINGS.shiftSchedule.endMinute)}`
+    : "MANUAL";
+  btn.innerHTML = `<span class="menu-icon">🕘</span><span>Shift: ${text}</span>`;
+}
+
+function ensureShiftMenuItem() {
+  const menu = document.getElementById("menuDropdown");
+  if (!menu || document.getElementById("shiftScheduleMenuItem")) return;
+  const ramadan = document.getElementById("ramadanToggle");
+  const btn = document.createElement("button");
+  btn.className = "menu-item";
+  btn.id = "shiftScheduleMenuItem";
+  btn.type = "button";
+  btn.onclick = () => openShiftScheduleFromMenu();
+  if (ramadan && ramadan.parentNode) {
+    ramadan.parentNode.insertBefore(btn, ramadan.nextSibling);
+  } else {
+    menu.appendChild(btn);
+  }
+  updateShiftMenuLabel();
+}
+
+function ensureShiftScheduleModal() {
+  if (document.getElementById("shiftScheduleOverlay")) return;
+  const overlay = document.createElement("div");
+  overlay.id = "shiftScheduleOverlay";
+  overlay.className = "admin-login-overlay";
+  overlay.setAttribute("aria-hidden", "true");
+  overlay.onclick = function(event) {
+    if (event.target === overlay) closeShiftScheduleModal();
+  };
+  overlay.innerHTML = `
+    <div class="admin-login-dialog" role="dialog" aria-modal="true" aria-labelledby="shiftScheduleTitle" onclick="event.stopPropagation()">
+      <h2 id="shiftScheduleTitle" class="admin-login-title">Production Shift Settings</h2>
+      <p id="shiftScheduleError" class="admin-login-error" hidden></p>
+      <form class="admin-login-form" onsubmit="event.preventDefault(); submitShiftScheduleModal();">
+        <label class="admin-login-label">
+          <span>Start time</span>
+          <input type="time" id="shiftStartTimeInput" step="60" />
+        </label>
+        <label class="admin-login-label">
+          <span>End time</span>
+          <input type="time" id="shiftEndTimeInput" step="60" />
+        </label>
+        <label class="admin-login-label">
+          <span><input type="checkbox" id="shiftAutoWindowToggle" checked style="margin-right:8px;">Enable auto window</span>
+        </label>
+        <div class="admin-login-actions">
+          <button type="submit" class="admin-login-submit">Save</button>
+          <button type="button" class="admin-login-cancel" onclick="closeShiftScheduleModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function openShiftScheduleModal() {
+  ensureShiftScheduleModal();
+  const overlay = document.getElementById("shiftScheduleOverlay");
+  const start = document.getElementById("shiftStartTimeInput");
+  const end = document.getElementById("shiftEndTimeInput");
+  const toggle = document.getElementById("shiftAutoWindowToggle");
+  const err = document.getElementById("shiftScheduleError");
+  if (!overlay || !start || !end || !toggle) return;
+  if (err) {
+    err.hidden = true;
+    err.textContent = "";
+  }
+  start.value = minuteToTimeString(SETTINGS.shiftSchedule.startMinute);
+  end.value = minuteToTimeString(SETTINGS.shiftSchedule.endMinute);
+  toggle.checked = !!SETTINGS.shiftSchedule.enableAutoWindow;
+  overlay.classList.add("open");
+  overlay.setAttribute("aria-hidden", "false");
+  requestAnimationFrame(() => start.focus());
+}
+
+function closeShiftScheduleModal() {
+  const overlay = document.getElementById("shiftScheduleOverlay");
+  if (!overlay) return;
+  overlay.classList.remove("open");
+  overlay.setAttribute("aria-hidden", "true");
+}
+
+function openShiftScheduleFromMenu() {
+  if (!isAdminRole()) return;
+  toggleMenuDropdown(false);
+  openShiftScheduleModal();
+}
+
+function submitShiftScheduleModal() {
+  const startIn = document.getElementById("shiftStartTimeInput");
+  const endIn = document.getElementById("shiftEndTimeInput");
+  const toggle = document.getElementById("shiftAutoWindowToggle");
+  const err = document.getElementById("shiftScheduleError");
+  if (!startIn || !endIn || !toggle) return;
+  const start = parseTimeToMinute(startIn.value);
+  const end = parseTimeToMinute(endIn.value);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end) {
+    if (err) {
+      err.textContent = "Invalid shift time. End time must be after start time.";
+      err.hidden = false;
+    }
+    return;
+  }
+  SETTINGS.shiftSchedule.startMinute = start;
+  SETTINGS.shiftSchedule.endMinute = end;
+  SETTINGS.shiftSchedule.enableAutoWindow = !!toggle.checked;
+  saveShiftScheduleToStorage();
+  updateShiftMenuLabel();
+  closeShiftScheduleModal();
+  applyShiftScheduleTick();
+}
+
 function ensureOvertimeModal() {
   if (document.getElementById("overtimeOverlay")) return;
   const overlay = document.createElement("div");
@@ -1015,14 +1174,14 @@ function submitOvertimeModal() {
 function ensureOvertimeMenuItem() {
   const menu = document.getElementById("menuDropdown");
   if (!menu || document.getElementById("overtimeMenuItem")) return;
-  const ramadan = document.getElementById("ramadanToggle");
+  const anchor = document.getElementById("shiftScheduleMenuItem") || document.getElementById("ramadanToggle");
   const btn = document.createElement("button");
   btn.className = "menu-item";
   btn.id = "overtimeMenuItem";
   btn.type = "button";
   btn.onclick = () => toggleOvertimeFromMenu();
-  if (ramadan && ramadan.parentNode) {
-    ramadan.parentNode.insertBefore(btn, ramadan.nextSibling);
+  if (anchor && anchor.parentNode) {
+    anchor.parentNode.insertBefore(btn, anchor.nextSibling);
   } else {
     menu.appendChild(btn);
   }
@@ -3623,6 +3782,10 @@ window.onload = async function() {
   if (!allowed) return;
 
   applyAppRoleUi();
+  loadShiftScheduleFromStorage();
+  ensureShiftMenuItem();
+  ensureShiftScheduleModal();
+  updateShiftMenuLabel();
   ensureOvertimeMenuItem();
   ensureOvertimeModal();
   updateOvertimeMenuLabel();
