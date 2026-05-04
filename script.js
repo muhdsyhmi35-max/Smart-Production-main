@@ -981,14 +981,14 @@ function updateShiftMenuLabel() {
 function ensureShiftMenuItem() {
   const menu = document.getElementById("menuDropdown");
   if (!menu || document.getElementById("shiftScheduleMenuItem")) return;
-  const ramadan = document.getElementById("ramadanToggle");
+  const main = document.getElementById("mainPageMenuItem");
   const btn = document.createElement("button");
   btn.className = "menu-item";
   btn.id = "shiftScheduleMenuItem";
   btn.type = "button";
   btn.onclick = () => openShiftScheduleFromMenu();
-  if (ramadan && ramadan.parentNode) {
-    ramadan.parentNode.insertBefore(btn, ramadan.nextSibling);
+  if (main && main.parentNode) {
+    main.parentNode.insertBefore(btn, main.nextSibling);
   } else {
     menu.appendChild(btn);
   }
@@ -1174,7 +1174,12 @@ function submitOvertimeModal() {
 function ensureOvertimeMenuItem() {
   const menu = document.getElementById("menuDropdown");
   if (!menu || document.getElementById("overtimeMenuItem")) return;
-  const anchor = document.getElementById("shiftScheduleMenuItem") || document.getElementById("ramadanToggle");
+  const shift = document.getElementById("shiftScheduleMenuItem");
+  const ramadan = document.getElementById("ramadanToggle");
+  if (ramadan && shift && ramadan.previousElementSibling !== shift) {
+    ramadan.parentNode.insertBefore(ramadan, shift.nextSibling);
+  }
+  const anchor = document.getElementById("ramadanToggle");
   const btn = document.createElement("button");
   btn.className = "menu-item";
   btn.id = "overtimeMenuItem";
