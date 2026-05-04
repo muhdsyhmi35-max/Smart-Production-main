@@ -3131,29 +3131,25 @@ function looksLikeDurationToken(raw) {
 function pickBestDowntimeValue(row, primaryIdx, candidateIdxs, legacyLayout) {
   if (legacyLayout) return row[7] || "";
 
-  const seen = new Set();
-  const idxsToCheck = [];
-  if (primaryIdx >= 0) idxsToCheck.push(primaryIdx);
-  candidateIdxs.forEach(i => idxsToCheck.push(i));
+  // In header-based layouts, trust the explicit downtime-event column first.
+  // This keeps dashboard values aligned with Google Sheet event values.
+  if (primaryIdx >= 0) {
+    const primaryRaw = row[primaryIdx];
+    return primaryRaw == null ? "" : primaryRaw;
+  }
 
-  // If multiple downtime columns exist, pick smallest non-zero value
-  // to avoid selecting cumulative totals (e.g. 11:35 vs event 00:07).
+  // If no explicit primary index exists, use first non-empty downtime-like candidate.
+  for (const i of candidateIdxs) {
+    if (i < 0) continue;
+    const raw = row[i];
+    if (raw == null || String(raw).trim() === "") continue;
+    return raw;
+  }
+
+  // Last fallback only when headers are unusable.
+  // Keep "smallest duration-looking token" behavior for legacy payloads.
   let bestRaw = "";
   let bestSec = Number.POSITIVE_INFINITY;
-  idxsToCheck.forEach(i => {
-    if (i < 0 || seen.has(i)) return;
-    seen.add(i);
-    const raw = row[i];
-    if (raw == null || String(raw).trim() === "") return;
-    const sec = parseMmSsToSeconds(String(raw));
-    if (sec > 0 && sec < bestSec) {
-      bestSec = sec;
-      bestRaw = raw;
-    }
-  });
-  if (bestRaw !== "") return bestRaw;
-
-  // Fallback for shifted/no-header responses: infer per-row duration-looking cells.
   row.forEach(raw => {
     if (raw == null || String(raw).trim() === "") return;
     if (!looksLikeDurationToken(raw)) return;
@@ -3165,14 +3161,6 @@ function pickBestDowntimeValue(row, primaryIdx, candidateIdxs, legacyLayout) {
   });
   if (bestRaw !== "") return bestRaw;
 
-  // If only zero-like values exist (e.g. 00:00), still prefer explicit primary.
-  if (primaryIdx >= 0) {
-    const primaryRaw = row[primaryIdx];
-    if (primaryRaw != null && String(primaryRaw).trim() !== "") return primaryRaw;
-  }
-
-  // In header-based layout, do not fallback to fixed legacy index.
-  // That index can point to aggregated values in wider sheet responses.
   return "";
 }
 
