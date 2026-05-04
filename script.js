@@ -3124,6 +3124,8 @@ function looksLikeDurationToken(raw) {
   const t = String(raw || "").trim();
   if (!t) return false;
   if (/^\d{1,4}[:.]\d{1,2}([:.]\d{1,2})?$/.test(t)) return true;
+  // Google Sheets duration can arrive as day-fraction decimal (e.g. 0.00005787 for 5s).
+  if (/^\d+\.\d{3,}$/.test(t)) return true;
   if (/T\d{2}:\d{2}:\d{2}/.test(t) && (t.includes("1899") || t.includes("1900"))) return true;
   return false;
 }
