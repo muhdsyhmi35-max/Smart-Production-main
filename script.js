@@ -1153,6 +1153,20 @@ function bindClockShiftShortcut() {
   });
 }
 
+function bindRamadanRevealShortcut() {
+  const icon = document.querySelector(".menu-brand-icon");
+  const ramadan = document.getElementById("ramadanToggle");
+  if (!icon || !ramadan || icon.dataset.ramadanRevealBound === "1") return;
+  icon.dataset.ramadanRevealBound = "1";
+  icon.style.cursor = "pointer";
+  icon.title = "Double-click to show or hide Ramadhan";
+  icon.addEventListener("dblclick", ev => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    ramadan.classList.toggle("menu-ramadan-hidden");
+  });
+}
+
 function ensureOvertimeModal() {
   if (document.getElementById("overtimeOverlay")) return;
   const overlay = document.createElement("div");
@@ -3871,6 +3885,7 @@ window.onload = async function() {
   loadShiftScheduleFromStorage();
   ensureShiftScheduleModal();
   bindClockShiftShortcut();
+  bindRamadanRevealShortcut();
   ensureOvertimeMenuItem();
   ensureOvertimeModal();
   updateOvertimeMenuLabel();

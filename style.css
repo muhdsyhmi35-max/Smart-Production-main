@@ -561,6 +561,11 @@ body.role-operator .menu-btn{
 .status-orange{color:var(--orange);}
 .status-purple{color:#a855f7;}
 
+/* Ramadhan menu: hidden until factory icon is double-clicked */
+.menu-item.menu-ramadan-hidden{
+  display:none !important;
+}
+
 /* RUNNING GLOW */
 .pulse{
   animation:pulseGlow 1.5s infinite;
