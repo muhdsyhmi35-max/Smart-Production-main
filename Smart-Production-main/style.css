@@ -902,10 +902,6 @@ body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-mini-c
   font-size:clamp(52px, 6.5vh, var(--big-number-size));
 }
 
-body.monitor-layout-active .monitor-downtime-eff-stack > .card#downtimeCard .big-number{
-  font-size:clamp(40px, 5.2vh, 72px);
-}
-
 .dashboard{
   display:grid;
   grid-template-columns:repeat(4, minmax(0, 1fr));
