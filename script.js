@@ -1401,11 +1401,15 @@ function scheduledBreakOverlapSec(startMs, endMs) {
 }
 
 function computeWorkingTimeNetElapsedMin() {
-  if (sessionWorkingStartMs == null || !Number.isFinite(sessionWorkingStartMs)) return null;
+  const startCandidates = [sessionWorkingStartMs, firstScanAtMs]
+    .map(v => Number(v))
+    .filter(v => Number.isFinite(v) && v > 0);
+  if (!startCandidates.length) return null;
+  const baselineStartMs = Math.min(...startCandidates);
   const nowMs = Date.now();
-  if (nowMs <= sessionWorkingStartMs) return 0;
-  const grossSec = Math.floor((nowMs - sessionWorkingStartMs) / 1000);
-  const breakSec = scheduledBreakOverlapSec(sessionWorkingStartMs, nowMs);
+  if (nowMs <= baselineStartMs) return 0;
+  const grossSec = Math.floor((nowMs - baselineStartMs) / 1000);
+  const breakSec = scheduledBreakOverlapSec(baselineStartMs, nowMs);
   const netSec = Math.max(0, grossSec - breakSec);
   return netSec / 60;
 }
