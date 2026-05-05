@@ -861,7 +861,7 @@ body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-grid-d
 }
 body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-grid-line-status{
   grid-column:4;
-  grid-row:2 / span 2;
+  grid-row:2;
   min-height:0;
   min-width:0;
 }
@@ -876,6 +876,13 @@ body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-grid-a
 
 body.monitor-layout-active .monitor-line-status-card{
   justify-content:flex-start;
+}
+
+body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-grid-plan,
+body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-grid-balance,
+body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-grid-line-status{
+  align-self:start;
+  min-height:clamp(88px, 11vh, 138px);
 }
 
 body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-mini-card{
