@@ -793,6 +793,108 @@ body.monitor-mode .main-pc-actions{
   display:none !important;
 }
 
+.monitor-connection-dock{
+  display:none;
+}
+
+body.monitor-layout-active .monitor-connection-dock{
+  display:flex;
+  flex:1;
+  justify-content:flex-end;
+  align-items:center;
+  align-self:stretch;
+  min-width:0;
+  padding-left:clamp(8px, 1.2vw, 20px);
+}
+
+body.monitor-layout-active .bottom-row{
+  display:none !important;
+}
+
+body.monitor-layout-active .monitor-hidden-eff-card{
+  display:none !important;
+}
+
+.monitor-connection-dock-inner.monitor-status-wrap,
+body.monitor-layout-active .monitor-connection-dock .monitor-status-wrap{
+  flex-direction:row;
+  flex-wrap:wrap;
+  gap:clamp(10px, 1.8vw, 18px);
+  min-height:0;
+}
+
+body.monitor-layout-active .monitor-connection-dock .monitor-only-text{
+  font-size:clamp(17px, 2vh, 22px);
+}
+
+body.monitor-layout-active .monitor-connection-dock .monitor-connection-badge{
+  font-size:clamp(16px, 1.9vh, 20px);
+}
+
+body.monitor-layout-active .dashboard.monitor-dashboard-relayout{
+  grid-template-columns:repeat(4, minmax(0, 1fr));
+  grid-template-rows:auto auto auto;
+  align-items:stretch;
+}
+
+body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-top-1{grid-column:1;grid-row:1;}
+body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-top-2{grid-column:2;grid-row:1;}
+body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-top-3{grid-column:3;grid-row:1;}
+body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-top-4{grid-column:4;grid-row:1;}
+
+body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-grid-plan{
+  grid-column:1;
+  grid-row:2;
+}
+body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-grid-balance{
+  grid-column:2;
+  grid-row:2;
+}
+body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-grid-downtime-stack{
+  grid-column:3;
+  grid-row:2 / span 2;
+  display:flex;
+  flex-direction:column;
+  gap:var(--dashboard-stack-gap);
+  min-height:0;
+  min-width:0;
+}
+body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-grid-line-status{
+  grid-column:4;
+  grid-row:2 / span 2;
+  min-height:0;
+  min-width:0;
+}
+body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-grid-plan-wt{
+  grid-column:1;
+  grid-row:3;
+}
+body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-grid-actual-wt{
+  grid-column:2;
+  grid-row:3;
+}
+
+body.monitor-layout-active .monitor-line-status-card{
+  justify-content:flex-start;
+}
+
+body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-mini-card{
+  min-height:clamp(72px, 10vh, 120px);
+  padding-top:clamp(10px, 1.6vh, 16px);
+  padding-bottom:clamp(10px, 1.6vh, 16px);
+}
+body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-mini-card h3{
+  font-size:clamp(15px, 2vh, 20px);
+  margin-bottom:4px;
+}
+body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-mini-card .big-number{
+  font-size:clamp(26px, 3.6vh, 48px);
+}
+
+body.monitor-layout-active .monitor-downtime-eff-stack > .card#downtimeCard .big-number{
+  font-size:clamp(40px, 5.2vh, 72px);
+}
+
 .dashboard{
   display:grid;
   grid-template-columns:repeat(4, minmax(0, 1fr));
@@ -2020,6 +2122,12 @@ body.graph-mode{
   grid-template-columns:repeat(4, minmax(0, 1fr));
   column-gap:clamp(12px, 1.5vw, 22px);
   row-gap:clamp(12px, 1.5vw, 22px);
+}
+
+:fullscreen body.monitor-layout-active .dashboard.monitor-dashboard-relayout,
+:-webkit-full-screen body.monitor-layout-active .dashboard.monitor-dashboard-relayout{
+  grid-template-columns:repeat(4, minmax(0, 1fr));
+  grid-template-rows:auto auto auto;
 }
 
 :fullscreen .bottom-row,

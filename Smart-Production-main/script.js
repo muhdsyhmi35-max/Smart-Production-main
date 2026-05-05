@@ -95,6 +95,10 @@ let initialLiveStateLoaded = false;
 let shiftScheduleInterval = null;
 let overtimeUntilMs = null;
 let activeShiftDayKey = null;
+const WORKING_TIME_PLAN_STORAGE_KEY = "TF2_WORKING_TIME_PLAN_MIN";
+let sessionWorkingStartMs = null;
+let stoppedLineEfficiencyValid = false;
+let targetAchievedEfficiencySnapDone = false;
 const firebaseSessionStartedAt = Date.now();
 const LOCAL_LIVE_STATE_KEY = "TF2_LIVE_STATE_SNAPSHOT";
 const syncClientId = localStorage.getItem("SYNC_CLIENT_ID") || ("SYNC-" + Math.random().toString(36).slice(2));
@@ -264,6 +268,8 @@ const API_URL = "https://script.google.com/macros/s/AKfycbwwLUYjoT7GH0sfFCGZMJoe
 
 // Detect monitor mode (?monitor)
 const isMonitor = window.location.search.includes("monitor");
+const MONITOR_LAYOUT_DATASET_KEY = "monitorLayoutV1";
+const MONITOR_BASELINE_EFF_PCT = 98;
 const FIREBASE_COMMAND_PATH = "production/commands/latest";
 const FIREBASE_LIVE_STATE_PATH = "production/liveState";
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || {
@@ -321,6 +327,102 @@ function updateMonitorDataNotice() {
 
   bar.style.display = show ? "block" : "none";
   bar.textContent = msg;
+}
+
+/* ===== MONITOR TV LAYOUT (?monitor only) ===== */
+
+function formatMonitorWtMinutes(val) {
+  if (val == null || !Number.isFinite(val) || val < 0) return "—";
+  return val.toFixed(2);
+}
+
+function syncMonitorWorkingTimeCards(planWtMin, netWtMin) {
+  if (!isMonitor) return;
+  const pw = document.getElementById("monitorPlanWTMins");
+  const aw = document.getElementById("monitorActualWTMins");
+  if (pw) pw.textContent = formatMonitorWtMinutes(planWtMin);
+  if (aw) aw.textContent = formatMonitorWtMinutes(netWtMin);
+}
+
+function syncMonitorPlanEffBaseline() {
+  if (!isMonitor) return;
+  const pe = document.getElementById("monitorPlanEffPct");
+  if (!pe) return;
+  pe.textContent = MONITOR_BASELINE_EFF_PCT.toFixed(1) + "%";
+  applyEfficiencyColorClass(pe, MONITOR_BASELINE_EFF_PCT);
+}
+
+function applyMonitorDashboardLayout() {
+  if (!isMonitor || document.body.dataset.monitorLayout === MONITOR_LAYOUT_DATASET_KEY) return;
+  const dock = document.getElementById("monitorConnectionDock");
+  const dashboard = document.querySelector(".dashboard");
+  if (!dock || !dashboard) return;
+
+  const lineCard = document.querySelector("#status")?.closest(".card.wide");
+  const downtimeCard = document.getElementById("downtimeCard");
+  const efficiencyCard = document.querySelector("#efficiency")?.closest(".card");
+  const planCard = document.querySelector("#plan")?.closest(".card");
+  const balanceCard = document.querySelector("#balance")?.closest(".card");
+  if (!lineCard || !downtimeCard || !planCard || !balanceCard || !efficiencyCard) return;
+
+  document.body.dataset.monitorLayout = MONITOR_LAYOUT_DATASET_KEY;
+  document.body.classList.add("monitor-layout-active");
+  dashboard.classList.add("monitor-dashboard-relayout");
+
+  dock.innerHTML = `
+    <div class="monitor-status-wrap monitor-connection-dock-inner">
+      <div class="monitor-only-text">MONITOR ONLY</div>
+      <div id="monitorConnectionStatus" class="monitor-connection-badge">LIVE</div>
+    </div>
+  `;
+
+  ["countdown", "actual", "expected", "delay"].forEach((id, i) => {
+    const c = document.getElementById(id)?.closest(".card");
+    if (c) {
+      c.classList.add("monitor-grid-top");
+      c.classList.add("monitor-top-" + (i + 1));
+    }
+  });
+
+  const stack = document.createElement("div");
+  stack.className = "monitor-downtime-eff-stack monitor-grid-downtime-stack";
+  downtimeCard.parentNode.insertBefore(stack, downtimeCard);
+  stack.appendChild(downtimeCard);
+
+  const planEffCard = document.createElement("div");
+  planEffCard.className = "card monitor-mini-card";
+  planEffCard.innerHTML =
+    `<h3>PLAN EFF (%)</h3><div class="big-number status-blue" id="monitorPlanEffPct">${MONITOR_BASELINE_EFF_PCT.toFixed(1)}%</div>`;
+
+  const actualEffCard = document.createElement("div");
+  actualEffCard.className = "card monitor-mini-card";
+  actualEffCard.innerHTML =
+    '<h3>ACTUAL EFF (%)</h3><div class="big-number status-blue" id="monitorActualEffPct">—</div>';
+
+  stack.appendChild(planEffCard);
+  stack.appendChild(actualEffCard);
+
+  planCard.classList.add("monitor-grid-plan");
+  balanceCard.classList.add("monitor-grid-balance");
+
+  efficiencyCard.classList.add("monitor-hidden-eff-card");
+
+  lineCard.classList.remove("wide");
+  lineCard.classList.add("monitor-grid-line-status", "monitor-line-status-card");
+  dashboard.appendChild(lineCard);
+
+  const planWTCard = document.createElement("div");
+  planWTCard.className = "card monitor-mini-card monitor-grid-plan-wt";
+  planWTCard.innerHTML = '<h3>PLAN W/T (MINS)</h3><div class="big-number status-blue" id="monitorPlanWTMins">—</div>';
+
+  const actualWTCard = document.createElement("div");
+  actualWTCard.className = "card monitor-mini-card monitor-grid-actual-wt";
+  actualWTCard.innerHTML = '<h3>ACTUAL W/T (MINS)</h3><div class="big-number status-green" id="monitorActualWTMins">—</div>';
+
+  dashboard.appendChild(planWTCard);
+  dashboard.appendChild(actualWTCard);
+
+  syncMonitorPlanEffBaseline();
 }
 
 /* ===== FORMAT ===== */
@@ -844,6 +946,9 @@ function resetDailyCountersForNewShiftDay(dayKey) {
   downtimeSeconds = 0;
   firstScanAtMs = null;
   lastScanTime = null;
+  sessionWorkingStartMs = null;
+  stoppedLineEfficiencyValid = false;
+  targetAchievedEfficiencySnapDone = false;
   countdownValue = (parseFloat(document.getElementById("cycleTarget").value) || SETTINGS.defaultCycle) * 60;
 }
 
@@ -1317,6 +1422,16 @@ function getBreakOverlapMs(fromMs, toMs) {
   return total;
 }
 
+function computeWorkingTimeNetElapsedMin() {
+  if (sessionWorkingStartMs == null || !Number.isFinite(sessionWorkingStartMs)) return null;
+  const nowMs = Date.now();
+  const wallMs = nowMs - sessionWorkingStartMs;
+  if (wallMs <= 0) return 0;
+  const breakMs = getBreakOverlapMs(sessionWorkingStartMs, nowMs);
+  const netSec = Math.max(Math.floor((wallMs - breakMs) / 1000), 0);
+  return netSec / 60;
+}
+
 function calculateExpectedOutput() {
   if (isMonitor) return 0;
   if (!firstScanAtMs) {
@@ -1363,27 +1478,83 @@ function getTotalDowntimeSec() {
   return getBookedDowntimeSec();
 }
 
-function calculateAvailabilityPercent() {
-  let expected = calculateExpectedOutput();
-  const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
-  if (plan > 0) {
-    expected = Math.min(expected, plan);
+function loadWorkingTimePlanFromStorage() {
+  const el = document.getElementById("workingTimePlanMin");
+  if (!el) return;
+  try {
+    const v = localStorage.getItem(WORKING_TIME_PLAN_STORAGE_KEY);
+    if (v != null && v !== "") el.value = v;
+  } catch (_) {}
+}
+
+function saveWorkingTimePlanToStorage() {
+  const el = document.getElementById("workingTimePlanMin");
+  if (!el) return;
+  try {
+    localStorage.setItem(WORKING_TIME_PLAN_STORAGE_KEY, String(el.value || ""));
+  } catch (_) {}
+}
+
+function applyEfficiencyColorClass(el, pct) {
+  if (!Number.isFinite(pct)) {
+    el.className = "big-number status-blue";
+    return;
   }
-  if (expected <= 0) return 0;
-
-  return Math.floor((actualCount / expected) * 100);
+  if (pct < 90) el.className = "big-number status-red";
+  else if (pct < 100) el.className = "big-number status-orange";
+  else el.className = "big-number status-green";
 }
 
-function refreshEfficiencyPercent() {
-  efficiencyPercent = calculateAvailabilityPercent();
+function syncEfficiencyCardDom() {
+  const effEl = document.getElementById("efficiency");
+  if (!effEl) return;
+  if (isMonitor) {
+    syncMonitorPlanEffBaseline();
+    effEl.innerText = efficiencyPercent + "%";
+    applyEfficiencyColorClass(effEl, efficiencyPercent);
+    const monAct = document.getElementById("monitorActualEffPct");
+    if (monAct) {
+      monAct.innerText = efficiencyPercent + "%";
+      applyEfficiencyColorClass(monAct, efficiencyPercent);
+    }
+    return;
+  }
+  if (stoppedLineEfficiencyValid) {
+    effEl.innerText = efficiencyPercent + "%";
+    applyEfficiencyColorClass(effEl, efficiencyPercent);
+  } else {
+    effEl.innerText = "—";
+    effEl.className = "big-number status-blue";
+  }
 }
 
-function computeEfficiencyFromCards() {
-  const expectedVal = parseInt(document.getElementById("expected").innerText, 10);
-  const actualVal = parseInt(document.getElementById("actual").innerText, 10);
-  if (!Number.isFinite(expectedVal) || expectedVal <= 0) return 0;
-  if (!Number.isFinite(actualVal) || actualVal < 0) return 0;
-  return Math.floor((actualVal / expectedVal) * 100);
+function finalizeEfficiencyOnStop() {
+  stoppedLineEfficiencyValid = false;
+  const wtPlanMin = parseFloat(document.getElementById("workingTimePlanMin")?.value) || 0;
+  const stopMs = Date.now();
+  const startMs = sessionWorkingStartMs != null
+    ? sessionWorkingStartMs
+    : (startTime ? startTime.getTime() : stopMs);
+  const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+  const actual = actualCount;
+
+  if (plan <= 0 || wtPlanMin <= 0 || stopMs <= startMs) {
+    efficiencyPercent = 0;
+    return;
+  }
+
+  const wallMs = stopMs - startMs;
+  const breakMs = getBreakOverlapMs(startMs, stopMs);
+  const netSec = Math.max(Math.floor((wallMs - breakMs) / 1000), 0);
+  const wtActualMin = netSec / 60;
+  if (wtActualMin <= 0) {
+    efficiencyPercent = 0;
+    return;
+  }
+
+  const raw = (actual / plan) * (wtPlanMin / wtActualMin) * 100 * 0.98;
+  efficiencyPercent = Math.max(0, Math.round(raw));
+  stoppedLineEfficiencyValid = true;
 }
 
 /* ===== STATUS ===== */
@@ -1649,6 +1820,16 @@ function applyLiveState(state) {
     planInput.value = daily != null && daily > 0 ? String(daily) : "";
     cycleInput.value = cycle != null && cycle > 0 ? String(cycle) : "";
     document.getElementById("plan").innerText = daily != null && daily > 0 ? String(daily) : "-";
+
+    const wtp =
+      parseFirebaseFloat(state.workingTimePlanMin) ??
+      parseFirebaseFloat(state.settings && state.settings.workingTimePlanMin);
+    const wtn =
+      parseFirebaseFloat(state.workingTimeNetElapsedMin) ??
+      parseFirebaseFloat(state.settings && state.settings.workingTimeNetElapsedMin);
+    const wtel = document.getElementById("workingTimePlanMin");
+    if (wtel && wtp != null && wtp > 0) wtel.value = String(wtp);
+    syncMonitorWorkingTimeCards(wtp, wtn);
   } else {
     effectivePlan = resolvePositiveNumber(state.dailyPlan, plan, currentDailyPlan);
     cycleTimeMin = resolvePositiveNumber(state.cycleTimeMin, state.cycleTarget, currentCycleTime);
@@ -1670,7 +1851,6 @@ function applyLiveState(state) {
   actualCount = actual;
   syncDowntimeSecondsFromTable();
   firstScanAtMs = state.firstScanAtMs ? Number(state.firstScanAtMs) : firstScanAtMs;
-  const effEl = document.getElementById("efficiency");
 
   if (!isMonitor) {
     document.getElementById("plan").innerText = effectivePlan;
@@ -1683,16 +1863,10 @@ function applyLiveState(state) {
   }
   document.getElementById("actual").innerText = actual;
   document.getElementById("expected").innerText = expected;
-  const liveEfficiency = computeEfficiencyFromCards();
-  efficiencyPercent = Number.isFinite(liveEfficiency) ? liveEfficiency : stateEfficiency;
-  effEl.innerText = efficiencyPercent + "%";
-  if (efficiencyPercent < 90) {
-    effEl.className = "big-number status-red";
-  } else if (efficiencyPercent < 100) {
-    effEl.className = "big-number status-orange";
-  } else {
-    effEl.className = "big-number status-green";
+  if (isMonitor) {
+    efficiencyPercent = Number.isFinite(stateEfficiency) ? stateEfficiency : 0;
   }
+  syncEfficiencyCardDom();
   startLiveCountdownTicker(countdown, status, state.updatedAt);
   syncDowntimeSecondsFromTable();
   // Keep card aligned to rendered table values when rows are present.
@@ -1835,6 +2009,12 @@ function startProduction(shouldSync = true) {
     publishSyncCommand("start");
   }
 
+  if (sessionWorkingStartMs == null) {
+    sessionWorkingStartMs = Date.now();
+  }
+  stoppedLineEfficiencyValid = false;
+  targetAchievedEfficiencySnapDone = false;
+
   // Set start time if first run
   if (!startTime) {
     startTime = new Date();
@@ -1921,6 +2101,7 @@ function stopProduction(shouldSync = true) {
   timer = null;
   lastTimerTickMs = null;
   breakPauseStartMs = null;
+  finalizeEfficiencyOnStop();
   // Remember pause moment; we will compensate on resume.
   pauseStartMs = Date.now();
   setStatus("PAUSED", "status-orange");
@@ -1947,6 +2128,9 @@ function resetProduction(shouldSync = true) {
   lastScanTime = null;
   startTime = null;
   firstScanAtMs = null;
+  sessionWorkingStartMs = null;
+  stoppedLineEfficiencyValid = false;
+  targetAchievedEfficiencySnapDone = false;
   efficiencyPercent = 0;
   breakPauseStartMs = null;
   pauseStartMs = null;
@@ -2148,7 +2332,6 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
 
     // One completed 4-scan cycle = one actual unit.
     actualCount++;
-    refreshEfficiencyPercent();
     hasLocalSession = true;
     countdownValue = cycleTimeSec;
     isDowntime = false;
@@ -2219,23 +2402,8 @@ function updateDisplay() {
 
   delayEl.innerText = delay > 0 ? ("+" + delay) : delay;
 
-  // Display Expected/Actual first, then compute efficiency from cards
-  // so the efficiency value always matches what user sees.
   document.getElementById("expected").innerText = expected;
   document.getElementById("actual").innerText = actualCount;
-  const efficiency = computeEfficiencyFromCards();
-  efficiencyPercent = efficiency;
-
-  const effEl = document.getElementById("efficiency");
-  effEl.innerText = efficiency + "%";
-
-  if (efficiency < 90) {
-    effEl.className = "big-number status-red";
-  } else if (efficiency < 100) {
-    effEl.className = "big-number status-orange";
-  } else {
-    effEl.className = "big-number status-green";
-  }
 
   // Display Expected
   document.getElementById("plan").innerText = plan;
@@ -2260,6 +2428,12 @@ function updateDisplay() {
     setStatus("DOWN TIME", "status-red blink");
   } else if (actualCount >= plan && plan > 0) {
     clearInterval(timer); timer = null; countdownValue = 0; isDowntime = false;
+    if (!targetAchievedEfficiencySnapDone) {
+      finalizeEfficiencyOnStop();
+      targetAchievedEfficiencySnapDone = true;
+      hasLocalSession = true;
+      updateLiveStateOnly();
+    }
     setStatus("TARGET ACHIEVED", "status-green");
   } else if (pendingChassis !== "" && pendingModel === "") {
     setStatus("WAITING MODEL", "status-orange");
@@ -2272,6 +2446,8 @@ function updateDisplay() {
   } else {
     setStatus("READY", "status-blue");
   }
+
+  syncEfficiencyCardDom();
 
   const downtimeCard = document.getElementById("downtimeCard");
   const downtimeText = document.getElementById("downtime");
@@ -3388,7 +3564,9 @@ function showSummaryPage() {
   const downtime = format(downtimeSec);
   const diff = actual - plan;
   const diffDisplaySafe = diff > 0 ? ("+" + diff) : String(diff);
-  const efficiency = plan > 0 ? `${Math.floor((actual / plan) * 100)}%` : "0%";
+  const todayK = toIsoDateLocal(new Date());
+  const efficiency =
+    activeDay === todayK && stoppedLineEfficiencyValid ? `${efficiencyPercent}%` : "—";
 
   let summaryPage = document.getElementById("summaryPage");
   if (!summaryPage) {
@@ -3523,6 +3701,9 @@ function updateLiveStateOnly() {
   const status = document.getElementById("status").innerText.trim();
   const lotNo = document.getElementById("lotInput").value || "";
   const bookedDowntime = getBookedDowntimeSec();
+  const wtPlanParsed = parseFloat(document.getElementById("workingTimePlanMin")?.value);
+  const workingTimePlanMinVal = Number.isFinite(wtPlanParsed) && wtPlanParsed > 0 ? wtPlanParsed : null;
+  const workingTimeNetElapsedMin = computeWorkingTimeNetElapsedMin();
   const liveStatePayload = {
     plan: plan,
     dailyPlan: plan,
@@ -3539,7 +3720,9 @@ function updateLiveStateOnly() {
     delay: delay,
     efficiency: efficiency,
     firstScanAtMs: firstScanAtMs,
-    lastScanAtMs: lastScanTime ? lastScanTime.getTime() : null
+    lastScanAtMs: lastScanTime ? lastScanTime.getTime() : null,
+    workingTimePlanMin: workingTimePlanMinVal,
+    workingTimeNetElapsedMin: workingTimeNetElapsedMin
   };
 
   saveLocalLiveStateSnapshot(liveStatePayload);
@@ -3893,6 +4076,7 @@ window.onload = async function() {
 
   applyAppRoleUi();
   loadShiftScheduleFromStorage();
+  loadWorkingTimePlanFromStorage();
   ensureShiftScheduleModal();
   bindClockShiftShortcut();
   bindRamadanRevealShortcut();
@@ -3905,27 +4089,16 @@ window.onload = async function() {
   updateDateTime();
   if (clockInterval) clearInterval(clockInterval);
   clockInterval = setInterval(updateDateTime, 1000);
+
+  if (isMonitor) {
+    document.body.classList.add("monitor-mode");
+    applyMonitorDashboardLayout();
+  }
+
   initFirebaseSync();
   loadInitialLiveState();
 
   if (isMonitor) {
-    document.body.classList.add("monitor-mode");
-
-    const monitorCard = document.querySelector(".bottom-row .card.wide");
-    if (monitorCard) {
-      const monitorTitle = monitorCard.querySelector("h3");
-      if (monitorTitle) monitorTitle.textContent = "CONNECTION STATUS";
-      const scanGrid = monitorCard.querySelector(".scan-grid");
-      if (scanGrid) {
-        scanGrid.innerHTML = `
-          <div class="monitor-status-wrap">
-            <div class="monitor-only-text">MONITOR ONLY</div>
-            <div id="monitorConnectionStatus" class="monitor-connection-badge">LIVE</div>
-          </div>
-        `;
-      }
-    }
-
     const chassisInput = document.getElementById("chassisInput");
     const modelInput = document.getElementById("modelInput");
     const engineInput = document.getElementById("engineInput");
@@ -3937,6 +4110,8 @@ window.onload = async function() {
 
     document.getElementById("cycleTarget").readOnly = true;
     document.getElementById("dailyPlanTarget").readOnly = true;
+    const workingPlanMon = document.getElementById("workingTimePlanMin");
+    if (workingPlanMon) workingPlanMon.readOnly = true;
     document.getElementById("lotInput").readOnly = true;
 
     // Dashboard cards/status: Firebase realtime listener source of truth
@@ -3970,6 +4145,14 @@ window.onload = async function() {
       if (!initialLiveStateLoaded && !hasLocalSession) return;
       updateLiveStateOnly();
     }, 2000);
+    const workingPlanOpNested = document.getElementById("workingTimePlanMin");
+    if (workingPlanOpNested) {
+      workingPlanOpNested.addEventListener("input", () => {
+        saveWorkingTimePlanToStorage();
+        hasLocalSession = true;
+        updateLiveStateOnly();
+      });
+    }
     applyShiftScheduleTick();
     if (shiftScheduleInterval) clearInterval(shiftScheduleInterval);
     shiftScheduleInterval = setInterval(applyShiftScheduleTick, 30000);

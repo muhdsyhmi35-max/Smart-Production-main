@@ -68,10 +68,17 @@
 </label>
 
 <label class="control-field">
+<span class="control-label">Working time plan (min)</span>
+<input type="number" id="workingTimePlanMin" min="1" step="1" title="Planned net working minutes — efficiency is calculated when you press Stop">
+</label>
+
+<label class="control-field">
 <span class="control-label">Lot</span>
 <input type="number" id="lotInput" placeholder="Lot No">
 </label>
 </div>
+
+<div id="monitorConnectionDock" class="monitor-connection-dock" aria-hidden="true"></div>
 
 <div class="control-actions main-pc-actions" aria-label="Production controls">
 <button type="button" class="start" onclick="startProduction()"><span class="ctrl-btn-icon" aria-hidden="true">▶</span> Start</button>
@@ -100,7 +107,7 @@
 
 <div class="card">
 <h3>EFFICIENCY</h3>
-<div class="big-number" id="efficiency">0%</div>
+<div class="big-number" id="efficiency">—</div>
 </div>
 
 </div>
