@@ -1510,12 +1510,22 @@ function syncEfficiencyCardDom() {
   if (!effEl) return;
   if (isMonitor) {
     syncMonitorPlanEffBaseline();
-    effEl.innerText = efficiencyPercent + "%";
-    applyEfficiencyColorClass(effEl, efficiencyPercent);
+    if (stoppedLineEfficiencyValid) {
+      effEl.innerText = efficiencyPercent + "%";
+      applyEfficiencyColorClass(effEl, efficiencyPercent);
+    } else {
+      effEl.innerText = "—";
+      effEl.className = "big-number status-blue";
+    }
     const monAct = document.getElementById("monitorActualEffPct");
     if (monAct) {
-      monAct.innerText = efficiencyPercent + "%";
-      applyEfficiencyColorClass(monAct, efficiencyPercent);
+      if (stoppedLineEfficiencyValid) {
+        monAct.innerText = efficiencyPercent + "%";
+        applyEfficiencyColorClass(monAct, efficiencyPercent);
+      } else {
+        monAct.innerText = "—";
+        monAct.className = "big-number status-blue";
+      }
     }
     return;
   }
@@ -1841,6 +1851,7 @@ function applyLiveState(state) {
   const expected = parseInt(state.expected, 10) || 0;
   const delay = parseInt(state.delay, 10) || 0;
   const stateEfficiency = parseInt(state.efficiency, 10) || 0;
+  const stateEfficiencyFinalized = !!state.efficiencyFinalized;
   const lotNo = state.lotNo || "";
   const fbTotalDowntime = Number(state.totalDowntime);
   if (isMonitor && Number.isFinite(fbTotalDowntime) && fbTotalDowntime >= 0) {
@@ -1864,7 +1875,8 @@ function applyLiveState(state) {
   document.getElementById("actual").innerText = actual;
   document.getElementById("expected").innerText = expected;
   if (isMonitor) {
-    efficiencyPercent = Number.isFinite(stateEfficiency) ? stateEfficiency : 0;
+    stoppedLineEfficiencyValid = stateEfficiencyFinalized;
+    efficiencyPercent = stateEfficiencyFinalized && Number.isFinite(stateEfficiency) ? stateEfficiency : 0;
   }
   syncEfficiencyCardDom();
   startLiveCountdownTicker(countdown, status, state.updatedAt);
@@ -3696,6 +3708,7 @@ function updateLiveStateOnly() {
   let delay = actual - expected;
 
   const efficiency = efficiencyPercent;
+  const efficiencyFinalized = !!stoppedLineEfficiencyValid;
 
   const balance = actual - plan;
   const status = document.getElementById("status").innerText.trim();
@@ -3719,6 +3732,7 @@ function updateLiveStateOnly() {
     expected: expected,
     delay: delay,
     efficiency: efficiency,
+    efficiencyFinalized: efficiencyFinalized,
     firstScanAtMs: firstScanAtMs,
     lastScanAtMs: lastScanTime ? lastScanTime.getTime() : null,
     workingTimePlanMin: workingTimePlanMinVal,
@@ -3746,7 +3760,8 @@ function updateLiveStateOnly() {
       downtimeDay: getActiveDowntimeDayKey(),
       expected: expected,
       delay: delay,
-      efficiency: efficiency
+      efficiency: efficiency,
+      efficiencyFinalized: efficiencyFinalized
     })
   });
 
