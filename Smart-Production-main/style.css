@@ -873,6 +873,10 @@ body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-grid-a
   grid-column:2;
   grid-row:3;
 }
+body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-grid-actual-eff{
+  grid-column:4;
+  grid-row:3;
+}
 
 body.monitor-layout-active .monitor-line-status-card{
   justify-content:flex-start;

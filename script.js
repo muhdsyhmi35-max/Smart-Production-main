@@ -390,12 +390,11 @@ function applyMonitorDashboardLayout() {
     `<h3>PLAN EFF (%)</h3><div class="big-number status-blue" id="monitorPlanEffPct">${MONITOR_BASELINE_EFF_PCT.toFixed(1)}%</div>`;
 
   const actualEffCard = document.createElement("div");
-  actualEffCard.className = "card monitor-mini-card";
+  actualEffCard.className = "card monitor-mini-card monitor-grid-actual-eff";
   actualEffCard.innerHTML =
     '<h3>ACTUAL EFF (%)</h3><div class="big-number status-blue" id="monitorActualEffPct">—</div>';
 
   stack.appendChild(planEffCard);
-  stack.appendChild(actualEffCard);
 
   planCard.classList.add("monitor-grid-plan");
   balanceCard.classList.add("monitor-grid-balance");
@@ -416,6 +415,7 @@ function applyMonitorDashboardLayout() {
 
   dashboard.appendChild(planWTCard);
   dashboard.appendChild(actualWTCard);
+  dashboard.appendChild(actualEffCard);
 
   syncMonitorPlanEffBaseline();
 }
