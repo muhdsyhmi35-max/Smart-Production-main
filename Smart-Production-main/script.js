@@ -49,8 +49,6 @@ let timer = null;
 let countdownValue = 0;
 let actualCount = 0;
 let downtimeSeconds = 0;
-/** null = rolling local \"today\" for downtime total; else YYYY-MM-DD for a specific day. */
-let downtimeFilterDate = null;
 /** null = today in graph filters; else YYYY-MM-DD. */
 let graphFilterDate = null;
 let graphPeriod = "week";
@@ -97,8 +95,6 @@ let initialLiveStateLoaded = false;
 let shiftScheduleInterval = null;
 let overtimeUntilMs = null;
 let activeShiftDayKey = null;
-let wipCarryMarkedDayKey = null;
-let wipShortfallMarkedDayKey = null;
 const firebaseSessionStartedAt = Date.now();
 const LOCAL_LIVE_STATE_KEY = "TF2_LIVE_STATE_SNAPSHOT";
 const syncClientId = localStorage.getItem("SYNC_CLIENT_ID") || ("SYNC-" + Math.random().toString(36).slice(2));
@@ -342,9 +338,9 @@ function toIsoDateLocal(d) {
   return `${y}-${mo}-${day}`;
 }
 
+/** Calendar day for downtime totals: matches History table date filter (rolling local \"today\" when cleared). */
 function getActiveDowntimeDayKey() {
-  if (downtimeFilterDate) return downtimeFilterDate;
-  return toIsoDateLocal(new Date());
+  return getActiveHistoryDayKey();
 }
 
 /** Map table Date cell (e.g. DD/MM/YYYY) to YYYY-MM-DD for filtering. */
@@ -595,12 +591,14 @@ function onHistoryDayFilterChange() {
   const todayK = toIsoDateLocal(new Date());
   historyFilterDate = v && v !== todayK ? v : null;
   applyHistoryDateFilter();
+  refreshDowntimeCardFromTable();
 }
 
 function onHistoryDayTodayClick() {
   historyFilterDate = null;
   syncHistoryDayPickerUi();
   applyHistoryDateFilter();
+  refreshDowntimeCardFromTable();
 }
 
 /** Parse "MM:SS" (or "M:SS") from table / sheet display into seconds. */
@@ -662,7 +660,12 @@ function parseMmSsToSeconds(text) {
   return 0;
 }
 
-/** Sum downtime from rendered rows for DOWN TIME on the active downtime day only. */
+function isRowStatusDownTime(raw) {
+  const s = String(raw || "").replace(/\s+/g, " ").trim().toUpperCase();
+  return s === "DOWN TIME" || s === "DOWNTIME";
+}
+
+/** Sum downtime from DOWN TIME rows on the same calendar day as the History filter (rolling \"today\" when cleared). */
 function sumBookedDowntimeFromScanTable() {
   let total = 0;
   const table = document.getElementById("scanTable");
@@ -674,7 +677,7 @@ function sumBookedDowntimeFromScanTable() {
     const downtimeCell = tr.cells[9];
     const statusCell = tr.cells[8];
     if (!downtimeCell || !statusCell) return;
-    if (statusCell.innerText.trim() !== "DOWN TIME") return;
+    if (!isRowStatusDownTime(statusCell.innerText)) return;
     const cleaned = cleanDowntime(downtimeCell.innerText || "");
     downtimeCell.innerText = cleaned;
     total += parseMmSsToSeconds(cleaned);
@@ -771,7 +774,7 @@ function renderDowntimeDebugPanel() {
     const raw = downtimeCell ? String(downtimeCell.innerText || "").trim() : "";
     const cleaned = cleanDowntime(raw);
     const sec = parseMmSsToSeconds(cleaned);
-    const included = status === "DOWN TIME";
+    const included = isRowStatusDownTime(status);
     if (included) running += sec;
     lines.push(
       `r${idx + 1} status=${status || "-"} raw="${raw}" clean="${cleaned}" sec=${sec} ${included ? "[+]" : "[-]"} total=${running}`
@@ -811,6 +814,14 @@ function isWithinShiftWindow(d = new Date()) {
   return minute >= SETTINGS.shiftSchedule.startMinute && minute < SETTINGS.shiftSchedule.endMinute;
 }
 
+/** Local wall time (ms) when the configured shift starts on the same calendar day as `d`. */
+function getTodayShiftStartMs(d = new Date()) {
+  const startMin = SETTINGS.shiftSchedule.startMinute;
+  const hh = Math.floor(startMin / 60) % 24;
+  const mm = startMin % 60;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), hh, mm, 0, 0).getTime();
+}
+
 function isOvertimeActive(d = new Date()) {
   return Number.isFinite(overtimeUntilMs) && d.getTime() < overtimeUntilMs;
 }
@@ -819,116 +830,20 @@ function canRunProductionNow(d = new Date()) {
   return isWithinShiftWindow(d) || isOvertimeActive(d);
 }
 
-function hasPendingIncompleteUnit() {
-  return !!(pendingChassis || pendingModel || pendingEngine || pendingKey);
-}
-
 function setOffShiftStatus() {
   const text = isOvertimeActive(new Date()) ? "OVERTIME" : "OFF SHIFT";
   const cls = isOvertimeActive(new Date()) ? "status-orange" : "status-blue";
   setStatus(text, cls);
 }
 
-function addWipCarryRow(dateObj = new Date()) {
-  if (!hasPendingIncompleteUnit()) return;
-  const dayKey = toIsoDateLocal(dateObj);
-  if (wipCarryMarkedDayKey === dayKey) return;
-
-  const table = document.getElementById("scanTable");
-  if (!table) return;
-
-  const lot = document.getElementById("lotInput")?.value || "-";
-  const row = table.insertRow(0);
-  row.insertCell(0).innerText = "";
-  row.insertCell(1).innerText = dateObj.toLocaleDateString();
-  row.insertCell(2).innerText = dateObj.toLocaleTimeString();
-  row.insertCell(3).innerText = lot;
-  row.insertCell(4).innerText = pendingModel || "-";
-  row.insertCell(5).innerText = pendingChassis || "-";
-  row.insertCell(6).innerText = pendingEngine || "-";
-  row.insertCell(7).innerText = pendingKey || "-";
-  const statusCell = row.insertCell(8);
-  statusCell.innerText = "WIP_CARRY";
-  statusCell.className = "status-orange";
-  row.insertCell(9).innerText = "";
-  row.dataset.scanDate = toIsoDateLocal(dateObj);
-  row.dataset.scanPlan = String(parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0);
-  renumberScanTable();
-  wipCarryMarkedDayKey = dayKey;
-
-  sendToSheet(
-    pendingChassis || "-",
-    pendingModel || "-",
-    pendingEngine || "-",
-    pendingKey || "-",
-    lot,
-    "WIP_CARRY",
-    ""
-  );
-}
-
-function hasTodayProductionEvidence(dayKey) {
-  if (actualCount > 0) return true;
-  const table = document.getElementById("scanTable");
-  if (!table || !table.rows || table.rows.length === 0) return false;
-  return Array.from(table.rows).some(tr => {
-    const rowDay = tr.dataset.scanDate || parseDisplayDateToIsoKey(tr.cells[1]?.innerText);
-    if (rowDay !== dayKey) return false;
-    const status = String(tr.cells[8]?.innerText || "").trim();
-    return status && status !== "WIP_CARRY";
-  });
-}
-
-function addWipShortfallRow(dateObj = new Date()) {
-  const dayKey = toIsoDateLocal(dateObj);
-  if (wipShortfallMarkedDayKey === dayKey) return;
-  if (!hasTodayProductionEvidence(dayKey)) return;
-
-  const plan = parseInt(document.getElementById("dailyPlanTarget")?.value, 10) || 0;
-  const remaining = Math.max(plan - actualCount, 0);
-  if (remaining <= 0) return;
-
-  const table = document.getElementById("scanTable");
-  if (!table) return;
-  const lot = document.getElementById("lotInput")?.value || "-";
-  const row = table.insertRow(0);
-  row.insertCell(0).innerText = "";
-  row.insertCell(1).innerText = dateObj.toLocaleDateString();
-  row.insertCell(2).innerText = dateObj.toLocaleTimeString();
-  row.insertCell(3).innerText = lot;
-  row.insertCell(4).innerText = "TARGET";
-  row.insertCell(5).innerText = "UNFINISHED UNIT";
-  row.insertCell(6).innerText = "-";
-  row.insertCell(7).innerText = `SHORTFALL ${remaining}`;
-  const statusCell = row.insertCell(8);
-  statusCell.innerText = "WIP_CARRY";
-  statusCell.className = "status-orange";
-  row.insertCell(9).innerText = "";
-  row.dataset.scanDate = dayKey;
-  row.dataset.scanPlan = String(plan);
-  renumberScanTable();
-  wipShortfallMarkedDayKey = dayKey;
-
-  sendToSheet(
-    "UNFINISHED UNIT",
-    "TARGET",
-    "-",
-    `SHORTFALL ${remaining}`,
-    lot,
-    "WIP_CARRY",
-    ""
-  );
-}
-
 function resetDailyCountersForNewShiftDay(dayKey) {
   if (!dayKey) return;
   if (activeShiftDayKey === dayKey) return;
   activeShiftDayKey = dayKey;
-  wipCarryMarkedDayKey = null;
-  wipShortfallMarkedDayKey = null;
   actualCount = 0;
   downtimeSeconds = 0;
   firstScanAtMs = null;
+  lastScanTime = null;
   countdownValue = (parseFloat(document.getElementById("cycleTarget").value) || SETTINGS.defaultCycle) * 60;
 }
 
@@ -946,13 +861,8 @@ function applyShiftScheduleTick() {
 
   if (!canRun) {
     if (timer) {
-      addWipCarryRow(now);
-      addWipShortfallRow(now);
       stopProduction(false);
-    } else if (hasPendingIncompleteUnit()) {
-      addWipCarryRow(now);
     }
-    addWipShortfallRow(now);
     setOffShiftStatus();
     updateDisplay();
     updateLiveStateOnly();
@@ -1751,14 +1661,6 @@ function applyLiveState(state) {
   const delay = parseInt(state.delay, 10) || 0;
   const stateEfficiency = parseInt(state.efficiency, 10) || 0;
   const lotNo = state.lotNo || "";
-  const downtimeDayIn = typeof state.downtimeDay === "string" && state.downtimeDay.trim()
-    ? state.downtimeDay.trim().slice(0, 10)
-    : null;
-  if (isMonitor && downtimeDayIn) {
-    const todayK = toIsoDateLocal(new Date());
-    downtimeFilterDate = downtimeDayIn === todayK ? null : downtimeDayIn;
-    syncDowntimeDayPickerUi();
-  }
   const fbTotalDowntime = Number(state.totalDowntime);
   if (isMonitor && Number.isFinite(fbTotalDowntime) && fbTotalDowntime >= 0) {
     monitorDowntimeOverrideSec = fbTotalDowntime;
@@ -1796,8 +1698,10 @@ function applyLiveState(state) {
   // Keep card aligned to rendered table values when rows are present.
   refreshDowntimeCardFromTable();
   syncDowntimeAccumulatedHighlight();
-  if (state.lastScanAtMs) {
+  if (actual > 0 && state.lastScanAtMs) {
     lastScanTime = new Date(Number(state.lastScanAtMs));
+  } else if (actual === 0) {
+    lastScanTime = null;
   }
   restoreProductionTimerFromLiveState(status, countdown, expected, state.firstScanAtMs, state.updatedAt, state.lastScanAtMs);
 
@@ -2171,10 +2075,26 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
     const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
     let downtimeEvent = "";
 
-    if (lastScanTime) {
-      const diffSec = Math.floor((now - lastScanTime) / 1000);
-      if (diffSec > cycleTimeSec) {
-        const actualDowntime = diffSec - cycleTimeSec;
+    let baselineMs = null;
+    const firstUnit = actualCount === 0;
+    if (!firstUnit && lastScanTime) {
+      baselineMs = lastScanTime.getTime();
+    } else if (firstUnit && SETTINGS.shiftSchedule.enableAutoWindow) {
+      const shiftStartMs = getTodayShiftStartMs(now);
+      const lineMs = startTime ? startTime.getTime() : shiftStartMs;
+      baselineMs = Math.max(shiftStartMs, lineMs);
+      if (now.getTime() <= baselineMs) baselineMs = null;
+    } else if (firstUnit && startTime) {
+      baselineMs = startTime.getTime();
+      if (now.getTime() <= baselineMs) baselineMs = null;
+    }
+
+    if (baselineMs != null) {
+      const wallSec = Math.floor((now.getTime() - baselineMs) / 1000);
+      const breakSec = Math.floor(getBreakOverlapMs(baselineMs, now.getTime()) / 1000);
+      const idleSecExBreak = Math.max(0, wallSec - breakSec);
+      if (idleSecExBreak > cycleTimeSec) {
+        const actualDowntime = idleSecExBreak - cycleTimeSec;
 
         // Count downtime only before target (or when plan is open-ended 0).
         if (plan === 0 || (actualCount + 1) <= plan) {
@@ -2707,6 +2627,7 @@ function toggleHistoryPanel(forceOpen) {
     panel.classList.add("open");
     syncHistoryDayPickerUi();
     applyHistoryDateFilter();
+    refreshDowntimeCardFromTable();
     triggerEnterAnimation(panel);
   } else {
     document.body.classList.remove("history-mode");
@@ -3897,21 +3818,18 @@ function loadLiveData() {
           const statusCell = newRow.insertCell(8);
           const statusText = legacyLayout ? (row[6] || "") : idxStatus >= 0 ? (row[idxStatus] || "") : "";
           statusCell.innerText = statusText;
+          const rowIsDownTime = isRowStatusDownTime(statusText);
 
           if (statusText === "SCANNED") statusCell.className = "status-green";
-          if (statusText === "DOWN TIME") statusCell.className = "status-red";
-          if (statusText === "WIP_CARRY") statusCell.className = "status-orange";
+          if (rowIsDownTime) statusCell.className = "status-red";
 
           const downtimeCell = newRow.insertCell(9);
 
-          if (statusText === "DOWN TIME") {
+          if (rowIsDownTime) {
             const rawDowntime = pickBestDowntimeValue(row, idxDowntime, downtimeCandidateIdxs, legacyLayout);
             const cleaned = cleanDowntime(rawDowntime);
             downtimeCell.innerText = cleaned;
             downtimeCell.className = "status-red";
-          } else if (statusText === "WIP_CARRY") {
-            downtimeCell.innerText = "";
-            downtimeCell.className = "status-orange";
           } else {
             downtimeCell.innerText = "";
           }
