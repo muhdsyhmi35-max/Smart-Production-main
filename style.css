@@ -2141,6 +2141,22 @@ body.graph-mode{
   grid-template-rows:auto auto auto;
 }
 
+:fullscreen body.monitor-layout-active .dashboard.monitor-dashboard-relayout .card,
+:-webkit-full-screen body.monitor-layout-active .dashboard.monitor-dashboard-relayout .card{
+  min-height:clamp(108px, 16vh, 170px);
+}
+
+:fullscreen body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-grid-plan,
+:fullscreen body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-grid-balance,
+:fullscreen body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-grid-line-status,
+:fullscreen body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-mini-card,
+:-webkit-full-screen body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-grid-plan,
+:-webkit-full-screen body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-grid-balance,
+:-webkit-full-screen body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-grid-line-status,
+:-webkit-full-screen body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-mini-card{
+  min-height:clamp(108px, 16vh, 170px);
+}
+
 :fullscreen .bottom-row,
 :-webkit-full-screen .bottom-row{
   margin-top:clamp(12px, 1.5vw, 22px);
