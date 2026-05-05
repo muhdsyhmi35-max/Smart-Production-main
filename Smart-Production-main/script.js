@@ -227,6 +227,14 @@ function applyAppRoleUi() {
       showMainPage();
     }
   }
+  if (isMonitor && document.body.classList.contains("monitor-mode")) {
+    const wantedLayout = admin ? MONITOR_LAYOUT_DATASET_KEY : MONITOR_LAYOUT_LEGACY_KEY;
+    const currentLayout = document.body.dataset.monitorLayout || "";
+    if (currentLayout && currentLayout !== wantedLayout) {
+      window.location.reload();
+      return;
+    }
+  }
   syncRoleDropdownAria();
 }
 
@@ -269,6 +277,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbwwLUYjoT7GH0sfFCGZMJoe
 // Detect monitor mode (?monitor)
 const isMonitor = window.location.search.includes("monitor");
 const MONITOR_LAYOUT_DATASET_KEY = "monitorLayoutV1";
+const MONITOR_LAYOUT_LEGACY_KEY = "monitorLegacy";
 const MONITOR_BASELINE_EFF_PCT = 98;
 const FIREBASE_COMMAND_PATH = "production/commands/latest";
 const FIREBASE_LIVE_STATE_PATH = "production/liveState";
@@ -423,6 +432,29 @@ function applyMonitorDashboardLayout() {
   dashboard.appendChild(actualEffCard);
 
   syncMonitorPlanEffBaseline();
+}
+
+function applyLegacyMonitorDashboardLayout() {
+  if (!isMonitor) return;
+  document.body.dataset.monitorLayout = MONITOR_LAYOUT_LEGACY_KEY;
+  document.body.classList.remove("monitor-layout-active");
+
+  const dock = document.getElementById("monitorConnectionDock");
+  if (dock) dock.innerHTML = "";
+
+  const monitorCard = document.querySelector(".bottom-row .card.wide");
+  if (!monitorCard) return;
+  const monitorTitle = monitorCard.querySelector("h3");
+  if (monitorTitle) monitorTitle.textContent = "CONNECTION STATUS";
+  const scanGrid = monitorCard.querySelector(".scan-grid");
+  if (scanGrid) {
+    scanGrid.innerHTML = `
+      <div class="monitor-status-wrap">
+        <div class="monitor-only-text">MONITOR ONLY</div>
+        <div id="monitorConnectionStatus" class="monitor-connection-badge">LIVE</div>
+      </div>
+    `;
+  }
 }
 
 /* ===== FORMAT ===== */
@@ -4111,7 +4143,8 @@ window.onload = async function() {
 
   if (isMonitor) {
     document.body.classList.add("monitor-mode");
-    applyMonitorDashboardLayout();
+    if (isAdminRole()) applyMonitorDashboardLayout();
+    else applyLegacyMonitorDashboardLayout();
   }
 
   initFirebaseSync();
@@ -4178,3 +4211,4 @@ window.onload = async function() {
   }
   updateViewToggleMenuItem();
 };
+
