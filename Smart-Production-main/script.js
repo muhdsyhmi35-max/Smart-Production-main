@@ -95,7 +95,6 @@ let monitorLiveStateError = null;
 let initialLiveStateLoaded = false;
 let shiftScheduleInterval = null;
 let overtimeUntilMs = null;
-let activeShiftDayKey = null;
 const firebaseSessionStartedAt = Date.now();
 const LOCAL_LIVE_STATE_KEY = "TF2_LIVE_STATE_SNAPSHOT";
 const syncClientId = localStorage.getItem("SYNC_CLIENT_ID") || ("SYNC-" + Math.random().toString(36).slice(2));
@@ -104,6 +103,8 @@ localStorage.setItem("SYNC_CLIENT_ID", syncClientId);
 const APP_ROLE_STORAGE_KEY = "TF2_DASHBOARD_ROLE";
 const APP_ADMIN_SESSION_KEY = "TF2_ADMIN_SESSION_OK";
 const SHIFT_SCHEDULE_STORAGE_KEY = "TF2_SHIFT_SCHEDULE";
+const SHIFT_WINDOW_STATE_KEY = "TF2_SHIFT_WINDOW_STATE";
+const SHIFT_PERIOD_KEY = "TF2_SHIFT_ACTIVE_PERIOD";
 
 /** Change these credentials for your deployment (client-side only; not secret from devtools). */
 const ADMIN_LOGIN = {
@@ -225,7 +226,7 @@ function applyAppRoleUi() {
     }
   }
   if (isMonitor && document.body.classList.contains("monitor-mode")) {
-    const wantedLayout = admin ? MONITOR_LAYOUT_DATASET_KEY : MONITOR_LAYOUT_LEGACY_KEY;
+    const wantedLayout = admin ? MONITOR_LAYOUT_OPERATOR_MIRROR_KEY : MONITOR_LAYOUT_LEGACY_KEY;
     const currentLayout = document.body.dataset.monitorLayout || "";
     if (currentLayout && currentLayout !== wantedLayout) {
       window.location.reload();
@@ -275,6 +276,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbwwLUYjoT7GH0sfFCGZMJoe
 const isMonitor = window.location.search.includes("monitor");
 const MONITOR_LAYOUT_DATASET_KEY = "monitorLayoutV1";
 const MONITOR_LAYOUT_LEGACY_KEY = "monitorLegacy";
+const MONITOR_LAYOUT_OPERATOR_MIRROR_KEY = "monitorOperatorMirror";
 const FIREBASE_COMMAND_PATH = "production/commands/latest";
 const FIREBASE_LIVE_STATE_PATH = "production/liveState";
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || {
@@ -381,10 +383,41 @@ function applyMonitorDashboardLayout() {
   dashboard.appendChild(lineCard);
 }
 
+function applyOperatorStyleMonitorDashboard() {
+  if (!isMonitor || document.body.dataset.monitorLayout === MONITOR_LAYOUT_OPERATOR_MIRROR_KEY) return;
+
+  document.body.dataset.monitorLayout = MONITOR_LAYOUT_OPERATOR_MIRROR_KEY;
+  document.body.classList.remove("monitor-layout-active");
+  document.body.classList.add("monitor-operator-dashboard");
+
+  const dock = document.getElementById("monitorConnectionDock");
+  if (dock) dock.innerHTML = "";
+
+  const dashboard = document.querySelector(".dashboard");
+  if (dashboard) dashboard.classList.remove("monitor-dashboard-relayout");
+
+  const scanCard = document.querySelector(".bottom-row .card.wide:first-child");
+  if (!scanCard) return;
+
+  const title = scanCard.querySelector("h3");
+  if (title) title.textContent = "SCAN INPUT";
+
+  if (scanCard.querySelector(".monitor-inline-connection")) return;
+
+  const wrap = document.createElement("div");
+  wrap.className = "monitor-status-wrap monitor-inline-connection";
+  wrap.innerHTML = `
+      <div class="monitor-only-text">MONITOR ONLY</div>
+      <div id="monitorConnectionStatus" class="monitor-connection-badge">LIVE</div>
+    `;
+  scanCard.appendChild(wrap);
+}
+
 function applyLegacyMonitorDashboardLayout() {
   if (!isMonitor) return;
   document.body.dataset.monitorLayout = MONITOR_LAYOUT_LEGACY_KEY;
   document.body.classList.remove("monitor-layout-active");
+  document.body.classList.remove("monitor-operator-dashboard");
 
   const dock = document.getElementById("monitorConnectionDock");
   if (dock) dock.innerHTML = "";
@@ -917,16 +950,8 @@ function setOffShiftStatus() {
   setStatus(text, cls);
 }
 
-function resetDailyCountersForNewShiftDay(dayKey) {
-  if (!dayKey) return;
-  if (activeShiftDayKey === dayKey) return;
-  activeShiftDayKey = dayKey;
-  actualCount = 0;
-  downtimeSeconds = 0;
-  firstScanAtMs = null;
-  lastScanTime = null;
-  lastScanWallMs = null;
-  countdownValue = (parseFloat(document.getElementById("cycleTarget").value) || SETTINGS.defaultCycle) * 60;
+function getShiftPeriodKey(d = new Date()) {
+  return `${toIsoDateLocal(d)}_${SETTINGS.shiftSchedule.startMinute}_${SETTINGS.shiftSchedule.endMinute}`;
 }
 
 function applyShiftScheduleTick() {
@@ -935,10 +960,37 @@ function applyShiftScheduleTick() {
   const inWindow = isWithinShiftWindow(now);
   const overtime = isOvertimeActive(now);
   const canRun = inWindow || overtime;
-  const dayKey = toIsoDateLocal(now);
 
   if (inWindow) {
-    resetDailyCountersForNewShiftDay(dayKey);
+    const periodKey = getShiftPeriodKey(now);
+    let prevState = null;
+    let storedPeriod = null;
+    try {
+      prevState = localStorage.getItem(SHIFT_WINDOW_STATE_KEY);
+      storedPeriod = localStorage.getItem(SHIFT_PERIOD_KEY);
+    } catch (_) {}
+
+    const freshStorage = prevState === null && storedPeriod === null;
+    const outsideWindow = prevState !== "in";
+    const newCalendarShift = storedPeriod != null && storedPeriod !== periodKey;
+
+    if (freshStorage) {
+      try {
+        localStorage.setItem(SHIFT_WINDOW_STATE_KEY, "in");
+        localStorage.setItem(SHIFT_PERIOD_KEY, periodKey);
+      } catch (_) {}
+    } else if (outsideWindow || newCalendarShift) {
+      resetProduction(false);
+      try {
+        localStorage.setItem(SHIFT_WINDOW_STATE_KEY, "in");
+        localStorage.setItem(SHIFT_PERIOD_KEY, periodKey);
+      } catch (_) {}
+    }
+  } else {
+    try {
+      localStorage.setItem(SHIFT_WINDOW_STATE_KEY, "out");
+      localStorage.removeItem(SHIFT_PERIOD_KEY);
+    } catch (_) {}
   }
 
   if (!canRun) {
@@ -3979,7 +4031,7 @@ window.onload = async function() {
 
   if (isMonitor) {
     document.body.classList.add("monitor-mode");
-    if (isAdminRole()) applyMonitorDashboardLayout();
+    if (isAdminRole()) applyOperatorStyleMonitorDashboard();
     else applyLegacyMonitorDashboardLayout();
   }
 

@@ -658,6 +658,17 @@ body.monitor-mode .monitor-status-wrap{
   width:100%;
 }
 
+/* Admin monitor (?monitor): match operator dashboard layout; hide scan inputs, show LIVE under SCAN INPUT */
+body.monitor-mode.monitor-operator-dashboard .bottom-row > .card.wide:first-child .scan-grid{
+  display:none !important;
+}
+body.monitor-mode.monitor-operator-dashboard .monitor-inline-connection{
+  margin-top:clamp(8px, 1.2vh, 14px);
+  padding-top:clamp(10px, 1.5vh, 16px);
+  border-top:1px solid rgba(71,85,105,0.35);
+  flex-shrink:0;
+}
+
 .monitor-status-wrap{
   grid-column:1 / -1;
   display:flex;
