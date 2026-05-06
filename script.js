@@ -1441,7 +1441,7 @@ function isBreakTime() {
 function calculateExpectedOutput() {
   if (isMonitor) return 0;
   if (!firstScanAtMs) {
-    return timer ? 1 : 0;
+    return 0;
   }
   if (!timer) {
     return actualCount;
@@ -1475,14 +1475,6 @@ function calculateExpectedOutput() {
   let expected = Math.floor(netTime / cycleTimeSec);
   if (plan > 0) {
     expected = Math.min(expected, plan);
-  }
-
-  // Start expected from 1 once production is active.
-  expected = Math.max(expected, 1);
-
-  //  START SHOW AFTER FIRST SCAN
-  if (actualCount > 0 && expected === 0) {
-    expected = 1;
   }
 
   return expected;
