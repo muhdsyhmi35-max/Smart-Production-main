@@ -811,10 +811,6 @@ body.monitor-layout-active .bottom-row{
   display:none !important;
 }
 
-body.monitor-layout-active .monitor-hidden-eff-card{
-  display:none !important;
-}
-
 .monitor-connection-dock-inner.monitor-status-wrap,
 body.monitor-layout-active .monitor-connection-dock .monitor-status-wrap{
   flex-direction:row;
