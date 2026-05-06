@@ -59,6 +59,7 @@ let historyFilterDate = null;
 /** null = today in summary filter; else YYYY-MM-DD. */
 let summaryFilterDate = null;
 let lastScanTime = null;
+let lastScanWallMs = null;
 let startTime = null;
 let firstScanAtMs = null;
 let isDowntime = false;
@@ -340,19 +341,6 @@ function updateMonitorDataNotice() {
 
 /* ===== MONITOR TV LAYOUT (?monitor only) ===== */
 
-function formatMonitorWtMinutes(val) {
-  if (val == null || !Number.isFinite(val) || val < 0) return "—";
-  return val.toFixed(2);
-}
-
-function syncMonitorWorkingTimeCards(planWtMin, netWtMin) {
-  if (!isMonitor) return;
-  const pw = document.getElementById("monitorPlanWTMins");
-  const aw = document.getElementById("monitorActualWTMins");
-  if (pw) pw.textContent = formatMonitorWtMinutes(planWtMin);
-  if (aw) aw.textContent = formatMonitorWtMinutes(netWtMin);
-}
-
 function syncMonitorPlanEffBaseline() {
   if (!isMonitor) return;
   const pe = document.getElementById("monitorPlanEffPct");
@@ -404,11 +392,12 @@ function applyMonitorDashboardLayout() {
     `<h3>PLAN EFF (%)</h3><div class="big-number status-blue" id="monitorPlanEffPct">${MONITOR_BASELINE_EFF_PCT.toFixed(1)}%</div>`;
 
   const actualEffCard = document.createElement("div");
-  actualEffCard.className = "card monitor-mini-card monitor-grid-actual-eff";
+  actualEffCard.className = "card monitor-mini-card";
   actualEffCard.innerHTML =
     '<h3>ACTUAL EFF (%)</h3><div class="big-number status-blue" id="monitorActualEffPct">—</div>';
 
   stack.appendChild(planEffCard);
+  stack.appendChild(actualEffCard);
 
   planCard.classList.add("monitor-grid-plan");
   balanceCard.classList.add("monitor-grid-balance");
@@ -418,18 +407,6 @@ function applyMonitorDashboardLayout() {
   lineCard.classList.remove("wide");
   lineCard.classList.add("monitor-grid-line-status", "monitor-line-status-card");
   dashboard.appendChild(lineCard);
-
-  const planWTCard = document.createElement("div");
-  planWTCard.className = "card monitor-mini-card monitor-grid-plan-wt";
-  planWTCard.innerHTML = '<h3>PLAN W/T (MINS)</h3><div class="big-number status-blue" id="monitorPlanWTMins">—</div>';
-
-  const actualWTCard = document.createElement("div");
-  actualWTCard.className = "card monitor-mini-card monitor-grid-actual-wt";
-  actualWTCard.innerHTML = '<h3>ACTUAL W/T (MINS)</h3><div class="big-number status-green" id="monitorActualWTMins">—</div>';
-
-  dashboard.appendChild(planWTCard);
-  dashboard.appendChild(actualWTCard);
-  dashboard.appendChild(actualEffCard);
 
   syncMonitorPlanEffBaseline();
 }
@@ -978,6 +955,7 @@ function resetDailyCountersForNewShiftDay(dayKey) {
   downtimeSeconds = 0;
   firstScanAtMs = null;
   lastScanTime = null;
+  lastScanWallMs = null;
   sessionWorkingStartMs = null;
   stoppedLineEfficiencyValid = false;
   targetAchievedEfficiencySnapDone = false;
@@ -1454,20 +1432,6 @@ function getBreakOverlapMs(fromMs, toMs) {
   return total;
 }
 
-function computeWorkingTimeNetElapsedMin() {
-  const startCandidates = [sessionWorkingStartMs, firstScanAtMs]
-    .map(v => Number(v))
-    .filter(v => Number.isFinite(v) && v > 0);
-  if (!startCandidates.length) return null;
-  const baselineStartMs = Math.min(...startCandidates);
-  const nowMs = Date.now();
-  const wallMs = nowMs - baselineStartMs;
-  if (wallMs <= 0) return 0;
-  const breakMs = getBreakOverlapMs(baselineStartMs, nowMs);
-  const netSec = Math.max(Math.floor((wallMs - breakMs) / 1000), 0);
-  return netSec / 60;
-}
-
 function calculateExpectedOutput() {
   if (isMonitor) return 0;
   if (!firstScanAtMs) {
@@ -1546,22 +1510,12 @@ function syncEfficiencyCardDom() {
   if (!effEl) return;
   if (isMonitor) {
     syncMonitorPlanEffBaseline();
-    if (stoppedLineEfficiencyValid) {
-      effEl.innerText = efficiencyPercent + "%";
-      applyEfficiencyColorClass(effEl, efficiencyPercent);
-    } else {
-      effEl.innerText = "—";
-      effEl.className = "big-number status-blue";
-    }
+    effEl.innerText = efficiencyPercent + "%";
+    applyEfficiencyColorClass(effEl, efficiencyPercent);
     const monAct = document.getElementById("monitorActualEffPct");
     if (monAct) {
-      if (stoppedLineEfficiencyValid) {
-        monAct.innerText = efficiencyPercent + "%";
-        applyEfficiencyColorClass(monAct, efficiencyPercent);
-      } else {
-        monAct.innerText = "—";
-        monAct.className = "big-number status-blue";
-      }
+      monAct.innerText = efficiencyPercent + "%";
+      applyEfficiencyColorClass(monAct, efficiencyPercent);
     }
     return;
   }
@@ -1866,16 +1820,6 @@ function applyLiveState(state) {
     planInput.value = daily != null && daily > 0 ? String(daily) : "";
     cycleInput.value = cycle != null && cycle > 0 ? String(cycle) : "";
     document.getElementById("plan").innerText = daily != null && daily > 0 ? String(daily) : "-";
-
-    const wtp =
-      parseFirebaseFloat(state.workingTimePlanMin) ??
-      parseFirebaseFloat(state.settings && state.settings.workingTimePlanMin);
-    const wtn =
-      parseFirebaseFloat(state.workingTimeNetElapsedMin) ??
-      parseFirebaseFloat(state.settings && state.settings.workingTimeNetElapsedMin);
-    const wtel = document.getElementById("workingTimePlanMin");
-    if (wtel && wtp != null && wtp > 0) wtel.value = String(wtp);
-    syncMonitorWorkingTimeCards(wtp, wtn);
   } else {
     effectivePlan = resolvePositiveNumber(state.dailyPlan, plan, currentDailyPlan);
     cycleTimeMin = resolvePositiveNumber(state.cycleTimeMin, state.cycleTarget, currentCycleTime);
@@ -1887,7 +1831,6 @@ function applyLiveState(state) {
   const expected = parseInt(state.expected, 10) || 0;
   const delay = parseInt(state.delay, 10) || 0;
   const stateEfficiency = parseInt(state.efficiency, 10) || 0;
-  const stateEfficiencyFinalized = !!state.efficiencyFinalized;
   const lotNo = state.lotNo || "";
   const fbTotalDowntime = Number(state.totalDowntime);
   if (isMonitor && Number.isFinite(fbTotalDowntime) && fbTotalDowntime >= 0) {
@@ -1911,8 +1854,7 @@ function applyLiveState(state) {
   document.getElementById("actual").innerText = actual;
   document.getElementById("expected").innerText = expected;
   if (isMonitor) {
-    stoppedLineEfficiencyValid = stateEfficiencyFinalized;
-    efficiencyPercent = stateEfficiencyFinalized && Number.isFinite(stateEfficiency) ? stateEfficiency : 0;
+    efficiencyPercent = Number.isFinite(stateEfficiency) ? stateEfficiency : 0;
   }
   syncEfficiencyCardDom();
   startLiveCountdownTicker(countdown, status, state.updatedAt);
@@ -1921,9 +1863,12 @@ function applyLiveState(state) {
   refreshDowntimeCardFromTable();
   syncDowntimeAccumulatedHighlight();
   if (actual > 0 && state.lastScanAtMs) {
-    lastScanTime = new Date(Number(state.lastScanAtMs));
+    const ls = Number(state.lastScanAtMs);
+    lastScanTime = new Date(ls);
+    lastScanWallMs = ls;
   } else if (actual === 0) {
     lastScanTime = null;
+    lastScanWallMs = null;
   }
   restoreProductionTimerFromLiveState(status, countdown, expected, state.firstScanAtMs, state.updatedAt, state.lastScanAtMs);
 
@@ -2174,6 +2119,7 @@ function resetProduction(shouldSync = true) {
   actualCount = 0;
   downtimeSeconds = 0;
   lastScanTime = null;
+  lastScanWallMs = null;
   startTime = null;
   firstScanAtMs = null;
   sessionWorkingStartMs = null;
@@ -2345,6 +2291,7 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
     }
 
     lastScanTime = now;
+    lastScanWallMs = now.getTime();
     if (!firstScanAtMs) {
       firstScanAtMs = now.getTime();
     }
@@ -3744,38 +3691,11 @@ function updateLiveStateOnly() {
   let delay = actual - expected;
 
   const efficiency = efficiencyPercent;
-  const efficiencyFinalized = !!stoppedLineEfficiencyValid;
 
   const balance = actual - plan;
   const status = document.getElementById("status").innerText.trim();
   const lotNo = document.getElementById("lotInput").value || "";
   const bookedDowntime = getBookedDowntimeSec();
-  const wtPlanParsed = parseFloat(document.getElementById("workingTimePlanMin")?.value);
-  const workingTimePlanMinVal = Number.isFinite(wtPlanParsed) && wtPlanParsed > 0 ? wtPlanParsed : null;
-  const workingTimeNetElapsedMin = computeWorkingTimeNetElapsedMin();
-  const liveStatePayload = {
-    plan: plan,
-    dailyPlan: plan,
-    cycleTimeMin: cycleTimeMin,
-    actual: actual,
-    balance: balance,
-    lotNo: lotNo,
-    status: status,
-    countdown: countdownValue,
-    bookedDowntime: bookedDowntime,
-    totalDowntime: bookedDowntime,
-    downtimeDay: getActiveDowntimeDayKey(),
-    expected: expected,
-    delay: delay,
-    efficiency: efficiency,
-    efficiencyFinalized: efficiencyFinalized,
-    firstScanAtMs: firstScanAtMs,
-    lastScanAtMs: lastScanTime ? lastScanTime.getTime() : null,
-    workingTimePlanMin: workingTimePlanMinVal,
-    workingTimeNetElapsedMin: workingTimeNetElapsedMin
-  };
-
-  saveLocalLiveStateSnapshot(liveStatePayload);
 
   fetch(API_URL, {
     method: "POST",
@@ -3796,12 +3716,31 @@ function updateLiveStateOnly() {
       downtimeDay: getActiveDowntimeDayKey(),
       expected: expected,
       delay: delay,
-      efficiency: efficiency,
-      efficiencyFinalized: efficiencyFinalized
+      efficiency: efficiency
     })
   });
 
-  publishLiveStateToFirebase(liveStatePayload);
+  const firebasePayload = {
+    plan: plan,
+    dailyPlan: plan,
+    cycleTimeMin: cycleTimeMin,
+    actual: actual,
+    balance: balance,
+    lotNo: lotNo,
+    status: status,
+    countdown: countdownValue,
+    bookedDowntime: bookedDowntime,
+    totalDowntime: bookedDowntime,
+    downtimeDay: getActiveDowntimeDayKey(),
+    expected: expected,
+    delay: delay,
+    efficiency: efficiency,
+    firstScanAtMs: firstScanAtMs,
+    lastScanAtMs: lastScanWallMs != null ? lastScanWallMs : null
+  };
+
+  saveLocalLiveStateSnapshot(firebasePayload);
+  publishLiveStateToFirebase(firebasePayload);
 }
 
 function sendToSheet(chassis, model, engine, key, lot, status, downtimeEvent) {
