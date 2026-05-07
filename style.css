@@ -1840,13 +1840,14 @@ body.graph-mode{
   display:flex;
   flex-direction:column;
   justify-content:center;
-  align-items:flex-start;
+  align-items:center;
+  text-align:center;
   gap:6px;
   border:1px solid rgba(71,85,105,.45);
   border-radius:6px;
   background:rgba(15,23,42,.58);
-  padding:6px 8px;
-  min-height:86px;
+  padding:4px 6px;
+  min-height:70px;
 }
 
 .report-eff-wt-card span{
@@ -1859,7 +1860,7 @@ body.graph-mode{
 .report-eff-wt-card strong{
   font-size:clamp(28px, 3.2vh, 36px);
   font-weight:900;
-  color:#22d3ee;
+  color:#ffffff;
   line-height:1;
 }
 
