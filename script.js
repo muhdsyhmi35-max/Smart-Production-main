@@ -2994,9 +2994,10 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
   const toY = (v) => yBase - ((v / maxVal) * chartH);
 
   const planBarW = Math.max(Math.min((stepX || 12) * 0.34, 16), 6);
+  const planBarOffsetX = Math.min((stepX || 0) * 0.18, 9);
   const planBars = labels.map((_, i) => {
     const v = planValues?.[i] || 0;
-    const x = (leftPad + (stepX * i)) - (planBarW / 2);
+    const x = (leftPad + (stepX * i)) - (planBarW / 2) + planBarOffsetX;
     const y = toY(v);
     const h = Math.max(yBase - y, v > 0 ? 2 : 0);
     return `<rect class="summary-bar" style="animation-delay:${i * 35}ms" x="${x.toFixed(2)}" y="${(yBase - h).toFixed(2)}" width="${planBarW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="#3b82f6" opacity=".9"><title>Plan EFF: ${v.toFixed(1)}${valueSuffix}</title></rect>`;
