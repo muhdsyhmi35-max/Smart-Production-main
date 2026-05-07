@@ -590,42 +590,43 @@ function onGraphWtPresetChange() {
   if (!sel) return;
   const v = String(sel.value || "").trim().toLowerCase();
   graphWtPreset = Object.prototype.hasOwnProperty.call(GRAPH_WT_PRESET_MINS, v) ? v : "normal";
+  syncGraphWtControl();
   renderGraphCharts();
 }
 
-function syncHeaderGraphWtControl() {
-  const meta = document.querySelector(".header-meta");
-  if (!meta) return;
+function syncGraphWtControl() {
+  const headerExisting = document.getElementById("headerGraphWtWrap");
+  if (headerExisting) headerExisting.remove();
+  const controlsExisting = document.getElementById("controlsGraphWtWrap");
+  if (controlsExisting) controlsExisting.remove();
+
+  if (!isAdminRole()) return;
+
   const inGraph = document.body.classList.contains("graph-mode");
-  const existing = document.getElementById("headerGraphWtWrap");
+  if (inGraph) return;
+  const parent = document.querySelector(".controls");
+  if (!parent) return;
 
-  if (!inGraph) {
-    if (existing) existing.remove();
-    return;
+  const wrap = document.createElement("label");
+  wrap.id = "controlsGraphWtWrap";
+  wrap.className = "header-pill controls-wt-wrap";
+  wrap.innerHTML = `
+    <span class="header-pill-icon">⏱</span>
+    <span>Working Time</span>
+    <select id="graphWtPreset" class="header-wt-select" title="Select planned working-time mode">
+      <option value="normal">Normal Hour</option>
+      <option value="halfday">Half Day</option>
+      <option value="friday">Friday</option>
+    </select>
+  `;
+
+  parent.appendChild(wrap);
+
+  const sel = wrap.querySelector("#graphWtPreset");
+  if (sel) {
+    sel.value = graphWtPreset;
+    sel.addEventListener("change", onGraphWtPresetChange);
   }
-
-  if (!existing) {
-    const wrap = document.createElement("label");
-    wrap.id = "headerGraphWtWrap";
-    wrap.className = "header-pill header-wt-wrap";
-    wrap.innerHTML = `
-      <span class="header-pill-icon">⏱</span>
-      <span>Working Time</span>
-      <select id="graphWtPreset" class="header-wt-select" title="Select planned working-time mode">
-        <option value="normal">Normal Hour</option>
-        <option value="halfday">Half Day</option>
-        <option value="friday">Friday</option>
-      </select>
-    `;
-    const firstPill = meta.querySelector(".header-pill");
-    if (firstPill) meta.insertBefore(wrap, firstPill);
-    else meta.appendChild(wrap);
-    const sel = wrap.querySelector("#graphWtPreset");
-    if (sel) sel.addEventListener("change", onGraphWtPresetChange);
-  }
-
-  const sel = document.getElementById("graphWtPreset");
-  if (sel) sel.value = graphWtPreset;
 }
 
 function syncGraphPeriodButtonsUi() {
@@ -2811,7 +2812,7 @@ function updateViewToggleMenuItem() {
   } else {
     if (main) main.classList.add("active");
   }
-  syncHeaderGraphWtControl();
+  syncGraphWtControl();
 }
 
 function toggleViewFromMenu() {
@@ -3466,7 +3467,7 @@ function showGraphPage() {
   const historyPanel = document.getElementById("historyPanel");
   if (historyPanel) historyPanel.classList.remove("open");
   document.body.classList.add("graph-mode");
-  syncHeaderGraphWtControl();
+  syncGraphWtControl();
   graphPage.classList.add("open");
   triggerEnterAnimation(graphPage);
   updateViewToggleMenuItem();
