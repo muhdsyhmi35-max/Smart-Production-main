@@ -52,6 +52,7 @@ let downtimeSeconds = 0;
 /** null = today in graph filters; else YYYY-MM-DD. */
 let graphFilterDate = null;
 let graphPeriod = "week";
+let graphWtPreset = "normal";
 let graphRangeStartDate = null;
 let graphRangeEndDate = null;
 /** null = today in history filter; else YYYY-MM-DD. */
@@ -71,6 +72,11 @@ let scannedChassis = new Set();
 let scannedModel = new Set();
 let scannedEngine = new Set();
 let scannedKey = new Set();
+const GRAPH_WT_PRESET_MINS = {
+  normal: 460,
+  halfday: 300,
+  friday: 400
+};
 let duplicateLock = false;
 let lastUpdateTime = 0;
 let lastTableData = "";
@@ -579,6 +585,14 @@ function onGraphPeriodChange(period) {
   }
   syncGraphPeriodButtonsUi();
   syncGraphRangePickerUi();
+  renderGraphCharts();
+}
+
+function onGraphWtPresetChange() {
+  const sel = document.getElementById("graphWtPreset");
+  if (!sel) return;
+  const v = String(sel.value || "").trim().toLowerCase();
+  graphWtPreset = Object.prototype.hasOwnProperty.call(GRAPH_WT_PRESET_MINS, v) ? v : "normal";
   renderGraphCharts();
 }
 
@@ -3396,21 +3410,36 @@ function renderGraphCharts() {
   }).join("");
   const planActualChart = buildPlanVsActualChart(activeDay, graphPeriod);
   const downtimeChart = buildSummaryBarChart(`DOWNTIME TREND (${periodLabel}: ${rangeLabel})`, labels, downtimeMins, "#ef4444", "", "Minutes");
-  const hourlyProduced = {};
-  rows.forEach(row => {
-    const cells = row.querySelectorAll("td");
-    if (!cells.length) return;
-    const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
-    if (!rowDay || !keySet.has(rowDay)) return;
-    const hour = parseHourFromTimeText(cells[2]?.innerText || "");
-    if (hour == null) return;
-    hourlyProduced[hour] = (hourlyProduced[hour] || 0) + 1;
-  });
-  const activeHours = Object.keys(hourlyProduced).map(v => parseInt(v, 10)).filter(Number.isFinite).sort((a, b) => a - b);
-  const prodHourLabels = activeHours.map(h => `${String(h).padStart(2, "0")}:00`);
-  /** Total scans in each clock-hour across the whole date range (not an average — avoids fractional “units”). */
-  const prodHourValues = activeHours.map(h => hourlyProduced[h] || 0);
-  const prodHourChart = buildSummaryBarChart(`PRODUCTION BY HOUR (${periodLabel}: ${rangeLabel})`, prodHourLabels, prodHourValues, "#3b82f6", "", "Units (total)");
+  const cycleTimeMin = parseFloat(document.getElementById("cycleTarget").value) || SETTINGS.defaultCycle;
+  const planWtMins = GRAPH_WT_PRESET_MINS[graphWtPreset] || GRAPH_WT_PRESET_MINS.normal;
+  const actualWtMins = totalProduced > 0 ? totalProduced * cycleTimeMin : null;
+  const planEffPct = 98;
+  let actualEffPct = null;
+  if (totalTarget > 0 && actualWtMins != null && actualWtMins > 0) {
+    const rawEff = (totalProduced / totalTarget) * (planWtMins / actualWtMins) * 98;
+    actualEffPct = Number(Math.max(0, Math.min(100, rawEff)).toFixed(1));
+  }
+  const wtCards = `
+    <div class="summary-graph-card-title">EFF / W/T CARDS (${periodLabel}: ${rangeLabel})</div>
+    <div class="report-eff-wt-grid">
+      <div class="report-eff-wt-card">
+        <span>Plan EFF</span>
+        <strong>${planEffPct}%</strong>
+      </div>
+      <div class="report-eff-wt-card">
+        <span>Actual EFF</span>
+        <strong>${actualEffPct == null ? "—" : `${actualEffPct}%`}</strong>
+      </div>
+      <div class="report-eff-wt-card">
+        <span>Plan W/T (MINS)</span>
+        <strong>${planWtMins.toFixed(1)}</strong>
+      </div>
+      <div class="report-eff-wt-card">
+        <span>Actual W/T (MINS)</span>
+        <strong>${actualWtMins == null ? "—" : actualWtMins.toFixed(1)}</strong>
+      </div>
+    </div>
+  `;
   const oeeLabels = periodKeys.map(k => {
     const d = new Date(`${k}T00:00:00`);
     return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
@@ -3435,7 +3464,7 @@ function renderGraphCharts() {
       <div class="summary-graph-card">${downtimeChart}</div>
     </div>
     <div class="report-bottom-grid">
-      <div class="summary-graph-card">${prodHourChart}</div>
+      <div class="summary-graph-card report-eff-wt-wrap">${wtCards}</div>
       <div class="summary-graph-card">${oeeChart}</div>
     </div>
   `;
@@ -3472,6 +3501,11 @@ function showGraphPage() {
           <input type="date" id="graphRangeStart" title="Graph range start date">
           <span class="graph-range-sep">-</span>
           <input type="date" id="graphRangeEnd" title="Graph range end date">
+          <select id="graphWtPreset" title="Select planned working-time minutes">
+            <option value="normal">Normal (460m)</option>
+            <option value="halfday">Half Day (300m)</option>
+            <option value="friday">Friday (400m)</option>
+          </select>
           <button type="button" id="graphRangeTodayBtn" class="graph-today-btn">Today</button>
         </div>
       </div>
@@ -3486,11 +3520,14 @@ function showGraphPage() {
   const graphRangeTodayBtn = document.getElementById("graphRangeTodayBtn");
   const graphPeriodWeekBtn = document.getElementById("graphPeriodWeekBtn");
   const graphPeriodMonthBtn = document.getElementById("graphPeriodMonthBtn");
+  const graphWtPresetEl = document.getElementById("graphWtPreset");
+  if (graphWtPresetEl) graphWtPresetEl.value = graphWtPreset;
   if (graphRangeStart) graphRangeStart.addEventListener("change", onGraphRangeFilterChange);
   if (graphRangeEnd) graphRangeEnd.addEventListener("change", onGraphRangeFilterChange);
   if (graphRangeTodayBtn) graphRangeTodayBtn.addEventListener("click", onGraphRangeTodayClick);
   if (graphPeriodWeekBtn) graphPeriodWeekBtn.addEventListener("click", () => onGraphPeriodChange("week"));
   if (graphPeriodMonthBtn) graphPeriodMonthBtn.addEventListener("click", () => onGraphPeriodChange("month"));
+  if (graphWtPresetEl) graphWtPresetEl.addEventListener("change", onGraphWtPresetChange);
   renderGraphCharts();
 
   document.body.classList.remove("summary-mode");

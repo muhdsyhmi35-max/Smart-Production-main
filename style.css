@@ -1529,21 +1529,6 @@ body.graph-mode{
   font-weight:600;
 }
 
-.report-selects{
-  display:flex;
-  align-items:center;
-  gap:8px;
-}
-
-.report-selects select{
-  height:30px;
-  border-radius:6px;
-  border:1px solid rgba(71,85,105,.65);
-  background:rgba(2,6,23,.85);
-  color:#cbd5e1;
-  padding:0 8px;
-}
-
 .graph-period-toggle{
   display:flex;
   align-items:center;
@@ -1607,6 +1592,15 @@ body.graph-mode{
   background:rgba(2,6,23,.85);
   color:#e2e8f0;
   color-scheme:dark;
+}
+
+.graph-range-inputs select{
+  height:30px;
+  border-radius:6px;
+  border:1px solid rgba(71,85,105,.65);
+  background:rgba(2,6,23,.85);
+  color:#cbd5e1;
+  padding:0 8px;
 }
 
 .graph-filter-row input[type="date"]::-webkit-calendar-picker-indicator{
@@ -1758,6 +1752,44 @@ body.graph-mode{
 .report-bottom-grid > .summary-graph-card{
   display:flex;
   flex-direction:column;
+}
+
+.report-eff-wt-wrap{
+  padding:8px;
+}
+
+.report-eff-wt-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:4px;
+  flex:1 1 auto;
+}
+
+.report-eff-wt-card{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:flex-start;
+  gap:6px;
+  border:1px solid rgba(71,85,105,.45);
+  border-radius:8px;
+  background:rgba(15,23,42,.58);
+  padding:10px 12px;
+}
+
+.report-eff-wt-card span{
+  font-size:11px;
+  color:#93c5fd;
+  text-transform:uppercase;
+  letter-spacing:.4px;
+}
+
+.report-eff-wt-card strong{
+  font-size:clamp(20px, 2.2vh, 28px);
+  font-weight:900;
+  color:#22d3ee;
+  line-height:1;
 }
 
 .report-bottom-grid > .summary-graph-card .summary-chart-svg{
