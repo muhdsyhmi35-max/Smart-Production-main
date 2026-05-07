@@ -1796,7 +1796,7 @@ body.graph-mode{
   gap:10px;
   align-items:stretch;
   min-height:0;
-  overflow:visible;
+  overflow:hidden;
 }
 
 .report-chart-grid > .summary-graph-card{
@@ -1811,7 +1811,7 @@ body.graph-mode{
   gap:10px;
   min-height:0;
   align-items:stretch;
-  overflow:visible;
+  overflow:hidden;
 }
 
 .report-bottom-grid > .summary-graph-card,
@@ -1845,29 +1845,22 @@ body.graph-mode{
   border:1px solid rgba(71,85,105,.45);
   border-radius:6px;
   background:rgba(15,23,42,.58);
-  padding:5px 7px;
-  min-height:78px;
+  padding:6px 8px;
+  min-height:86px;
 }
 
 .report-eff-wt-card span{
-  font-size:14px;
+  font-size:13px;
   color:#93c5fd;
   text-transform:uppercase;
   letter-spacing:.5px;
 }
 
 .report-eff-wt-card strong{
-  font-size:clamp(26px, 3vh, 34px);
+  font-size:clamp(28px, 3.2vh, 36px);
   font-weight:900;
   color:#22d3ee;
-  line-height:1.05;
-}
-
-.report-chart-grid > .summary-graph-card .summary-chart-svg{
-  flex:1 1 auto;
-  width:100%;
-  height:100%;
-  max-height:none;
+  line-height:1;
 }
 
 .report-bottom-grid > .summary-graph-card .summary-chart-svg{
