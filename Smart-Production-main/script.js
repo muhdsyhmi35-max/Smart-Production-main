@@ -105,6 +105,7 @@ const APP_ADMIN_SESSION_KEY = "TF2_ADMIN_SESSION_OK";
 const SHIFT_SCHEDULE_STORAGE_KEY = "TF2_SHIFT_SCHEDULE";
 const SHIFT_WINDOW_STATE_KEY = "TF2_SHIFT_WINDOW_STATE";
 const SHIFT_PERIOD_KEY = "TF2_SHIFT_ACTIVE_PERIOD";
+const DASHBOARD_CALENDAR_DAY_KEY = "TF2_DASHBOARD_CALENDAR_DAY";
 
 /** Change these credentials for your deployment (client-side only; not secret from devtools). */
 const ADMIN_LOGIN = {
@@ -916,6 +917,37 @@ function updateDateTime() {
 
   document.getElementById("clock").innerText =
     now.toLocaleTimeString("en-MY");
+
+  maybeResetDashboardForNewCalendarDay();
+}
+
+function maybeResetDashboardForNewCalendarDay() {
+  if (isMonitor) return;
+  if (!initialLiveStateLoaded) return;
+  const today = toIsoDateLocal(new Date());
+  let stored = null;
+  try {
+    stored = localStorage.getItem(DASHBOARD_CALENDAR_DAY_KEY);
+  } catch (_) {}
+
+  if (stored === today) return;
+
+  if (stored === null) {
+    try {
+      localStorage.setItem(DASHBOARD_CALENDAR_DAY_KEY, today);
+    } catch (_) {}
+    return;
+  }
+
+  try {
+    localStorage.removeItem(SHIFT_WINDOW_STATE_KEY);
+    localStorage.removeItem(SHIFT_PERIOD_KEY);
+  } catch (_) {}
+
+  resetProduction(false);
+  try {
+    localStorage.setItem(DASHBOARD_CALENDAR_DAY_KEY, today);
+  } catch (_) {}
 }
 
 function getLocalMinuteOfDay(d = new Date()) {
@@ -1453,29 +1485,36 @@ function getBreakOverlapMs(fromMs, toMs) {
 
 function calculateExpectedOutput() {
   if (isMonitor) return 0;
-  if (!firstScanAtMs) {
-    return 0;
-  }
-  if (!timer) {
-    return actualCount;
-  }
 
-  // ✅ STOP expected when target achieved
   const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
   if (actualCount >= plan && plan > 0) {
     return plan;
   }
 
-  const now = new Date();
-  const elapsedSec = Math.floor((now.getTime() - firstScanAtMs) / 1000);
+  const shiftAuto = SETTINGS.shiftSchedule.enableAutoWindow;
+  let timelineStartMs = null;
 
+  if (shiftAuto) {
+    const nowMs = Date.now();
+    const shiftStartMs = getTodayShiftStartMs(new Date(nowMs));
+    if (nowMs < shiftStartMs) {
+      return 0;
+    }
+    timelineStartMs = shiftStartMs;
+  } else {
+    if (!firstScanAtMs) return 0;
+    timelineStartMs = firstScanAtMs;
+    if (!timer) {
+      return actualCount;
+    }
+  }
+
+  const nowMs = Date.now();
+  const elapsedSec = Math.floor((nowMs - timelineStartMs) / 1000);
   const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
 
-  // Exclude scheduled break overlap from expected output timeline.
-  const breakSeconds = Math.floor(getBreakOverlapMs(firstScanAtMs, now.getTime()) / 1000);
-
-  let netTime = elapsedSec - breakSeconds;
-  if (netTime < 0) netTime = 0;
+  const breakSeconds = Math.floor(getBreakOverlapMs(timelineStartMs, nowMs) / 1000);
+  const netTime = Math.max(0, elapsedSec - breakSeconds);
 
   let expected = Math.floor(netTime / cycleTimeSec);
   if (plan > 0) {
@@ -1892,7 +1931,11 @@ function applyLiveState(state) {
 }
 
 function loadInitialLiveState() {
-  if (!firebaseLiveStateRef) return;
+  if (!firebaseLiveStateRef) {
+    initialLiveStateLoaded = true;
+    maybeResetDashboardForNewCalendarDay();
+    return;
+  }
 
   firebaseLiveStateRef.once("value")
     .then(snapshot => {
@@ -1912,11 +1955,20 @@ function loadInitialLiveState() {
         };
       }
 
-      if (!liveState) return;
+      if (!liveState) {
+        initialLiveStateLoaded = true;
+        maybeResetDashboardForNewCalendarDay();
+        return;
+      }
       applyLiveState(liveState);
       initialLiveStateLoaded = true;
+      maybeResetDashboardForNewCalendarDay();
     })
-    .catch(err => console.log("Firebase initial live state error:", err));
+    .catch(err => {
+      console.log("Firebase initial live state error:", err);
+      initialLiveStateLoaded = true;
+      maybeResetDashboardForNewCalendarDay();
+    });
 }
 
 function loadMonitorStateFromFirebase() {
