@@ -3313,15 +3313,19 @@ function calcActualWtMinsForDay(dayKey) {
   const todayKey = toIsoDateLocal(new Date());
 
   if (dayKey < todayKey) {
-    // Past day: full configured shift window
-    return Math.max(0, (shiftEndMs - shiftStartMs) / 60000);
+    // Past day: full configured shift window minus scheduled breaks
+    const spanSec = Math.max(0, (shiftEndMs - shiftStartMs) / 1000);
+    const breakSec = scheduledBreakOverlapSec(shiftStartMs, shiftEndMs);
+    return Math.max(0, (spanSec - breakSec) / 60);
   }
   if (dayKey > todayKey) return 0;
 
   // Today: elapsed up to now, capped at shift end
   const nowMs = Date.now();
   const cappedMs = Math.min(Math.max(nowMs, shiftStartMs), shiftEndMs);
-  return Math.max(0, (cappedMs - shiftStartMs) / 60000);
+  const spanTodaySec = Math.max(0, (cappedMs - shiftStartMs) / 1000);
+  const breakTodaySec = scheduledBreakOverlapSec(shiftStartMs, cappedMs);
+  return Math.max(0, (spanTodaySec - breakTodaySec) / 60);
 }
 
 function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, rangeLabel) {
