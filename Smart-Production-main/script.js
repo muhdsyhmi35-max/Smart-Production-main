@@ -55,6 +55,8 @@ let graphPeriod = "week";
 let graphWtPreset = "normal";
 let graphRangeStartDate = null;
 let graphRangeEndDate = null;
+let graphFocusedDayKey = null; // when clicking Production Trend, cards show this day only
+let graphReportCache = null; // cached maps for the currently rendered Production Report range
 /** null = today in history filter; else YYYY-MM-DD. */
 let historyFilterDate = null;
 /** null = today in summary filter; else YYYY-MM-DD. */
@@ -3246,7 +3248,7 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
     const y = yBase - barH;
     const dTxt = formatIsoDateAsDdMmYy(dayKeys[i]);
     const vTxt = formatNum(targetSeries[i] || 0);
-    return `<rect class="summary-bar" style="animation-delay:${i * 35}ms" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${targetBarW.toFixed(2)}" height="${barH.toFixed(2)}" rx="2" fill="#3b82f6" opacity=".92"><title>Target\n${dTxt}: ${vTxt}</title></rect>`;
+    return `<rect class="summary-bar" data-report-day="${dayKeys[i]}" style="animation-delay:${i * 35}ms; cursor:pointer" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${targetBarW.toFixed(2)}" height="${barH.toFixed(2)}" rx="2" fill="#3b82f6" opacity=".92" onclick="focusGraphDay('${dayKeys[i]}')"><title>Target\n${dTxt}: ${vTxt}</title></rect>`;
   }).join("");
   const areaPath = actualPoints.length
     ? `${actualPath} L ${actualPoints[actualPoints.length - 1].x.toFixed(2)} ${yBase.toFixed(2)} L ${actualPoints[0].x.toFixed(2)} ${yBase.toFixed(2)} Z`
@@ -3279,7 +3281,7 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
   const actualDots = actualPoints.map((p, i) => {
     const dTxt = formatIsoDateAsDdMmYy(dayKeys[i]);
     const vTxt = formatNum(p.value);
-    return `<circle class="trend-dot" style="animation-delay:${i * 45}ms" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="4.2" fill="#4ade80"><title>Actual\n${dTxt}: ${vTxt}</title></circle>`;
+    return `<circle class="trend-dot" data-report-day="${dayKeys[i]}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="4.2" fill="#4ade80" onclick="focusGraphDay('${dayKeys[i]}')"><title>Actual\n${dTxt}: ${vTxt}</title></circle>`;
   }).join("");
 
   return `
@@ -3396,6 +3398,88 @@ function collectHourlyGraphData(dayKey = getActiveGraphDayKey(), period = graphP
   return { labels, outputVals, downtimeMins, bucketName: "Day" };
 }
 
+function calcActualWtMinsForDay(dayKey) {
+  const shiftStartMin = Number(SETTINGS.shiftSchedule.startMinute);
+  const shiftEndMin = Number(SETTINGS.shiftSchedule.endMinute);
+  if (!Number.isFinite(shiftStartMin) || !Number.isFinite(shiftEndMin) || shiftEndMin <= shiftStartMin) return null;
+
+  const [yy, mm, dd] = String(dayKey).split("-").map(v => parseInt(v, 10));
+  if (!Number.isFinite(yy) || !Number.isFinite(mm) || !Number.isFinite(dd)) return null;
+
+  const dayStartMs = new Date(yy, mm - 1, dd, 0, 0, 0, 0).getTime();
+  const shiftStartMs = dayStartMs + (shiftStartMin * 60 * 1000);
+  const shiftEndMs = dayStartMs + (shiftEndMin * 60 * 1000);
+  const todayKey = toIsoDateLocal(new Date());
+
+  if (dayKey < todayKey) {
+    // Past day: full configured shift window
+    return Math.max(0, (shiftEndMs - shiftStartMs) / 60000);
+  }
+  if (dayKey > todayKey) return 0;
+
+  // Today: elapsed up to now, capped at shift end
+  const nowMs = Date.now();
+  const cappedMs = Math.min(Math.max(nowMs, shiftStartMs), shiftEndMs);
+  return Math.max(0, (cappedMs - shiftStartMs) / 60000);
+}
+
+function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, rangeLabel) {
+  const planEffPct = 98;
+  const planWtMins = GRAPH_WT_PRESET_MINS[graphWtPreset] || GRAPH_WT_PRESET_MINS.normal;
+
+  const planUnits = dayTarget?.[dayKey] || 0;
+  const actualUnits = dayProduced?.[dayKey] || 0;
+  const actualWtMins = calcActualWtMinsForDay(dayKey);
+
+  let actualEffPct = null;
+  if (planUnits > 0 && actualWtMins != null && actualWtMins > 0) {
+    // Company formula: (actual unit/plan unit) * (Working time plan / Working time actual) * 98%
+    const rawEff = (actualUnits / planUnits) * (planWtMins / actualWtMins) * 98;
+    actualEffPct = Number(Math.max(0, rawEff).toFixed(1));
+  }
+
+  const titleDay = dayKey ? formatIsoDateAsDdMmYy(dayKey) : `${periodLabel}: ${rangeLabel}`;
+  return `
+    <div class="summary-graph-card-title">EFF / W/T CARDS (${titleDay})</div>
+    <div class="report-eff-wt-grid">
+      <div class="report-eff-wt-card">
+        <span>Plan EFF</span>
+        <strong>${planEffPct}%</strong>
+      </div>
+      <div class="report-eff-wt-card">
+        <span>Actual EFF</span>
+        <strong>${actualEffPct == null ? "—" : `${actualEffPct}%`}</strong>
+      </div>
+      <div class="report-eff-wt-card">
+        <span>Plan W/T (MINS)</span>
+        <strong>${planWtMins.toFixed(1)}</strong>
+      </div>
+      <div class="report-eff-wt-card">
+        <span>Actual W/T (MINS)</span>
+        <strong>${actualWtMins == null ? "—" : actualWtMins.toFixed(1)}</strong>
+      </div>
+    </div>
+  `;
+}
+
+function updateGraphWtCardsFromFocus() {
+  const wrapEl = document.getElementById("graphEffWtCardsWrap");
+  if (!wrapEl || !graphReportCache) return;
+  const scopeDayKey = graphFocusedDayKey || graphReportCache.anchorDay;
+  wrapEl.innerHTML = buildEffWtCardsHtmlForDay(
+    scopeDayKey,
+    graphReportCache.dayProduced,
+    graphReportCache.dayTarget,
+    graphReportCache.periodLabel,
+    graphReportCache.rangeLabel
+  );
+}
+
+function focusGraphDay(dayKey) {
+  graphFocusedDayKey = dayKey;
+  updateGraphWtCardsFromFocus();
+}
+
 function renderGraphCharts() {
   const graphBody = document.getElementById("graphChartsBody");
   if (!graphBody) return;
@@ -3405,6 +3489,9 @@ function renderGraphCharts() {
   const { labels, downtimeMins } = collectHourlyGraphData(activeDay, graphPeriod);
   const periodLabel = graphPeriod === "month" ? "Month" : "Week";
   const periodKeys = getDayKeysBetween(range.start, range.end);
+  if (graphFocusedDayKey && !periodKeys.includes(graphFocusedDayKey)) {
+    graphFocusedDayKey = null;
+  }
   const keySet = new Set(periodKeys);
   const rows = document.querySelectorAll("#scanTable tr");
   const dayProduced = {};
@@ -3426,6 +3513,14 @@ function renderGraphCharts() {
     fallbackDayPlan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
   }
   const dayTarget = computeDayTargetsForReport(periodKeys, dayProduced, fallbackDayPlan);
+  graphReportCache = {
+    anchorDay: activeDay,
+    periodKeys,
+    dayProduced,
+    dayTarget,
+    periodLabel,
+    rangeLabel
+  };
   const totalProduced = periodKeys.reduce((s, k) => s + (dayProduced[k] || 0), 0);
   const totalTarget = periodKeys.reduce((s, k) => s + (dayTarget[k] || 0), 0);
   const totalDowntimeMin = Math.max(0, Math.round(periodKeys.reduce((s, k) => s + (dayDowntimeSec[k] || 0), 0) / 60));
@@ -3447,55 +3542,8 @@ function renderGraphCharts() {
   }).join("");
   const planActualChart = buildPlanVsActualChart(activeDay, graphPeriod);
   const downtimeChart = buildSummaryBarChart(`DOWNTIME TREND (${periodLabel}: ${rangeLabel})`, labels, downtimeMins, "#ef4444", "", "Minutes");
-  const planWtMins = GRAPH_WT_PRESET_MINS[graphWtPreset] || GRAPH_WT_PRESET_MINS.normal;
-  let actualWtMins = null;
-  const shiftStartMin = Number(SETTINGS.shiftSchedule.startMinute);
-  const shiftEndMin = Number(SETTINGS.shiftSchedule.endMinute);
-  if (Number.isFinite(shiftStartMin) && Number.isFinite(shiftEndMin) && shiftEndMin > shiftStartMin) {
-    const [yy, mm, dd] = String(activeDay).split("-").map(v => parseInt(v, 10));
-    if (Number.isFinite(yy) && Number.isFinite(mm) && Number.isFinite(dd)) {
-      const dayStartMs = new Date(yy, mm - 1, dd, 0, 0, 0, 0).getTime();
-      const shiftStartMs = dayStartMs + (shiftStartMin * 60 * 1000);
-      const shiftEndMs = dayStartMs + (shiftEndMin * 60 * 1000);
-      const todayKey = toIsoDateLocal(new Date());
-      if (activeDay < todayKey) {
-        actualWtMins = Math.max(0, (shiftEndMs - shiftStartMs) / 60000);
-      } else if (activeDay > todayKey) {
-        actualWtMins = 0;
-      } else {
-        const nowMs = Date.now();
-        const cappedMs = Math.min(Math.max(nowMs, shiftStartMs), shiftEndMs);
-        actualWtMins = Math.max(0, (cappedMs - shiftStartMs) / 60000);
-      }
-    }
-  }
-  const planEffPct = 98;
-  let actualEffPct = null;
-  if (totalTarget > 0 && actualWtMins != null && actualWtMins > 0) {
-    const rawEff = (totalProduced / totalTarget) * (planWtMins / actualWtMins) * 98;
-    actualEffPct = Number(Math.max(0, rawEff).toFixed(1));
-  }
-  const wtCards = `
-    <div class="summary-graph-card-title">EFF / W/T CARDS (${periodLabel}: ${rangeLabel})</div>
-    <div class="report-eff-wt-grid">
-      <div class="report-eff-wt-card">
-        <span>Plan EFF</span>
-        <strong>${planEffPct}%</strong>
-      </div>
-      <div class="report-eff-wt-card">
-        <span>Actual EFF</span>
-        <strong>${actualEffPct == null ? "—" : `${actualEffPct}%`}</strong>
-      </div>
-      <div class="report-eff-wt-card">
-        <span>Plan W/T (MINS)</span>
-        <strong>${planWtMins.toFixed(1)}</strong>
-      </div>
-      <div class="report-eff-wt-card">
-        <span>Actual W/T (MINS)</span>
-        <strong>${actualWtMins == null ? "—" : actualWtMins.toFixed(1)}</strong>
-      </div>
-    </div>
-  `;
+  const scopeDayKey = graphFocusedDayKey || activeDay;
+  const wtCards = buildEffWtCardsHtmlForDay(scopeDayKey, dayProduced, dayTarget, periodLabel, rangeLabel);
   const oeeLabels = periodKeys.map(k => {
     const d = new Date(`${k}T00:00:00`);
     return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
@@ -3520,7 +3568,7 @@ function renderGraphCharts() {
       <div class="summary-graph-card">${downtimeChart}</div>
     </div>
     <div class="report-bottom-grid">
-      <div class="summary-graph-card report-eff-wt-wrap">${wtCards}</div>
+      <div class="summary-graph-card report-eff-wt-wrap" id="graphEffWtCardsWrap">${wtCards}</div>
       <div class="summary-graph-card">${oeeChart}</div>
     </div>
   `;
