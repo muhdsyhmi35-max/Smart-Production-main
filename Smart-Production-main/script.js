@@ -3080,6 +3080,78 @@ function buildSummaryLineChart(title, labels, values, color, valueSuffix = "", y
   `;
 }
 
+function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valueSuffix = "%", yAxisLabel = "%") {
+  if (!labels.length || !actualValues.length) {
+    return `<div class="summary-graph-empty">No data</div>`;
+  }
+  const width = 500;
+  const height = 170;
+  const leftPad = 36;
+  const rightPad = 12;
+  const topPad = 14;
+  const bottomPad = 28;
+  const chartW = width - leftPad - rightPad;
+  const chartH = height - topPad - bottomPad;
+  const maxVal = Math.max(1, ...actualValues, ...(planValues || []));
+  const stepX = labels.length <= 1 ? chartW : (chartW / (labels.length - 1));
+  const yBase = topPad + chartH;
+  const toY = (v) => yBase - ((v / maxVal) * chartH);
+
+  const planBarW = Math.max(Math.min((stepX || 12) * 0.34, 16), 6);
+  const planBars = labels.map((_, i) => {
+    const v = planValues?.[i] || 0;
+    const x = (leftPad + (stepX * i)) - (planBarW / 2);
+    const y = toY(v);
+    const h = Math.max(yBase - y, v > 0 ? 2 : 0);
+    return `<rect class="summary-bar" style="animation-delay:${i * 35}ms" x="${x.toFixed(2)}" y="${(yBase - h).toFixed(2)}" width="${planBarW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="#3b82f6" opacity=".9"><title>Plan EFF: ${v.toFixed(1)}${valueSuffix}</title></rect>`;
+  }).join("");
+
+  const points = actualValues.map((v, i) => ({
+    x: leftPad + (stepX * i),
+    y: toY(v),
+    value: v
+  }));
+  const path = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+  const circles = points.map((p, i) => `
+    <circle class="trend-dot" style="animation-delay:${i * 45}ms" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="3.8" fill="#a855f7">
+      <title>${labels[i]}: ${p.value}${valueSuffix}</title>
+    </circle>
+  `).join("");
+
+  const labelStride = labels.length > 24 ? 3 : labels.length > 16 ? 2 : 1;
+  const xLabels = labels.map((label, i) => {
+    if (i % labelStride !== 0 && i !== labels.length - 1) return "";
+    return `<text x="${(leftPad + stepX * i).toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>`;
+  }).join("");
+  const yTicks = 4;
+  const yGrid = Array.from({ length: yTicks + 1 }, (_, i) => {
+    const ratio = i / yTicks;
+    const y = topPad + chartH * ratio;
+    const val = Math.round(maxVal * (1 - ratio));
+    return `
+      <line x1="${leftPad}" y1="${y.toFixed(2)}" x2="${(width - rightPad).toFixed(2)}" y2="${y.toFixed(2)}" stroke="rgba(148,163,184,.16)" stroke-width="1"></line>
+      <text x="${(leftPad - 6).toFixed(2)}" y="${(y + 4).toFixed(2)}" text-anchor="end" fill="#94a3b8" font-size="10">${val}</text>
+    `;
+  }).join("");
+  const titleMatch = String(title).match(/^(.*?)(\s*\((.*)\))$/);
+  const titleMain = titleMatch ? titleMatch[1].trim() : String(title);
+  const titleSub = titleMatch ? String(titleMatch[3] || "").trim() : "";
+  return `
+    <div class="trend-title-wrap trend-title-wrap-compact">
+      <div class="trend-title trend-title-small">${titleMain}</div>
+      ${titleSub ? `<div class="trend-subtitle">${titleSub}</div>` : ""}
+    </div>
+    ${yAxisLabel ? `<div class="trend-units">${yAxisLabel}</div>` : ""}
+    <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg" role="img" aria-label="${title}">
+      ${yGrid}
+      ${planBars}
+      <path class="trend-line" d="${path}" fill="none" stroke="#a855f7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+      ${circles}
+      ${xLabels}
+    </svg>
+  `;
+}
+
 function getPlanActualForPeriod(anchorDay, period = "day") {
   const range = getActiveGraphRange();
   const periodKeys = getDayKeysBetween(range.start, range.end);
@@ -3561,10 +3633,14 @@ function renderGraphCharts() {
   const oeeValues = periodKeys.map(k => {
     const target = dayTarget[k] || 0;
     const produced = dayProduced[k] || 0;
-    if (target <= 0) return 0;
-    return Number(Math.max(0, (produced / target) * 100).toFixed(1));
+    const planWtMins = GRAPH_WT_PRESET_MINS[graphWtPreset] || GRAPH_WT_PRESET_MINS.normal;
+    const actualWtMins = calcActualWtMinsForDay(k);
+    if (target <= 0 || actualWtMins == null || actualWtMins <= 0) return 0;
+    const rawEff = (produced / target) * (planWtMins / actualWtMins) * 98;
+    return Number(Math.max(0, rawEff).toFixed(1));
   });
-  const oeeChart = buildSummaryLineChart(`EFFICIENCY TREND (${periodLabel}: ${rangeLabel})`, oeeLabels, oeeValues, "#a855f7", "%", "%");
+  const planEffValues = periodKeys.map(() => 98);
+  const oeeChart = buildEfficiencyTrendChart(`EFFICIENCY TREND (${periodLabel}: ${rangeLabel})`, oeeLabels, oeeValues, planEffValues, "%", "%");
   graphBody.innerHTML = `
     <div class="report-kpi-grid">
       <div class="report-kpi"><span>Total Produced</span><strong>${totalProduced}</strong><em>units</em></div>
