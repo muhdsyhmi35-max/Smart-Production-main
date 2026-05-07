@@ -2275,6 +2275,7 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
     }
 
     row.dataset.scanDate = toIsoDateLocal(now);
+    row.dataset.scanMs = String(now.getTime());
     row.dataset.scanPlan = String(planForRow);
     renumberScanTable();
 
@@ -3371,7 +3372,45 @@ function collectHourlyGraphData(dayKey = getActiveGraphDayKey(), period = graphP
   return { labels, outputVals, downtimeMins, bucketName: "Day" };
 }
 
-function calcActualWtMinsForDay(dayKey) {
+function parseDayTimeTextToMs(dayKey, timeText) {
+  const [yy, mm, dd] = String(dayKey).split("-").map(v => parseInt(v, 10));
+  if (!Number.isFinite(yy) || !Number.isFinite(mm) || !Number.isFinite(dd)) return null;
+  const t = String(timeText || "").trim().toLowerCase();
+  const m = t.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?/i);
+  if (!m) return null;
+  let h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  const sec = parseInt(m[3] || "0", 10);
+  const ampm = String(m[4] || "").toLowerCase();
+  if (ampm === "pm" && h < 12) h += 12;
+  if (ampm === "am" && h === 12) h = 0;
+  if (!Number.isFinite(h) || !Number.isFinite(min) || !Number.isFinite(sec)) return null;
+  return new Date(yy, mm - 1, dd, h, min, sec, 0).getTime();
+}
+
+function getTargetAchievedMsForDay(dayKey, targetUnits) {
+  if (!Number.isFinite(targetUnits) || targetUnits <= 0) return null;
+  const rows = document.querySelectorAll("#scanTable tr");
+  const times = [];
+  rows.forEach(row => {
+    const cells = row.querySelectorAll("td");
+    if (!cells.length) return;
+    const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
+    if (rowDay !== dayKey) return;
+    const scanMsRaw = parseInt(String(row.dataset.scanMs || "").trim(), 10);
+    if (Number.isFinite(scanMsRaw) && scanMsRaw > 0) {
+      times.push(scanMsRaw);
+      return;
+    }
+    const parsedMs = parseDayTimeTextToMs(rowDay, cells[2]?.innerText || "");
+    if (Number.isFinite(parsedMs)) times.push(parsedMs);
+  });
+  if (times.length < targetUnits) return null;
+  times.sort((a, b) => a - b); // earliest -> latest
+  return times[targetUnits - 1] || null;
+}
+
+function calcActualWtMinsForDay(dayKey, targetUnits = 0) {
   const shiftStartMin = Number(SETTINGS.shiftSchedule.startMinute);
   const shiftEndMin = Number(SETTINGS.shiftSchedule.endMinute);
   if (!Number.isFinite(shiftStartMin) || !Number.isFinite(shiftEndMin) || shiftEndMin <= shiftStartMin) return null;
@@ -3383,20 +3422,23 @@ function calcActualWtMinsForDay(dayKey) {
   const shiftStartMs = dayStartMs + (shiftStartMin * 60 * 1000);
   const shiftEndMs = dayStartMs + (shiftEndMin * 60 * 1000);
   const todayKey = toIsoDateLocal(new Date());
+  const achievedMs = getTargetAchievedMsForDay(dayKey, targetUnits);
 
   if (dayKey < todayKey) {
     // Past day: full configured shift window minus scheduled breaks
-    const spanSec = Math.max(0, (shiftEndMs - shiftStartMs) / 1000);
-    const breakSec = scheduledBreakOverlapSec(shiftStartMs, shiftEndMs);
+    const endMs = Number.isFinite(achievedMs) ? Math.min(shiftEndMs, Math.max(achievedMs, shiftStartMs)) : shiftEndMs;
+    const spanSec = Math.max(0, (endMs - shiftStartMs) / 1000);
+    const breakSec = scheduledBreakOverlapSec(shiftStartMs, endMs);
     return Math.max(0, (spanSec - breakSec) / 60);
   }
   if (dayKey > todayKey) return 0;
 
   // Today: elapsed up to now, capped at shift end
   const nowMs = Date.now();
-  const cappedMs = Math.min(Math.max(nowMs, shiftStartMs), shiftEndMs);
-  const spanTodaySec = Math.max(0, (cappedMs - shiftStartMs) / 1000);
-  const breakTodaySec = scheduledBreakOverlapSec(shiftStartMs, cappedMs);
+  const naturalEndMs = Math.min(Math.max(nowMs, shiftStartMs), shiftEndMs);
+  const endMs = Number.isFinite(achievedMs) ? Math.min(naturalEndMs, Math.max(achievedMs, shiftStartMs)) : naturalEndMs;
+  const spanTodaySec = Math.max(0, (endMs - shiftStartMs) / 1000);
+  const breakTodaySec = scheduledBreakOverlapSec(shiftStartMs, endMs);
   return Math.max(0, (spanTodaySec - breakTodaySec) / 60);
 }
 
@@ -3406,7 +3448,7 @@ function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, 
 
   const planUnits = dayTarget?.[dayKey] || 0;
   const actualUnits = dayProduced?.[dayKey] || 0;
-  const actualWtMins = calcActualWtMinsForDay(dayKey);
+  const actualWtMins = calcActualWtMinsForDay(dayKey, planUnits);
 
   let actualEffPct = null;
   if (planUnits > 0 && actualWtMins != null && actualWtMins > 0) {
@@ -3530,7 +3572,7 @@ function renderGraphCharts() {
     const target = dayTarget[k] || 0;
     const produced = dayProduced[k] || 0;
     const planWtMins = GRAPH_WT_PRESET_MINS[graphWtPreset] || GRAPH_WT_PRESET_MINS.normal;
-    const actualWtMins = calcActualWtMinsForDay(k);
+    const actualWtMins = calcActualWtMinsForDay(k, target);
     if (target <= 0 || actualWtMins == null || actualWtMins <= 0) return 0;
     const rawEff = (produced / target) * (planWtMins / actualWtMins) * 98;
     return Number(Math.max(0, rawEff).toFixed(1));
@@ -4136,6 +4178,7 @@ function loadLiveData() {
           newRow.dataset.scanDate = Number.isFinite(fullDateTime.getTime())
             ? toIsoDateLocal(fullDateTime)
             : parseDisplayDateToIsoKey(newRow.cells[1]?.innerText);
+          newRow.dataset.scanMs = Number.isFinite(fullDateTime.getTime()) ? String(fullDateTime.getTime()) : "";
           const rawPlan = idxPlan >= 0 ? row[idxPlan] : "";
           const planVal = parseInt(String(rawPlan ?? "").trim(), 10);
           newRow.dataset.scanPlan = Number.isFinite(planVal) && planVal > 0 ? String(planVal) : "";
