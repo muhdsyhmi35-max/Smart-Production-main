@@ -3388,6 +3388,7 @@ function focusGraphDay(dayKey) {
 function renderGraphCharts() {
   const graphBody = document.getElementById("graphChartsBody");
   if (!graphBody) return;
+  try {
   const activeDay = getActiveGraphDayKey();
   const range = getActiveGraphRange();
   const rangeLabel = formatIsoRangeAsDdMmYy(range.start, range.end);
@@ -3477,6 +3478,15 @@ function renderGraphCharts() {
       <div class="summary-graph-card">${oeeChart}</div>
     </div>
   `;
+  } catch (err) {
+    console.error("renderGraphCharts failed:", err);
+    graphBody.innerHTML = `
+      <div class="summary-graph-card">
+        <div class="summary-graph-card-title">Production Report</div>
+        <div class="summary-graph-empty">Failed to render report data. Please refresh and try again.</div>
+      </div>
+    `;
+  }
 }
 
 function showGraphPageFromMenu() {
@@ -3529,7 +3539,11 @@ function showGraphPage() {
   if (graphRangeTodayBtn) graphRangeTodayBtn.addEventListener("click", onGraphRangeTodayClick);
   if (graphPeriodWeekBtn) graphPeriodWeekBtn.addEventListener("click", () => onGraphPeriodChange("week"));
   if (graphPeriodMonthBtn) graphPeriodMonthBtn.addEventListener("click", () => onGraphPeriodChange("month"));
-  renderGraphCharts();
+  try {
+    renderGraphCharts();
+  } catch (err) {
+    console.error("showGraphPage render failed:", err);
+  }
 
   document.body.classList.remove("summary-mode");
   document.body.classList.remove("history-mode");
