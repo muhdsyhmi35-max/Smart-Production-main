@@ -1535,6 +1535,11 @@ function getBreakOverlapMs(fromMs, toMs) {
   return total;
 }
 
+// Compatibility helper: keep shared report logic using seconds-based break overlap.
+function scheduledBreakOverlapSec(startMs, endMs) {
+  return Math.floor(getBreakOverlapMs(startMs, endMs) / 1000);
+}
+
 function calculateExpectedOutput() {
   if (isMonitor) return 0;
 
