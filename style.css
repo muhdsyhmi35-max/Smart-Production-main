@@ -253,6 +253,34 @@ body::-webkit-scrollbar{
   -webkit-appearance:none;
 }
 
+.header-wt-wrap{
+  gap:8px;
+  cursor:pointer;
+  transition:transform var(--dur-fast) var(--ease-soft), filter var(--dur-fast) var(--ease-soft), border-color var(--dur-fast) var(--ease-soft);
+}
+
+.header-wt-wrap:hover{
+  transform:translateY(-1px);
+  filter:brightness(1.05);
+  border-color:rgba(56,189,248,.55);
+}
+
+.header-wt-select{
+  min-width:132px;
+  height:30px;
+  border-radius:6px;
+  border:1px solid rgba(71,85,105,.65);
+  background:rgba(2,6,23,.85);
+  color:#cbd5e1;
+  padding:0 8px;
+  font-weight:700;
+}
+
+.header-wt-select:focus-visible{
+  outline:2px solid rgba(96,165,250,.55);
+  outline-offset:2px;
+}
+
 .header-role-trigger.header-pill:focus-visible{
   outline:2px solid rgba(96,165,250,.55);
   outline-offset:2px;

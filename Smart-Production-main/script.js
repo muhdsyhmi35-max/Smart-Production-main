@@ -596,6 +596,41 @@ function onGraphWtPresetChange() {
   renderGraphCharts();
 }
 
+function syncHeaderGraphWtControl() {
+  const meta = document.querySelector(".header-meta");
+  if (!meta) return;
+  const inGraph = document.body.classList.contains("graph-mode");
+  const existing = document.getElementById("headerGraphWtWrap");
+
+  if (!inGraph) {
+    if (existing) existing.remove();
+    return;
+  }
+
+  if (!existing) {
+    const wrap = document.createElement("label");
+    wrap.id = "headerGraphWtWrap";
+    wrap.className = "header-pill header-wt-wrap";
+    wrap.innerHTML = `
+      <span class="header-pill-icon">⏱</span>
+      <span>Working Time</span>
+      <select id="graphWtPreset" class="header-wt-select" title="Select planned working-time mode">
+        <option value="normal">Normal Hour</option>
+        <option value="halfday">Half Day</option>
+        <option value="friday">Friday</option>
+      </select>
+    `;
+    const firstPill = meta.querySelector(".header-pill");
+    if (firstPill) meta.insertBefore(wrap, firstPill);
+    else meta.appendChild(wrap);
+    const sel = wrap.querySelector("#graphWtPreset");
+    if (sel) sel.addEventListener("change", onGraphWtPresetChange);
+  }
+
+  const sel = document.getElementById("graphWtPreset");
+  if (sel) sel.value = graphWtPreset;
+}
+
 function syncGraphPeriodButtonsUi() {
   const weekBtn = document.getElementById("graphPeriodWeekBtn");
   const monthBtn = document.getElementById("graphPeriodMonthBtn");
@@ -2875,6 +2910,7 @@ function updateViewToggleMenuItem() {
   } else {
     if (main) main.classList.add("active");
   }
+  syncHeaderGraphWtControl();
 }
 
 function toggleViewFromMenu() {
@@ -3490,17 +3526,6 @@ function showGraphPage() {
 
   graphPage.innerHTML = `
     <div class="summary-head">Production Report</div>
-    <div class="graph-top-tools">
-      <label class="graph-wt-pill" for="graphWtPreset">
-        <span class="header-pill-icon">⏱</span>
-        <span>Working Time</span>
-        <select id="graphWtPreset" class="graph-wt-select" title="Select planned working-time mode">
-          <option value="normal">Normal Hour</option>
-          <option value="halfday">Half Day</option>
-          <option value="friday">Friday</option>
-        </select>
-      </label>
-    </div>
     <div class="graph-filter-row">
       <div class="graph-period-toggle" role="group" aria-label="Graph period">
         <button type="button" id="graphPeriodWeekBtn" class="graph-period-btn">Week</button>
@@ -3526,14 +3551,11 @@ function showGraphPage() {
   const graphRangeTodayBtn = document.getElementById("graphRangeTodayBtn");
   const graphPeriodWeekBtn = document.getElementById("graphPeriodWeekBtn");
   const graphPeriodMonthBtn = document.getElementById("graphPeriodMonthBtn");
-  const graphWtPresetEl = document.getElementById("graphWtPreset");
-  if (graphWtPresetEl) graphWtPresetEl.value = graphWtPreset;
   if (graphRangeStart) graphRangeStart.addEventListener("change", onGraphRangeFilterChange);
   if (graphRangeEnd) graphRangeEnd.addEventListener("change", onGraphRangeFilterChange);
   if (graphRangeTodayBtn) graphRangeTodayBtn.addEventListener("click", onGraphRangeTodayClick);
   if (graphPeriodWeekBtn) graphPeriodWeekBtn.addEventListener("click", () => onGraphPeriodChange("week"));
   if (graphPeriodMonthBtn) graphPeriodMonthBtn.addEventListener("click", () => onGraphPeriodChange("month"));
-  if (graphWtPresetEl) graphWtPresetEl.addEventListener("change", onGraphWtPresetChange);
   renderGraphCharts();
 
   document.body.classList.remove("summary-mode");
@@ -3543,6 +3565,7 @@ function showGraphPage() {
   const historyPanel = document.getElementById("historyPanel");
   if (historyPanel) historyPanel.classList.remove("open");
   document.body.classList.add("graph-mode");
+  syncHeaderGraphWtControl();
   graphPage.classList.add("open");
   triggerEnterAnimation(graphPage);
   updateViewToggleMenuItem();
