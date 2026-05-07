@@ -591,7 +591,7 @@ function onGraphWtPresetChange() {
   const sel = document.getElementById("graphWtPreset");
   if (!sel) return;
   const v = String(sel.value || "").trim().toLowerCase();
-  graphWtPreset = Object.prototype.hasOwnProperty.call(GRAPH_WT_PRESET_MINS, v) ? v : "normal";
+  graphWtPreset = (v === "halfday") ? "halfday" : "normal";
   syncGraphWtControl();
   renderGraphCharts();
 }
@@ -618,7 +618,6 @@ function syncGraphWtControl() {
     <select id="graphWtPreset" class="header-wt-select" title="Select planned working-time mode">
       <option value="normal">Normal Hour</option>
       <option value="halfday">Half Day</option>
-      <option value="friday">Friday</option>
     </select>
   `;
 
@@ -626,6 +625,7 @@ function syncGraphWtControl() {
 
   const sel = wrap.querySelector("#graphWtPreset");
   if (sel) {
+    if (graphWtPreset === "friday") graphWtPreset = "normal";
     sel.value = graphWtPreset;
     sel.addEventListener("change", onGraphWtPresetChange);
   }
@@ -3442,9 +3442,17 @@ function calcActualWtMinsForDay(dayKey, targetUnits = 0) {
   return Math.max(0, (spanTodaySec - breakTodaySec) / 60);
 }
 
+function getPlanWtMinsForDay(dayKey) {
+  const d = new Date(`${dayKey}T12:00:00`);
+  if (Number.isFinite(d.getTime()) && d.getDay() === 5) {
+    return GRAPH_WT_PRESET_MINS.friday;
+  }
+  return GRAPH_WT_PRESET_MINS[graphWtPreset] || GRAPH_WT_PRESET_MINS.normal;
+}
+
 function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, rangeLabel) {
   const planEffPct = 98;
-  const planWtMins = GRAPH_WT_PRESET_MINS[graphWtPreset] || GRAPH_WT_PRESET_MINS.normal;
+  const planWtMins = getPlanWtMinsForDay(dayKey);
 
   const planUnits = dayTarget?.[dayKey] || 0;
   const actualUnits = dayProduced?.[dayKey] || 0;
@@ -3571,7 +3579,7 @@ function renderGraphCharts() {
   const oeeValues = periodKeys.map(k => {
     const target = dayTarget[k] || 0;
     const produced = dayProduced[k] || 0;
-    const planWtMins = GRAPH_WT_PRESET_MINS[graphWtPreset] || GRAPH_WT_PRESET_MINS.normal;
+    const planWtMins = getPlanWtMinsForDay(k);
     const actualWtMins = calcActualWtMinsForDay(k, target);
     if (target <= 0 || actualWtMins == null || actualWtMins <= 0) return 0;
     const rawEff = (produced / target) * (planWtMins / actualWtMins) * 98;
