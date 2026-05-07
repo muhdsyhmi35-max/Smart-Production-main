@@ -1544,7 +1544,7 @@ function syncEfficiencyCardDom() {
   const expectedShown = parseInt(document.getElementById("expected")?.innerText, 10) || 0;
   let pct = null;
   if (expectedShown > 0) {
-    pct = Math.max(0, Math.round((actualCount / expectedShown) * 100));
+    pct = Math.min(100, Math.max(0, Math.round((actualCount / expectedShown) * 100)));
   }
   if (!isMonitor) {
     efficiencyPercent = pct != null ? pct : 0;
@@ -3555,7 +3555,7 @@ function showSummaryPage() {
   const downtime = format(downtimeSec);
   const diff = actual - plan;
   const diffDisplaySafe = diff > 0 ? ("+" + diff) : String(diff);
-  const efficiency = plan > 0 ? `${Math.round((actual / plan) * 100)}%` : "—";
+  const efficiency = plan > 0 ? `${Math.min(100, Math.round((actual / plan) * 100))}%` : "—";
 
   let summaryPage = document.getElementById("summaryPage");
   if (!summaryPage) {
