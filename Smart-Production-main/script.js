@@ -3086,7 +3086,7 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
   }
   const width = 500;
   const height = 170;
-  const leftPad = 36;
+  const leftPad = 52;
   const rightPad = 12;
   const topPad = 14;
   const bottomPad = 28;
