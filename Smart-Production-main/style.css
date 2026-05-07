@@ -1851,14 +1851,14 @@ body.graph-mode{
 }
 
 .report-eff-wt-card span{
-  font-size:13px;
+  font-size:16px;
   color:#93c5fd;
   text-transform:uppercase;
   letter-spacing:.5px;
 }
 
 .report-eff-wt-card strong{
-  font-size:clamp(28px, 3.2vh, 36px);
+  font-size:clamp(40px, 4.6vh, 54px);
   font-weight:900;
   color:#ffffff;
   line-height:1;
