@@ -381,7 +381,7 @@ function applyMonitorDashboardLayout() {
   dashboard.appendChild(lineCard);
 }
 
-/** Admin monitor: operator-style 4+4 dashboard cards + SCAN INPUT / LINE STATUS bottom row (inputs hidden by monitor-mode). */
+/** Admin monitor: operator-style 4+4 dashboard cards + CONNECTION STATUS / LINE STATUS bottom row (inputs hidden by monitor-mode). */
 function applyOperatorStyleMonitorDashboard() {
   if (!isMonitor || document.body.dataset.monitorLayout === MONITOR_LAYOUT_OPERATOR_MIRROR_KEY) return;
 
@@ -399,7 +399,7 @@ function applyOperatorStyleMonitorDashboard() {
   if (!scanCard) return;
 
   const title = scanCard.querySelector("h3");
-  if (title) title.textContent = "SCAN INPUT";
+  if (title) title.textContent = "CONNECTION STATUS";
 
   if (scanCard.querySelector(".monitor-inline-connection")) return;
 

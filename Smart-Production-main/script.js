@@ -401,7 +401,7 @@ function applyOperatorStyleMonitorDashboard() {
   if (!scanCard) return;
 
   const title = scanCard.querySelector("h3");
-  if (title) title.textContent = "SCAN INPUT";
+  if (title) title.textContent = "CONNECTION STATUS";
 
   if (scanCard.querySelector(".monitor-inline-connection")) return;
 

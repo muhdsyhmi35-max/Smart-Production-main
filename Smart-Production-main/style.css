@@ -658,8 +658,18 @@ body.monitor-mode .monitor-status-wrap{
   width:100%;
 }
 
+/* Admin monitor (?monitor): match operator dashboard layout; show LIVE under CONNECTION STATUS */
 body.monitor-mode.monitor-operator-dashboard .bottom-row > .card.wide:first-child .scan-grid{
   display:none !important;
+}
+body.monitor-mode.monitor-operator-dashboard .bottom-row > .card.wide:first-child{
+  padding-bottom:0;
+  justify-content:flex-start;
+}
+body.monitor-mode.monitor-operator-dashboard .bottom-row > .card.wide:first-child > h3{
+  flex-shrink:0;
+  width:100%;
+  margin-bottom:0;
 }
 body.monitor-mode.monitor-operator-dashboard .monitor-inline-connection{
   margin-top:clamp(8px, 1.2vh, 14px);
