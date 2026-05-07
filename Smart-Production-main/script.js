@@ -3579,10 +3579,11 @@ function renderGraphCharts() {
   `;
   } catch (err) {
     console.error("renderGraphCharts failed:", err);
+    const detail = String(err?.message || err || "Unknown error");
     graphBody.innerHTML = `
       <div class="summary-graph-card">
         <div class="summary-graph-card-title">Production Report</div>
-        <div class="summary-graph-empty">Failed to render report data. Please refresh and try again.</div>
+        <div class="summary-graph-empty">Failed to render report data: ${detail}</div>
       </div>
     `;
   }
