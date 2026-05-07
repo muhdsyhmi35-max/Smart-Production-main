@@ -1585,7 +1585,7 @@ function syncEfficiencyCardDom() {
   const expectedShown = parseInt(document.getElementById("expected")?.innerText, 10) || 0;
   let pct = null;
   if (expectedShown > 0) {
-    pct = Math.min(100, Math.max(0, Math.round((actualCount / expectedShown) * 100)));
+    pct = Math.max(0, Math.round((actualCount / expectedShown) * 100));
   }
   if (!isMonitor) {
     efficiencyPercent = pct != null ? pct : 0;
@@ -3348,14 +3348,33 @@ function renderGraphCharts() {
   }).join("");
   const planActualChart = buildPlanVsActualChart(activeDay, graphPeriod);
   const downtimeChart = buildSummaryBarChart(`DOWNTIME TREND (${periodLabel}: ${rangeLabel})`, labels, downtimeMins, "#ef4444", "", "Minutes");
-  const cycleTimeMin = parseFloat(document.getElementById("cycleTarget").value) || SETTINGS.defaultCycle;
   const planWtMins = GRAPH_WT_PRESET_MINS[graphWtPreset] || GRAPH_WT_PRESET_MINS.normal;
-  const actualWtMins = totalProduced > 0 ? totalProduced * cycleTimeMin : null;
+  let actualWtMins = null;
+  const shiftStartMin = Number(SETTINGS.shiftSchedule.startMinute);
+  const shiftEndMin = Number(SETTINGS.shiftSchedule.endMinute);
+  if (Number.isFinite(shiftStartMin) && Number.isFinite(shiftEndMin) && shiftEndMin > shiftStartMin) {
+    const [yy, mm, dd] = String(activeDay).split("-").map(v => parseInt(v, 10));
+    if (Number.isFinite(yy) && Number.isFinite(mm) && Number.isFinite(dd)) {
+      const dayStartMs = new Date(yy, mm - 1, dd, 0, 0, 0, 0).getTime();
+      const shiftStartMs = dayStartMs + (shiftStartMin * 60 * 1000);
+      const shiftEndMs = dayStartMs + (shiftEndMin * 60 * 1000);
+      const todayKey = toIsoDateLocal(new Date());
+      if (activeDay < todayKey) {
+        actualWtMins = Math.max(0, (shiftEndMs - shiftStartMs) / 60000);
+      } else if (activeDay > todayKey) {
+        actualWtMins = 0;
+      } else {
+        const nowMs = Date.now();
+        const cappedMs = Math.min(Math.max(nowMs, shiftStartMs), shiftEndMs);
+        actualWtMins = Math.max(0, (cappedMs - shiftStartMs) / 60000);
+      }
+    }
+  }
   const planEffPct = 98;
   let actualEffPct = null;
   if (totalTarget > 0 && actualWtMins != null && actualWtMins > 0) {
     const rawEff = (totalProduced / totalTarget) * (planWtMins / actualWtMins) * 98;
-    actualEffPct = Number(Math.max(0, Math.min(100, rawEff)).toFixed(1));
+    actualEffPct = Number(Math.max(0, rawEff).toFixed(1));
   }
   const wtCards = `
     <div class="summary-graph-card-title">EFF / W/T CARDS (${periodLabel}: ${rangeLabel})</div>
@@ -3386,7 +3405,7 @@ function renderGraphCharts() {
     const target = dayTarget[k] || 0;
     const produced = dayProduced[k] || 0;
     if (target <= 0) return 0;
-    return Number(Math.max(0, Math.min(100, (produced / target) * 100)).toFixed(1));
+    return Number(Math.max(0, (produced / target) * 100).toFixed(1));
   });
   const oeeChart = buildSummaryLineChart(`EFFICIENCY TREND (${periodLabel}: ${rangeLabel})`, oeeLabels, oeeValues, "#a855f7", "%", "%");
   graphBody.innerHTML = `
@@ -3523,7 +3542,7 @@ function showSummaryPage() {
   const downtime = format(downtimeSec);
   const diff = actual - plan;
   const diffDisplaySafe = diff > 0 ? ("+" + diff) : String(diff);
-  const efficiency = plan > 0 ? `${Math.min(100, Math.round((actual / plan) * 100))}%` : "—";
+  const efficiency = plan > 0 ? `${Math.max(0, Math.round((actual / plan) * 100))}%` : "—";
 
   let summaryPage = document.getElementById("summaryPage");
   if (!summaryPage) {

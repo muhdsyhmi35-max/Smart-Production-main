@@ -1824,14 +1824,14 @@ body.graph-mode{
 }
 
 .report-eff-wt-wrap{
-  padding:8px;
+  padding:6px;
 }
 
 .report-eff-wt-grid{
   display:grid;
   grid-template-columns:1fr 1fr;
-  gap:8px;
-  margin-top:4px;
+  gap:6px;
+  margin-top:2px;
   flex:1 1 auto;
 }
 
@@ -1840,22 +1840,22 @@ body.graph-mode{
   flex-direction:column;
   justify-content:center;
   align-items:flex-start;
-  gap:6px;
+  gap:4px;
   border:1px solid rgba(71,85,105,.45);
-  border-radius:8px;
+  border-radius:6px;
   background:rgba(15,23,42,.58);
-  padding:10px 12px;
+  padding:8px 10px;
 }
 
 .report-eff-wt-card span{
-  font-size:11px;
+  font-size:10px;
   color:#93c5fd;
   text-transform:uppercase;
   letter-spacing:.4px;
 }
 
 .report-eff-wt-card strong{
-  font-size:clamp(20px, 2.2vh, 28px);
+  font-size:clamp(16px, 1.8vh, 22px);
   font-weight:900;
   color:#22d3ee;
   line-height:1;
