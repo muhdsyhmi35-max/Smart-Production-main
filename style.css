@@ -1502,6 +1502,52 @@ body.graph-mode{
   margin-bottom:6px;
 }
 
+.graph-top-tools{
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  margin:0 0 6px;
+  min-height:34px;
+}
+
+.graph-wt-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 12px;
+  border-radius:8px;
+  border:1px solid rgba(71,85,105,.5);
+  background:#000000;
+  color:#e2e8f0;
+  font-size:13px;
+  font-weight:700;
+  line-height:1;
+  box-shadow:0 4px 10px rgba(2,6,23,.3), inset 0 1px 0 rgba(255,255,255,.08);
+  transition:transform var(--dur-fast) var(--ease-soft), filter var(--dur-fast) var(--ease-soft), border-color var(--dur-fast) var(--ease-soft);
+}
+
+.graph-wt-pill:hover{
+  transform:translateY(-1px);
+  filter:brightness(1.05);
+  border-color:rgba(56,189,248,.55);
+}
+
+.graph-wt-select{
+  min-width:136px;
+  height:30px;
+  border-radius:6px;
+  border:1px solid rgba(71,85,105,.65);
+  background:rgba(2,6,23,.85);
+  color:#cbd5e1;
+  padding:0 8px;
+  font-weight:700;
+}
+
+.graph-wt-select:focus-visible{
+  outline:2px solid rgba(96,165,250,.55);
+  outline-offset:2px;
+}
+
 .summary-grid{
   display:grid;
   grid-template-columns:repeat(4, minmax(0,1fr));
@@ -1594,14 +1640,6 @@ body.graph-mode{
   color-scheme:dark;
 }
 
-.graph-range-inputs select{
-  height:30px;
-  border-radius:6px;
-  border:1px solid rgba(71,85,105,.65);
-  background:rgba(2,6,23,.85);
-  color:#cbd5e1;
-  padding:0 8px;
-}
 
 .graph-filter-row input[type="date"]::-webkit-calendar-picker-indicator{
   cursor:pointer;

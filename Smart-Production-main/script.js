@@ -3490,6 +3490,17 @@ function showGraphPage() {
 
   graphPage.innerHTML = `
     <div class="summary-head">Production Report</div>
+    <div class="graph-top-tools">
+      <label class="graph-wt-pill" for="graphWtPreset">
+        <span class="header-pill-icon">⏱</span>
+        <span>Working Time</span>
+        <select id="graphWtPreset" class="graph-wt-select" title="Select planned working-time mode">
+          <option value="normal">Normal Hour</option>
+          <option value="halfday">Half Day</option>
+          <option value="friday">Friday</option>
+        </select>
+      </label>
+    </div>
     <div class="graph-filter-row">
       <div class="graph-period-toggle" role="group" aria-label="Graph period">
         <button type="button" id="graphPeriodWeekBtn" class="graph-period-btn">Week</button>
@@ -3501,11 +3512,6 @@ function showGraphPage() {
           <input type="date" id="graphRangeStart" title="Graph range start date">
           <span class="graph-range-sep">-</span>
           <input type="date" id="graphRangeEnd" title="Graph range end date">
-          <select id="graphWtPreset" title="Select planned working-time minutes">
-            <option value="normal">Normal (460m)</option>
-            <option value="halfday">Half Day (300m)</option>
-            <option value="friday">Friday (400m)</option>
-          </select>
           <button type="button" id="graphRangeTodayBtn" class="graph-today-btn">Today</button>
         </div>
       </div>
