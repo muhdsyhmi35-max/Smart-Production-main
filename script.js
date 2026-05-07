@@ -3007,9 +3007,9 @@ function getPlanActualForPeriod(anchorDay, period = "day") {
   });
 
   if (plan <= 0) {
-    const planRaw = document.getElementById("plan").innerText.trim();
+    const planRaw = String(document.getElementById("plan")?.innerText || "").trim();
     const planCard = parseInt(planRaw, 10);
-    const planInput = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+    const planInput = parseInt(document.getElementById("dailyPlanTarget")?.value || "0", 10) || 0;
     const fallbackDayPlan = Number.isFinite(planCard) && planCard > 0 ? planCard : planInput;
     const multiplier = Math.max(periodKeys.length, 1);
     plan = Math.max(0, fallbackDayPlan * multiplier);
@@ -3072,9 +3072,9 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
     dailyActualMap[rowDay] = (dailyActualMap[rowDay] || 0) + 1;
   });
 
-  let fallbackDayPlan = parseInt(document.getElementById("plan").innerText.trim(), 10);
+  let fallbackDayPlan = parseInt(String(document.getElementById("plan")?.innerText || "").trim(), 10);
   if (!Number.isFinite(fallbackDayPlan) || fallbackDayPlan <= 0) {
-    fallbackDayPlan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+    fallbackDayPlan = parseInt(document.getElementById("dailyPlanTarget")?.value || "0", 10) || 0;
   }
   const dayTarget = computeDayTargetsForReport(dayKeys, dailyActualMap, fallbackDayPlan);
   const totalPlan = dayKeys.reduce((sum, key) => sum + (dayTarget[key] || 0), 0);
@@ -3413,9 +3413,9 @@ function renderGraphCharts() {
       dayDowntimeSec[rowDay] = (dayDowntimeSec[rowDay] || 0) + parseMmSsToSeconds(cells[9]?.innerText || "");
     }
   });
-  let fallbackDayPlan = parseInt(document.getElementById("plan").innerText.trim(), 10);
+  let fallbackDayPlan = parseInt(String(document.getElementById("plan")?.innerText || "").trim(), 10);
   if (!Number.isFinite(fallbackDayPlan) || fallbackDayPlan <= 0) {
-    fallbackDayPlan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+    fallbackDayPlan = parseInt(document.getElementById("dailyPlanTarget")?.value || "0", 10) || 0;
   }
   const dayTarget = computeDayTargetsForReport(periodKeys, dayProduced, fallbackDayPlan);
   graphReportCache = {
