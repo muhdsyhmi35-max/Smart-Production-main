@@ -3048,7 +3048,7 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
     const x = barCenterX - (planBarW / 2);
     const y = toY(v);
     const h = Math.max(yBase - y, v > 0 ? 2 : 0);
-    return `<rect class="summary-bar" style="animation-delay:${i * 35}ms" x="${x.toFixed(2)}" y="${(yBase - h).toFixed(2)}" width="${planBarW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="#3b82f6" opacity="1"><title>Plan EFF: ${v.toFixed(1)}${valueSuffix}</title></rect>`;
+    return `<rect class="summary-bar" style="animation-delay:${i * 35}ms" x="${x.toFixed(2)}" y="${(yBase - h).toFixed(2)}" width="${planBarW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="#3b82f6" opacity=".9"><title>Plan EFF: ${v.toFixed(1)}${valueSuffix}</title></rect>`;
   }).join("");
 
   const points = actualValues.map((v, i) => ({
@@ -3078,11 +3078,6 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
       <text x="${yAxisTextX}" y="${(y + 4).toFixed(2)}" text-anchor="end" fill="#94a3b8" font-size="10">${val}</text>
     `;
   }).join("");
-  const axisStroke = "rgba(148,163,184,.72)";
-  const axisLines = `
-    <line x1="${plotLeft}" y1="${topPad.toFixed(2)}" x2="${plotLeft}" y2="${yBase.toFixed(2)}" stroke="${axisStroke}" stroke-width="2" stroke-linecap="round"></line>
-    <line x1="${plotLeft}" y1="${yBase.toFixed(2)}" x2="${(width - rightPad).toFixed(2)}" y2="${yBase.toFixed(2)}" stroke="${axisStroke}" stroke-width="2" stroke-linecap="round"></line>
-  `;
   const titleMatch = String(title).match(/^(.*?)(\s*\((.*)\))$/);
   const titleMain = titleMatch ? titleMatch[1].trim() : String(title);
   const titleSub = titleMatch ? String(titleMatch[3] || "").trim() : "";
@@ -3094,9 +3089,8 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
     ${yAxisLabel ? `<div class="trend-units">${yAxisLabel}</div>` : ""}
     <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg" role="img" aria-label="${title}">
       ${yGrid}
-      ${axisLines}
-      <path class="trend-line" d="${path}" fill="none" stroke="#a855f7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
       ${planBars}
+      <path class="trend-line" d="${path}" fill="none" stroke="#a855f7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
       ${circles}
       ${xLabels}
     </svg>
