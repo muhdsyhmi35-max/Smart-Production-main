@@ -3103,7 +3103,7 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
         ${titleSub ? `<div class="trend-subtitle">${titleSub}</div>` : ""}
       </div>
       <div class="trend-legend">
-        <span class="trend-legend-item"><i class="trend-swatch trend-swatch-actual"></i>Actual</span>
+        <span class="trend-legend-item"><i class="trend-swatch" style="background:#a855f7;border-color:#a855f7"></i>Actual</span>
         <span class="trend-legend-item"><i class="trend-swatch trend-swatch-target"></i>Target</span>
       </div>
     </div>
@@ -3671,7 +3671,7 @@ function renderGraphCharts() {
   const oeeChart = buildEfficiencyTrendChart(`EFFICIENCY TREND (${periodLabel}: ${rangeLabel})`, oeeLabels, oeeValues, planEffValues, "%", "%");
   graphBody.innerHTML = `
     <div class="report-kpi-grid">
-      <div class="report-kpi"><span>Total Produced</span><strong>${totalProduced}</strong><em>units</em></div>
+      <div class="report-kpi"><span>Total Produced</span><strong class="pos">${totalProduced}</strong><em>units</em></div>
       <div class="report-kpi"><span>Total Target</span><strong>${totalTarget}</strong><em>units</em></div>
       <div class="report-kpi"><span>Production Balance</span><strong class="${(totalProduced-totalTarget) < 0 ? "neg" : "pos"}">${(totalProduced-totalTarget) > 0 ? "+" : ""}${totalProduced-totalTarget}</strong><em>units</em></div>
       <div class="report-kpi"><span>Total Downtime</span><strong class="neg">${totalDowntimeMin}</strong><em>min</em></div>
