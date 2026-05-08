@@ -3095,8 +3095,8 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
     <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg" role="img" aria-label="${title}">
       ${yGrid}
       ${axisLines}
-      ${planBars}
       <path class="trend-line" d="${path}" fill="none" stroke="#a855f7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+      ${planBars}
       ${circles}
       ${xLabels}
     </svg>
