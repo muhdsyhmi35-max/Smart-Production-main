@@ -86,6 +86,7 @@ const DEBUG_DOWNTIME = false;
 let firebaseDb = null;
 let firebaseCommandRef = null;
 let firebaseLiveStateRef = null;
+let firebaseShiftScheduleRef = null;
 let isApplyingRemoteCommand = false;
 let hasLocalSession = false;
 /** Operator: avoid calendar-day reset until first Firebase live-state read completes (prevents stale overwrite). */
@@ -286,6 +287,8 @@ const MONITOR_LAYOUT_LEGACY_KEY = "monitorLegacy";
 const MONITOR_LAYOUT_OPERATOR_MIRROR_KEY = "monitorOperatorMirror";
 const FIREBASE_COMMAND_PATH = "production/commands/latest";
 const FIREBASE_LIVE_STATE_PATH = "production/liveState";
+/** Operator (main) writes; ?monitor PCs read and mirror local shift / auto-window. */
+const FIREBASE_SHIFT_SCHEDULE_PATH = "production/shiftSchedule";
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || {
   apiKey: "AIzaSyBFKY6pmz_1UPAmozY65aMnWr0n7Mdka8I",
   authDomain: "monitoring-system-61d36.firebaseapp.com",
@@ -1162,6 +1165,35 @@ function saveShiftScheduleToStorage() {
   } catch (_) {}
 }
 
+function applyShiftScheduleFromRemote(payload) {
+  if (!payload || typeof payload !== "object") return;
+  const start = parseInt(payload.startMinute, 10);
+  const end = parseInt(payload.endMinute, 10);
+  if (!Number.isFinite(start) || start < 0 || start >= 1440) return;
+  if (!Number.isFinite(end) || end <= 0 || end > 1440 || start >= end) return;
+  const enableAutoWindow = payload.enableAutoWindow === true;
+  SETTINGS.shiftSchedule.startMinute = start;
+  SETTINGS.shiftSchedule.endMinute = end;
+  SETTINGS.shiftSchedule.enableAutoWindow = enableAutoWindow;
+  saveShiftScheduleToStorage();
+  updateShiftMenuLabel();
+  applyShiftScheduleTick();
+}
+
+/** Main operator only: push current shift to Firebase so monitors stay in sync. */
+function publishShiftScheduleToFirebase() {
+  if (!firebaseShiftScheduleRef || isMonitor) return;
+  firebaseShiftScheduleRef.set({
+    startMinute: SETTINGS.shiftSchedule.startMinute,
+    endMinute: SETTINGS.shiftSchedule.endMinute,
+    enableAutoWindow: !!SETTINGS.shiftSchedule.enableAutoWindow,
+    sender: syncClientId,
+    updatedAt: firebase.database.ServerValue.TIMESTAMP
+  }).catch(err => {
+    console.log("Firebase shift schedule publish error:", err);
+  });
+}
+
 function updateShiftMenuLabel() {
   const btn = document.getElementById("shiftScheduleMenuItem");
   if (!btn) return;
@@ -1275,6 +1307,7 @@ function submitShiftScheduleModal() {
   SETTINGS.shiftSchedule.endMinute = end;
   SETTINGS.shiftSchedule.enableAutoWindow = !!toggle.checked;
   saveShiftScheduleToStorage();
+  publishShiftScheduleToFirebase();
   updateShiftMenuLabel();
   closeShiftScheduleModal();
   applyShiftScheduleTick();
@@ -1629,6 +1662,18 @@ function initFirebaseSync() {
   firebaseDb = firebase.database();
   firebaseCommandRef = firebaseDb.ref(FIREBASE_COMMAND_PATH);
   firebaseLiveStateRef = firebaseDb.ref(FIREBASE_LIVE_STATE_PATH);
+  firebaseShiftScheduleRef = firebaseDb.ref(FIREBASE_SHIFT_SCHEDULE_PATH);
+
+  firebaseShiftScheduleRef.on("value", snapshot => {
+    const v = snapshot.val();
+    if (v) applyShiftScheduleFromRemote(v);
+  });
+
+  if (!isMonitor) {
+    firebaseShiftScheduleRef.once("value").then(snap => {
+      if (!snap.val()) publishShiftScheduleToFirebase();
+    }).catch(() => {});
+  }
 
   if (isMonitor) {
     const connectedRef = firebaseDb.ref(".info/connected");
