@@ -529,6 +529,15 @@ function getDayKeysBetween(startIso, endIso) {
   return out;
 }
 
+/** Local Saturday/Sunday for an ISO calendar day (YYYY-MM-DD). */
+function isWeekendIsoDay(isoKey) {
+  if (!isoKey) return false;
+  const [y, m, d] = String(isoKey).split("-").map(v => parseInt(v, 10));
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return false;
+  const dow = new Date(y, m - 1, d).getDay();
+  return dow === 0 || dow === 6;
+}
+
 function getDefaultGraphRangeFromPeriod() {
   const anchor = getActiveGraphDayKey();
   const keys = getPeriodDayKeys(anchor, graphPeriod);
@@ -3724,11 +3733,15 @@ function renderGraphCharts() {
   const downtimeChart = buildSummaryBarChart(`DOWNTIME TREND (${periodLabel}: ${rangeLabel})`, labels, downtimeMins, "#ef4444", "", "Minutes");
   const scopeDayKey = graphFocusedDayKey || activeDay;
   const wtCards = buildEffWtCardsHtmlForDay(scopeDayKey, dayProduced, dayTarget, periodLabel, rangeLabel);
-  const oeeLabels = periodKeys.map(k => {
+  const effTrendKeys = periodKeys.filter(k => {
+    if (!isWeekendIsoDay(k)) return true;
+    return (dayProduced[k] || 0) > 0;
+  });
+  const oeeLabels = effTrendKeys.map(k => {
     const d = new Date(`${k}T00:00:00`);
     return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
   });
-  const oeeValues = periodKeys.map(k => {
+  const oeeValues = effTrendKeys.map(k => {
     const target = dayTarget[k] || 0;
     const produced = dayProduced[k] || 0;
     const planWtMins = getPlanWtMinsForDay(k);
@@ -3737,7 +3750,7 @@ function renderGraphCharts() {
     const rawEff = (produced / target) * (planWtMins / actualWtMins) * 98;
     return Number(Math.max(0, rawEff).toFixed(1));
   });
-  const planEffValues = periodKeys.map(() => 98);
+  const planEffValues = effTrendKeys.map(() => 98);
   const oeeChart = buildEfficiencyTrendChart(`EFFICIENCY TREND (${periodLabel}: ${rangeLabel})`, oeeLabels, oeeValues, planEffValues, "%", "%");
   graphBody.innerHTML = `
     <div class="report-kpi-grid">
