@@ -3649,10 +3649,7 @@ function renderGraphCharts() {
   const downtimeChart = buildSummaryBarChart(`DOWNTIME TREND (${periodLabel}: ${rangeLabel})`, labels, downtimeMins, "#ef4444", "", "Minutes");
   const scopeDayKey = graphFocusedDayKey || activeDay;
   const wtCards = buildEffWtCardsHtmlForDay(scopeDayKey, dayProduced, dayTarget, periodLabel, rangeLabel);
-  const effTrendKeys = periodKeys.filter(k => {
-    if (!isWeekendIsoDay(k)) return true;
-    return (dayProduced[k] || 0) > 0;
-  });
+  const effTrendKeys = periodKeys;
   const oeeLabels = effTrendKeys.map(k => {
     const d = new Date(`${k}T00:00:00`);
     return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
@@ -3666,7 +3663,11 @@ function renderGraphCharts() {
     const rawEff = (produced / target) * (planWtMins / actualWtMins) * 98;
     return Number(Math.max(0, rawEff).toFixed(1));
   });
-  const planEffValues = effTrendKeys.map(() => 98);
+  const planEffValues = effTrendKeys.map(k => {
+    if (!isWeekendIsoDay(k)) return 98;
+    const weekendDailyPlan = getHistoricalPlanForDay(k);
+    return Number.isFinite(weekendDailyPlan) && weekendDailyPlan > 0 ? 98 : 0;
+  });
   const oeeChart = buildEfficiencyTrendChart(`EFFICIENCY TREND (${periodLabel}: ${rangeLabel})`, oeeLabels, oeeValues, planEffValues, "%", "%");
   graphBody.innerHTML = `
     <div class="report-kpi-grid">
