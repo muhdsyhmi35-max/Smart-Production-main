@@ -3141,13 +3141,11 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
   }
   const width = 500;
   const height = 170;
-  /** Tick numbers sit left of the plot; end-anchored at this x so wide values (e.g. 103) never touch bars. */
-  const yAxisTextX = 40;
-  const plotLeft = 78;
+  const leftPad = 36;
   const rightPad = 12;
   const topPad = 14;
   const bottomPad = 28;
-  const chartW = width - plotLeft - rightPad;
+  const chartW = width - leftPad - rightPad;
   const chartH = height - topPad - bottomPad;
   const maxVal = Math.max(1, ...actualValues, ...(planValues || []));
   const stepX = labels.length <= 1 ? chartW : (chartW / (labels.length - 1));
@@ -3155,21 +3153,24 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
   const toY = (v) => yBase - ((v / maxVal) * chartH);
 
   const planBarW = Math.max(Math.min((stepX || 12) * 0.34, 16), 6);
+  const planBarOffsetX = Math.min((stepX || 0) * 0.18, 9);
   const planBars = labels.map((_, i) => {
     const v = planValues?.[i] || 0;
-    const barCenterX = plotLeft + (stepX * i);
-    const x = barCenterX - (planBarW / 2);
+    const x = leftPad + (stepX * i) - (planBarW / 2) + planBarOffsetX;
     const y = toY(v);
     const h = Math.max(yBase - y, v > 0 ? 2 : 0);
     return `<rect class="summary-bar" style="animation-delay:${i * 35}ms" x="${x.toFixed(2)}" y="${(yBase - h).toFixed(2)}" width="${planBarW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="#3b82f6" opacity=".9"><title>Plan EFF: ${v.toFixed(1)}${valueSuffix}</title></rect>`;
   }).join("");
 
   const points = actualValues.map((v, i) => ({
-    x: plotLeft + (stepX * i),
+    x: leftPad + (stepX * i),
     y: toY(v),
     value: v
   }));
   const path = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+  const areaPath = points.length
+    ? `${path} L ${points[points.length - 1].x.toFixed(2)} ${yBase.toFixed(2)} L ${points[0].x.toFixed(2)} ${yBase.toFixed(2)} Z`
+    : "";
   const circles = points.map((p, i) => `
     <circle class="trend-dot" style="animation-delay:${i * 45}ms" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="3.8" fill="#a855f7">
       <title>${labels[i]}: ${p.value}${valueSuffix}</title>
@@ -3179,7 +3180,7 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
   const labelStride = labels.length > 24 ? 3 : labels.length > 16 ? 2 : 1;
   const xLabels = labels.map((label, i) => {
     if (i % labelStride !== 0 && i !== labels.length - 1) return "";
-    return `<text x="${(plotLeft + stepX * i).toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>`;
+    return `<text x="${(leftPad + stepX * i).toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>`;
   }).join("");
   const yTicks = 4;
   const yGrid = Array.from({ length: yTicks + 1 }, (_, i) => {
@@ -3187,23 +3188,42 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
     const y = topPad + chartH * ratio;
     const val = Math.round(maxVal * (1 - ratio));
     return `
-      <line x1="${plotLeft}" y1="${y.toFixed(2)}" x2="${(width - rightPad).toFixed(2)}" y2="${y.toFixed(2)}" stroke="rgba(148,163,184,.16)" stroke-width="1"></line>
-      <text x="${yAxisTextX}" y="${(y + 4).toFixed(2)}" text-anchor="end" fill="#94a3b8" font-size="10">${val}</text>
+      <line x1="${leftPad}" y1="${y.toFixed(2)}" x2="${(width - rightPad).toFixed(2)}" y2="${y.toFixed(2)}" stroke="rgba(30,64,175,.2)" stroke-width="1"></line>
+      <text x="${(leftPad - 8).toFixed(2)}" y="${(y + 4).toFixed(2)}" text-anchor="end" fill="#94a3b8" font-size="10">${val}</text>
     `;
   }).join("");
+  const axisStroke = "rgba(148,163,184,.72)";
+  const axisLines = `
+    <line x1="${leftPad}" y1="${topPad.toFixed(2)}" x2="${leftPad}" y2="${yBase.toFixed(2)}" stroke="${axisStroke}" stroke-width="2" stroke-linecap="round"></line>
+    <line x1="${leftPad}" y1="${yBase.toFixed(2)}" x2="${(width - rightPad).toFixed(2)}" y2="${yBase.toFixed(2)}" stroke="${axisStroke}" stroke-width="2" stroke-linecap="round"></line>
+  `;
   const titleMatch = String(title).match(/^(.*?)(\s*\((.*)\))$/);
   const titleMain = titleMatch ? titleMatch[1].trim() : String(title);
   const titleSub = titleMatch ? String(titleMatch[3] || "").trim() : "";
   return `
-    <div class="trend-title-wrap trend-title-wrap-compact">
-      <div class="trend-title trend-title-small">${titleMain}</div>
-      ${titleSub ? `<div class="trend-subtitle">${titleSub}</div>` : ""}
+    <div class="trend-header">
+      <div class="trend-title-wrap trend-title-wrap-compact">
+        <div class="trend-title trend-title-small">${titleMain}</div>
+        ${titleSub ? `<div class="trend-subtitle">${titleSub}</div>` : ""}
+      </div>
+      <div class="trend-legend">
+        <span class="trend-legend-item"><i class="trend-swatch trend-swatch-actual"></i>Actual</span>
+        <span class="trend-legend-item"><i class="trend-swatch trend-swatch-target"></i>Target</span>
+      </div>
     </div>
     ${yAxisLabel ? `<div class="trend-units">${yAxisLabel}</div>` : ""}
-    <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg" role="img" aria-label="${title}">
+    <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg summary-chart-plan-actual" role="img" aria-label="${title}">
+      <defs>
+        <linearGradient id="effTrendFill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="rgba(168,85,247,.34)"></stop>
+          <stop offset="100%" stop-color="rgba(168,85,247,0)"></stop>
+        </linearGradient>
+      </defs>
       ${yGrid}
+      ${axisLines}
+      ${areaPath ? `<path d="${areaPath}" fill="url(#effTrendFill)"></path>` : ""}
       ${planBars}
-      <path class="trend-line" d="${path}" fill="none" stroke="#a855f7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+      <path class="trend-line trend-line-actual" d="${path}" fill="none" stroke="#a855f7" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"></path>
       ${circles}
       ${xLabels}
     </svg>
