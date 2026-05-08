@@ -1842,23 +1842,23 @@ body.graph-mode{
   justify-content:center;
   align-items:center;
   text-align:center;
-  gap:6px;
+  gap:8px;
   border:1px solid rgba(71,85,105,.45);
   border-radius:6px;
   background:rgba(15,23,42,.58);
   padding:4px 6px;
-  min-height:70px;
+  min-height:84px;
 }
 
 .report-eff-wt-card span{
-  font-size:13px;
+  font-size:16px;
   color:#93c5fd;
   text-transform:uppercase;
-  letter-spacing:.5px;
+  letter-spacing:.6px;
 }
 
 .report-eff-wt-card strong{
-  font-size:clamp(28px, 3.2vh, 36px);
+  font-size:clamp(34px, 4vh, 46px);
   font-weight:900;
   color:#ffffff;
   line-height:1;
