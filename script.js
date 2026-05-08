@@ -3028,11 +3028,13 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
   }
   const width = 500;
   const height = 170;
-  const leftPad = 68;
+  /** Tick numbers sit left of the plot; end-anchored at this x so wide values (e.g. 103) never touch bars. */
+  const yAxisTextX = 40;
+  const plotLeft = 78;
   const rightPad = 12;
   const topPad = 14;
   const bottomPad = 28;
-  const chartW = width - leftPad - rightPad;
+  const chartW = width - plotLeft - rightPad;
   const chartH = height - topPad - bottomPad;
   const maxVal = Math.max(1, ...actualValues, ...(planValues || []));
   const stepX = labels.length <= 1 ? chartW : (chartW / (labels.length - 1));
@@ -3042,14 +3044,15 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
   const planBarW = Math.max(Math.min((stepX || 12) * 0.34, 16), 6);
   const planBars = labels.map((_, i) => {
     const v = planValues?.[i] || 0;
-    const x = (leftPad + (stepX * i)) - (planBarW / 2);
+    const barCenterX = plotLeft + (stepX * i);
+    const x = barCenterX - (planBarW / 2);
     const y = toY(v);
     const h = Math.max(yBase - y, v > 0 ? 2 : 0);
     return `<rect class="summary-bar" style="animation-delay:${i * 35}ms" x="${x.toFixed(2)}" y="${(yBase - h).toFixed(2)}" width="${planBarW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="#3b82f6" opacity=".9"><title>Plan EFF: ${v.toFixed(1)}${valueSuffix}</title></rect>`;
   }).join("");
 
   const points = actualValues.map((v, i) => ({
-    x: leftPad + (stepX * i),
+    x: plotLeft + (stepX * i),
     y: toY(v),
     value: v
   }));
@@ -3063,7 +3066,7 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
   const labelStride = labels.length > 24 ? 3 : labels.length > 16 ? 2 : 1;
   const xLabels = labels.map((label, i) => {
     if (i % labelStride !== 0 && i !== labels.length - 1) return "";
-    return `<text x="${(leftPad + stepX * i).toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>`;
+    return `<text x="${(plotLeft + stepX * i).toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>`;
   }).join("");
   const yTicks = 4;
   const yGrid = Array.from({ length: yTicks + 1 }, (_, i) => {
@@ -3071,8 +3074,8 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
     const y = topPad + chartH * ratio;
     const val = Math.round(maxVal * (1 - ratio));
     return `
-      <line x1="${leftPad}" y1="${y.toFixed(2)}" x2="${(width - rightPad).toFixed(2)}" y2="${y.toFixed(2)}" stroke="rgba(148,163,184,.16)" stroke-width="1"></line>
-      <text x="${(leftPad - 6).toFixed(2)}" y="${(y + 4).toFixed(2)}" text-anchor="end" fill="#94a3b8" font-size="10">${val}</text>
+      <line x1="${plotLeft}" y1="${y.toFixed(2)}" x2="${(width - rightPad).toFixed(2)}" y2="${y.toFixed(2)}" stroke="rgba(148,163,184,.16)" stroke-width="1"></line>
+      <text x="${yAxisTextX}" y="${(y + 4).toFixed(2)}" text-anchor="end" fill="#94a3b8" font-size="10">${val}</text>
     `;
   }).join("");
   const titleMatch = String(title).match(/^(.*?)(\s*\((.*)\))$/);
