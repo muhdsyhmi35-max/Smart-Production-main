@@ -3048,7 +3048,7 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
     const x = barCenterX - (planBarW / 2);
     const y = toY(v);
     const h = Math.max(yBase - y, v > 0 ? 2 : 0);
-    return `<rect class="summary-bar" style="animation-delay:${i * 35}ms" x="${x.toFixed(2)}" y="${(yBase - h).toFixed(2)}" width="${planBarW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="#3b82f6" opacity=".9"><title>Plan EFF: ${v.toFixed(1)}${valueSuffix}</title></rect>`;
+    return `<rect class="summary-bar" style="animation-delay:${i * 35}ms" x="${x.toFixed(2)}" y="${(yBase - h).toFixed(2)}" width="${planBarW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="#3b82f6" opacity="1"><title>Plan EFF: ${v.toFixed(1)}${valueSuffix}</title></rect>`;
   }).join("");
 
   const points = actualValues.map((v, i) => ({
