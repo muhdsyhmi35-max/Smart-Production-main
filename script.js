@@ -274,56 +274,6 @@ function onRoleOptionClick(event, role) {
   setAppRole("operator");
 }
 
-function syncGraphWtDropdownAria() {
-  const trigger = document.getElementById("graphWtTrigger");
-  const dd = document.getElementById("graphWtDropdown");
-  if (!trigger || !dd) return;
-  trigger.setAttribute("aria-expanded", dd.classList.contains("open") ? "true" : "false");
-}
-
-function toggleGraphWtDropdown(forceOpen) {
-  const dd = document.getElementById("graphWtDropdown");
-  const trigger = document.getElementById("graphWtTrigger");
-  if (!dd || !trigger) return;
-  let open;
-  if (typeof forceOpen === "boolean") {
-    open = forceOpen;
-  } else {
-    open = !dd.classList.contains("open");
-  }
-  dd.classList.toggle("open", open);
-  dd.setAttribute("aria-hidden", open ? "false" : "true");
-  syncGraphWtDropdownAria();
-}
-
-function onGraphWtTriggerClick(event) {
-  event.stopPropagation();
-  toggleGraphWtDropdown();
-}
-
-function applyGraphWtControlUi() {
-  if (graphWtPreset === "friday") graphWtPreset = "normal";
-  const preset = graphWtPreset === "halfday" ? "halfday" : "normal";
-  const label = document.getElementById("graphWtLabel");
-  if (label) label.textContent = preset === "halfday" ? "Half Day" : "Normal Hour";
-  document.querySelectorAll(".header-wt-option").forEach(btn => {
-    const w = btn.getAttribute("data-wt");
-    const sel = (preset === "halfday" && w === "halfday") || (preset === "normal" && w === "normal");
-    btn.setAttribute("aria-selected", sel ? "true" : "false");
-    btn.classList.toggle("selected", sel);
-  });
-}
-
-function onGraphWtOptionClick(event, preset) {
-  event.stopPropagation();
-  toggleGraphWtDropdown(false);
-  const p = preset === "halfday" ? "halfday" : "normal";
-  if (graphWtPreset === p) return;
-  graphWtPreset = p;
-  applyGraphWtControlUi();
-  renderGraphCharts();
-}
-
 /* ================= GOOGLE SHEET MIRROR LAYER ================= */
 
 // 🔴 GANTI DENGAN LINK /exec WEB APP ANDA
@@ -649,6 +599,15 @@ function onGraphPeriodChange(period) {
   renderGraphCharts();
 }
 
+function onGraphWtPresetChange() {
+  const sel = document.getElementById("graphWtPreset");
+  if (!sel) return;
+  const v = String(sel.value || "").trim().toLowerCase();
+  graphWtPreset = (v === "halfday") ? "halfday" : "normal";
+  syncGraphWtControl();
+  renderGraphCharts();
+}
+
 function syncGraphWtControl() {
   const headerExisting = document.getElementById("headerGraphWtWrap");
   if (headerExisting) headerExisting.remove();
@@ -662,22 +621,26 @@ function syncGraphWtControl() {
   const parent = document.querySelector(".controls");
   if (!parent) return;
 
-  const wrap = document.createElement("div");
+  const wrap = document.createElement("label");
   wrap.id = "controlsGraphWtWrap";
-  wrap.className = "header-wt-dd-wrap controls-wt-wrap";
+  wrap.className = "header-pill controls-wt-wrap";
   wrap.innerHTML = `
-    <button type="button" class="header-pill header-wt-trigger" id="graphWtTrigger" onclick="onGraphWtTriggerClick(event)" aria-expanded="false" aria-haspopup="listbox" aria-label="Select planned working time">
-      <span class="header-pill-icon">⏱</span><span id="graphWtLabel">Normal Hour</span><span class="header-role-caret header-wt-caret" aria-hidden="true">▾</span>
-    </button>
-    <div class="header-wt-dropdown" id="graphWtDropdown" role="listbox" aria-labelledby="graphWtTrigger" aria-hidden="true">
-      <button type="button" class="header-wt-option" data-wt="normal" role="option" onclick="onGraphWtOptionClick(event, 'normal')">Normal Hour</button>
-      <button type="button" class="header-wt-option" data-wt="halfday" role="option" onclick="onGraphWtOptionClick(event, 'halfday')">Half Day</button>
-    </div>
+    <span class="header-pill-icon">⏱</span>
+    <span>Working Time</span>
+    <select id="graphWtPreset" class="header-wt-select" title="Select planned working-time mode">
+      <option value="normal">Normal Hour</option>
+      <option value="halfday">Half Day</option>
+    </select>
   `;
 
   parent.appendChild(wrap);
-  applyGraphWtControlUi();
-  syncGraphWtDropdownAria();
+
+  const sel = wrap.querySelector("#graphWtPreset");
+  if (sel) {
+    if (graphWtPreset === "friday") graphWtPreset = "normal";
+    sel.value = graphWtPreset;
+    sel.addEventListener("change", onGraphWtPresetChange);
+  }
 }
 
 function syncGraphPeriodButtonsUi() {
@@ -3933,12 +3896,6 @@ document.addEventListener("click", (event) => {
   if (roleDd && roleDd.classList.contains("open") && !roleWrap) {
     toggleRoleDropdown(false);
   }
-
-  const wtDd = document.getElementById("graphWtDropdown");
-  const wtWrap = event.target.closest(".header-wt-dd-wrap");
-  if (wtDd && wtDd.classList.contains("open") && !wtWrap) {
-    toggleGraphWtDropdown(false);
-  }
 });
 
 document.addEventListener("keydown", (event) => {
@@ -3949,7 +3906,6 @@ document.addEventListener("keydown", (event) => {
       return;
     }
     toggleRoleDropdown(false);
-    toggleGraphWtDropdown(false);
     toggleMenuDropdown(false);
     if (document.body.classList.contains("history-mode")) {
       showMainPage();
