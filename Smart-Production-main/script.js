@@ -245,6 +245,7 @@ function applyAppRoleUi() {
     }
   }
   syncRoleDropdownAria();
+  syncGraphWtControl();
 }
 
 function toggleRoleDropdown(forceOpen) {
@@ -338,7 +339,10 @@ function applyNonProductionMode() {
 }
 
 function applyGraphWtPresetEffects(prevPreset) {
-  if (isMonitor) return;
+  if (isMonitor) {
+    applyGraphWtControlUi();
+    return;
+  }
   if (isNonProductionMode()) {
     applyNonProductionMode();
     return;
@@ -740,9 +744,9 @@ function syncGraphWtControl() {
 
   const inGraph = document.body.classList.contains("graph-mode");
   if (inGraph) return;
+  const controlsBar = document.querySelector(".controls");
+  if (!controlsBar) return;
   const actions = document.querySelector(".control-actions");
-  const parent = actions || document.querySelector(".controls");
-  if (!parent) return;
 
   const wrap = document.createElement("div");
   wrap.id = "controlsGraphWtWrap";
@@ -758,10 +762,16 @@ function syncGraphWtControl() {
     </div>
   `;
 
-  if (actions) actions.insertBefore(wrap, actions.firstChild);
-  else parent.appendChild(wrap);
+  if (isMonitor) {
+    controlsBar.appendChild(wrap);
+  } else if (actions) {
+    actions.insertBefore(wrap, actions.firstChild);
+  } else {
+    controlsBar.appendChild(wrap);
+  }
   applyGraphWtControlUi();
   syncGraphWtDropdownAria();
+  if (isMonitor) return;
   if (isNonProductionMode()) applyNonProductionMode();
   else {
     document.body.classList.remove("non-production-mode");
@@ -4736,6 +4746,7 @@ window.onload = async function() {
       liveStatePollInterval = null;
     }
     updateMonitorDataNotice();
+    syncGraphWtControl();
   } else {
     syncGraphWtControl();
     // IMPORTANT:

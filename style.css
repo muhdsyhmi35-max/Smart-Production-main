@@ -343,6 +343,13 @@ body::-webkit-scrollbar{
   margin-right:clamp(8px, 1.2vw, 12px);
 }
 
+body.monitor-mode .controls-wt-wrap{
+  display:inline-flex !important;
+  margin-left:auto;
+  margin-right:0;
+  align-self:center;
+}
+
 .header-role-trigger.header-pill:focus-visible,
 .header-wt-trigger.header-pill:focus-visible{
   outline:2px solid rgba(96,165,250,.55);
