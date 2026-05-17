@@ -740,8 +740,6 @@ function syncGraphWtControl() {
   const controlsExisting = document.getElementById("controlsGraphWtWrap");
   if (controlsExisting) controlsExisting.remove();
 
-  if (!isAdminRole()) return;
-
   const inGraph = document.body.classList.contains("graph-mode");
   if (inGraph) return;
   const controlsBar = document.querySelector(".controls");
@@ -3233,6 +3231,71 @@ function formatBarChartValue(v) {
   return String(Math.round(n * 10) / 10).replace(/\.0$/, "");
 }
 
+/** Green / purple actual trend lines: stroke draw + dots timed along the path. */
+function animateTrendLines(container) {
+  if (!container) return;
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const run = () => {
+    const lines = container.querySelectorAll("path.trend-line-actual, path.trend-line");
+    lines.forEach((path, lineIdx) => {
+      let len = 0;
+      try {
+        len = path.getTotalLength();
+      } catch (_) {
+        len = 0;
+      }
+      if (!Number.isFinite(len) || len <= 0) return;
+
+      const durationSec = Math.min(1.75, Math.max(0.9, len / 320));
+      const baseDelayMs = lineIdx * 90;
+
+      if (reduceMotion) {
+        path.style.strokeDasharray = "";
+        path.style.strokeDashoffset = "";
+        path.style.animation = "none";
+      } else {
+        path.style.strokeDasharray = `${len}`;
+        path.style.strokeDashoffset = `${len}`;
+        path.style.animation = "none";
+        void path.getBoundingClientRect();
+        path.style.animation = `trendLineDraw ${durationSec}s var(--ease-smooth) ${baseDelayMs}ms forwards`;
+      }
+
+      const svg = path.closest("svg");
+      if (!svg) return;
+      const dots = [...svg.querySelectorAll("circle.trend-dot")];
+      const n = dots.length;
+      dots.forEach((dot, i) => {
+        const along = n <= 1 ? 1 : i / (n - 1);
+        const dotDelay = Math.round(baseDelayMs + durationSec * 1000 * along * 0.92);
+        if (reduceMotion) {
+          dot.style.animation = "none";
+          dot.style.opacity = "1";
+          return;
+        }
+        dot.style.opacity = "0";
+        dot.style.animation = "none";
+        void dot.getBoundingClientRect();
+        dot.style.animation = `trendDotPop .4s var(--ease-soft) ${dotDelay}ms forwards`;
+      });
+    });
+
+    container.querySelectorAll("path.trend-area-fill").forEach((area, i) => {
+      if (reduceMotion) {
+        area.style.opacity = "1";
+        area.style.animation = "none";
+        return;
+      }
+      const delay = 180 + i * 100;
+      area.style.opacity = "0";
+      area.style.animation = "none";
+      void area.getBoundingClientRect();
+      area.style.animation = `trendAreaFade 0.85s var(--ease-smooth) ${delay}ms forwards`;
+    });
+  };
+  requestAnimationFrame(() => requestAnimationFrame(run));
+}
+
 /** Count-up labels on bar charts after bars finish growing. */
 function animateSummaryBarValues(container) {
   if (!container) return;
@@ -3480,7 +3543,7 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
       </defs>
       ${yGrid}
       ${axisLines}
-      ${areaPath ? `<path d="${areaPath}" fill="url(#effTrendFill)"></path>` : ""}
+      ${areaPath ? `<path class="trend-area-fill" d="${areaPath}" fill="url(#effTrendFill)"></path>` : ""}
       ${planBars}
       <path class="trend-line trend-line-actual" d="${path}" fill="none" stroke="#a855f7" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"></path>
       ${circles}
@@ -3722,7 +3785,7 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
         </defs>
         ${gridLines}
         ${axisLines}
-        ${areaPath ? `<path d="${areaPath}" fill="url(#actualTrendFill)"></path>` : ""}
+        ${areaPath ? `<path class="trend-area-fill" d="${areaPath}" fill="url(#actualTrendFill)"></path>` : ""}
         ${targetBars}
         <path class="trend-line trend-line-actual" d="${actualPath}" fill="none" stroke="#4ade80" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"></path>
         ${actualDots}
@@ -4051,6 +4114,7 @@ function renderGraphCharts() {
     </div>
   `;
   animateSummaryBarValues(graphBody);
+  animateTrendLines(graphBody);
   } catch (err) {
     console.error("renderGraphCharts failed:", err);
     const detail = String(err?.message || err || "Unknown error");

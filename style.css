@@ -2135,22 +2135,27 @@ body.graph-mode{
   color:#94a3b8;
 }
 
-.trend-line{
-  stroke-dasharray:1400;
-  stroke-dashoffset:1400;
+path.trend-line,
+path.trend-line-actual{
+  stroke-dasharray:var(--trend-len, 1200);
+  stroke-dashoffset:var(--trend-len, 1200);
   will-change:stroke-dashoffset;
-  animation:trendLineDraw 1.15s var(--ease-smooth) forwards;
 }
 
 .trend-line-target{
   stroke-dasharray:8 8;
 }
 
+path.trend-area-fill{
+  opacity:0;
+  will-change:opacity;
+}
+
 .trend-dot{
   opacity:0;
   transform-origin:center;
+  transform-box:fill-box;
   will-change:transform, opacity;
-  animation:trendDotPop .38s var(--ease-soft) forwards;
 }
 
 @keyframes trendLineDraw{
@@ -2158,8 +2163,13 @@ body.graph-mode{
 }
 
 @keyframes trendDotPop{
-  from{ opacity:0; transform:scale(.4); }
+  from{ opacity:0; transform:scale(.35); }
   to{ opacity:1; transform:scale(1); }
+}
+
+@keyframes trendAreaFade{
+  from{ opacity:0; }
+  to{ opacity:1; }
 }
 
 .summary-graph-card-title{
