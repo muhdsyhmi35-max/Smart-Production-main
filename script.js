@@ -78,6 +78,7 @@ const GRAPH_WT_PRESET_MINS = {
   halfday: 300,
   friday: 400
 };
+const GRAPH_WT_PRESET_STORAGE_KEY = "TF2_GRAPH_WT_PRESET";
 let duplicateLock = false;
 let lastUpdateTime = 0;
 let lastTableData = "";
@@ -272,6 +273,133 @@ function onRoleOptionClick(event, role) {
     return;
   }
   setAppRole("operator");
+}
+
+function isNonProductionMode() {
+  return graphWtPreset === "nonproduction";
+}
+
+function normalizeGraphWtPreset(v) {
+  const x = String(v || "").trim().toLowerCase();
+  if (x === "halfday" || x === "half-day") return "halfday";
+  if (x === "nonproduction" || x === "non-production" || x === "non production") return "nonproduction";
+  return "normal";
+}
+
+function getGraphWtPresetLabel(preset) {
+  if (preset === "halfday") return "Half Day";
+  if (preset === "nonproduction") return "Non Production";
+  return "Normal Hour";
+}
+
+function loadGraphWtPresetFromStorage() {
+  try {
+    const stored = localStorage.getItem(GRAPH_WT_PRESET_STORAGE_KEY);
+    if (stored) graphWtPreset = normalizeGraphWtPreset(stored);
+  } catch (_) {}
+  if (graphWtPreset === "friday") graphWtPreset = "normal";
+}
+
+function saveGraphWtPresetToStorage() {
+  try {
+    localStorage.setItem(GRAPH_WT_PRESET_STORAGE_KEY, graphWtPreset);
+  } catch (_) {}
+}
+
+function setScanInputsEnabled(enabled) {
+  ["chassisInput", "modelInput", "engineInput", "keyInput"].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.disabled = !enabled;
+    el.readOnly = !enabled;
+    el.classList.toggle("scan-disabled", !enabled);
+    if (!enabled) el.blur();
+  });
+}
+
+function applyNonProductionMode() {
+  if (isMonitor) return;
+  document.body.classList.add("non-production-mode");
+  clearInterval(timer);
+  timer = null;
+  isDowntime = false;
+  duplicateLock = false;
+  pendingChassis = "";
+  pendingModel = "";
+  pendingEngine = "";
+  pendingKey = "";
+  setScanInputsEnabled(false);
+  setStatus("NON PRODUCTION", "status-orange");
+  updateDisplay();
+  updateLiveStateOnly();
+}
+
+function applyGraphWtPresetEffects(prevPreset) {
+  if (isMonitor) return;
+  if (isNonProductionMode()) {
+    applyNonProductionMode();
+    return;
+  }
+  document.body.classList.remove("non-production-mode");
+  setScanInputsEnabled(true);
+  if (prevPreset === "nonproduction") {
+    updateDisplay();
+    updateLiveStateOnly();
+  }
+}
+
+function syncGraphWtDropdownAria() {
+  const trigger = document.getElementById("graphWtTrigger");
+  const dd = document.getElementById("graphWtDropdown");
+  if (!trigger || !dd) return;
+  trigger.setAttribute("aria-expanded", dd.classList.contains("open") ? "true" : "false");
+}
+
+function toggleGraphWtDropdown(forceOpen) {
+  const dd = document.getElementById("graphWtDropdown");
+  const trigger = document.getElementById("graphWtTrigger");
+  if (!dd || !trigger) return;
+  let open;
+  if (typeof forceOpen === "boolean") {
+    open = forceOpen;
+  } else {
+    open = !dd.classList.contains("open");
+  }
+  dd.classList.toggle("open", open);
+  dd.setAttribute("aria-hidden", open ? "false" : "true");
+  syncGraphWtDropdownAria();
+}
+
+function onGraphWtTriggerClick(event) {
+  event.stopPropagation();
+  toggleGraphWtDropdown();
+}
+
+function applyGraphWtControlUi() {
+  if (graphWtPreset === "friday") graphWtPreset = "normal";
+  const preset = normalizeGraphWtPreset(graphWtPreset);
+  graphWtPreset = preset;
+  const label = document.getElementById("graphWtLabel");
+  if (label) label.textContent = getGraphWtPresetLabel(preset);
+  document.querySelectorAll(".header-wt-option").forEach(btn => {
+    const w = normalizeGraphWtPreset(btn.getAttribute("data-wt"));
+    const sel = w === preset;
+    btn.setAttribute("aria-selected", sel ? "true" : "false");
+    btn.classList.toggle("selected", sel);
+  });
+}
+
+function onGraphWtOptionClick(event, preset) {
+  event.stopPropagation();
+  toggleGraphWtDropdown(false);
+  const p = normalizeGraphWtPreset(preset);
+  if (graphWtPreset === p) return;
+  const prev = graphWtPreset;
+  graphWtPreset = p;
+  saveGraphWtPresetToStorage();
+  applyGraphWtControlUi();
+  applyGraphWtPresetEffects(prev);
+  renderGraphCharts();
 }
 
 /* ================= GOOGLE SHEET MIRROR LAYER ================= */
@@ -599,15 +727,6 @@ function onGraphPeriodChange(period) {
   renderGraphCharts();
 }
 
-function onGraphWtPresetChange() {
-  const sel = document.getElementById("graphWtPreset");
-  if (!sel) return;
-  const v = String(sel.value || "").trim().toLowerCase();
-  graphWtPreset = (v === "halfday") ? "halfday" : "normal";
-  syncGraphWtControl();
-  renderGraphCharts();
-}
-
 function syncGraphWtControl() {
   const headerExisting = document.getElementById("headerGraphWtWrap");
   if (headerExisting) headerExisting.remove();
@@ -621,25 +740,27 @@ function syncGraphWtControl() {
   const parent = document.querySelector(".controls");
   if (!parent) return;
 
-  const wrap = document.createElement("label");
+  const wrap = document.createElement("div");
   wrap.id = "controlsGraphWtWrap";
-  wrap.className = "header-pill controls-wt-wrap";
+  wrap.className = "header-wt-dd-wrap controls-wt-wrap";
   wrap.innerHTML = `
-    <span class="header-pill-icon">⏱</span>
-    <span>Working Time</span>
-    <select id="graphWtPreset" class="header-wt-select" title="Select planned working-time mode">
-      <option value="normal">Normal Hour</option>
-      <option value="halfday">Half Day</option>
-    </select>
+    <button type="button" class="header-pill header-wt-trigger" id="graphWtTrigger" onclick="onGraphWtTriggerClick(event)" aria-expanded="false" aria-haspopup="listbox" aria-label="Select working time mode">
+      <span class="header-pill-icon">⏱</span><span id="graphWtLabel">Normal Hour</span><span class="header-role-caret header-wt-caret" aria-hidden="true">▾</span>
+    </button>
+    <div class="header-wt-dropdown" id="graphWtDropdown" role="listbox" aria-labelledby="graphWtTrigger" aria-hidden="true">
+      <button type="button" class="header-wt-option" data-wt="normal" role="option" onclick="onGraphWtOptionClick(event, 'normal')">Normal Hour</button>
+      <button type="button" class="header-wt-option" data-wt="halfday" role="option" onclick="onGraphWtOptionClick(event, 'halfday')">Half Day</button>
+      <button type="button" class="header-wt-option" data-wt="nonproduction" role="option" onclick="onGraphWtOptionClick(event, 'nonproduction')">Non Production</button>
+    </div>
   `;
 
   parent.appendChild(wrap);
-
-  const sel = wrap.querySelector("#graphWtPreset");
-  if (sel) {
-    if (graphWtPreset === "friday") graphWtPreset = "normal";
-    sel.value = graphWtPreset;
-    sel.addEventListener("change", onGraphWtPresetChange);
+  applyGraphWtControlUi();
+  syncGraphWtDropdownAria();
+  if (isNonProductionMode()) applyNonProductionMode();
+  else {
+    document.body.classList.remove("non-production-mode");
+    setScanInputsEnabled(true);
   }
 }
 
@@ -1080,6 +1201,13 @@ function getShiftPeriodKey(d = new Date()) {
 
 function applyShiftScheduleTick() {
   if (isMonitor || !SETTINGS.shiftSchedule.enableAutoWindow) return;
+  if (isNonProductionMode()) {
+    if (timer) stopProduction(false);
+    setStatus("NON PRODUCTION", "status-orange");
+    updateDisplay();
+    updateLiveStateOnly();
+    return;
+  }
   const now = new Date();
   const inWindow = isWithinShiftWindow(now);
   const overtime = isOvertimeActive(now);
@@ -2054,6 +2182,11 @@ function loadMonitorStateFromFirebase() {
 function applyRemoteCommand(action) {
   isApplyingRemoteCommand = true;
 
+  if (isNonProductionMode() && (action === "start" || action === "reset")) {
+    isApplyingRemoteCommand = false;
+    return;
+  }
+
   if (action === "start") {
     startProduction(false);
   } else if (action === "stop") {
@@ -2069,6 +2202,10 @@ function applyRemoteCommand(action) {
 
 function startProduction(shouldSync = true) {
   if (isMonitor) return;
+  if (isNonProductionMode()) {
+    setStatus("NON PRODUCTION", "status-orange");
+    return;
+  }
   if (timer) return;
   if (!canRunProductionNow(new Date()) && !isAdminRole()) {
     setOffShiftStatus();
@@ -2134,6 +2271,7 @@ function stopProduction(shouldSync = true) {
 /* RESET */
 function resetProduction(shouldSync = true) {
   if (isMonitor) return;
+  if (isNonProductionMode()) return;
 
   hasLocalSession = true;
 
@@ -2172,6 +2310,10 @@ function resetProduction(shouldSync = true) {
 
 document.getElementById("chassisInput").addEventListener("keydown", function(e) {
   if (e.key === "Enter" && this.value.trim() !== "") {
+    if (isNonProductionMode()) {
+      this.value = "";
+      return;
+    }
     const value = this.value.trim();
 
     /* DUPLICATE CHECK */
@@ -2194,6 +2336,10 @@ document.getElementById("chassisInput").addEventListener("keydown", function(e) 
 
 document.getElementById("modelInput").addEventListener("keydown", function(e) {
   if (e.key === "Enter" && this.value.trim() !== "") {
+    if (isNonProductionMode()) {
+      this.value = "";
+      return;
+    }
     if (pendingChassis === "") return;
 
     const model = this.value.trim();
@@ -2210,6 +2356,10 @@ document.getElementById("modelInput").addEventListener("keydown", function(e) {
 
 document.getElementById("engineInput").addEventListener("keydown", function(e) {
   if (e.key === "Enter" && this.value.trim() !== "") {
+    if (isNonProductionMode()) {
+      this.value = "";
+      return;
+    }
     if (pendingModel === "") return;
 
     const value = this.value.trim();
@@ -2234,6 +2384,10 @@ document.getElementById("engineInput").addEventListener("keydown", function(e) {
 
 document.getElementById("keyInput").addEventListener("keydown", function(e) {
   if (e.key === "Enter" && this.value.trim() !== "") {
+    if (isNonProductionMode()) {
+      this.value = "";
+      return;
+    }
     if (!canRunProductionNow(new Date()) && !isAdminRole()) {
       setOffShiftStatus();
       this.value = "";
@@ -2474,7 +2628,9 @@ function updateDisplay() {
   ) {
     duplicateLock = false;
   }
-  if (isBreakTime()) {
+  if (isNonProductionMode()) {
+    setStatus("NON PRODUCTION", "status-orange");
+  } else if (isBreakTime()) {
     setStatus("BREAK TIME", "status-orange");
   } else if (duplicateLock) {
     setStatus("DUPLICATE SCAN", "status-red blink");
@@ -3615,7 +3771,8 @@ function getPlanWtMinsForDay(dayKey) {
   if (Number.isFinite(d.getTime()) && d.getDay() === 5) {
     return GRAPH_WT_PRESET_MINS.friday;
   }
-  return GRAPH_WT_PRESET_MINS[graphWtPreset] || GRAPH_WT_PRESET_MINS.normal;
+  const presetKey = graphWtPreset === "nonproduction" ? "normal" : graphWtPreset;
+  return GRAPH_WT_PRESET_MINS[presetKey] || GRAPH_WT_PRESET_MINS.normal;
 }
 
 function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, rangeLabel) {
@@ -3988,6 +4145,12 @@ document.addEventListener("click", (event) => {
   if (roleDd && roleDd.classList.contains("open") && !roleWrap) {
     toggleRoleDropdown(false);
   }
+
+  const wtDd = document.getElementById("graphWtDropdown");
+  const wtWrap = event.target.closest(".header-wt-dd-wrap");
+  if (wtDd && wtDd.classList.contains("open") && !wtWrap) {
+    toggleGraphWtDropdown(false);
+  }
 });
 
 document.addEventListener("keydown", (event) => {
@@ -3998,6 +4161,7 @@ document.addEventListener("keydown", (event) => {
       return;
     }
     toggleRoleDropdown(false);
+    toggleGraphWtDropdown(false);
     toggleMenuDropdown(false);
     if (document.body.classList.contains("history-mode")) {
       showMainPage();
@@ -4417,6 +4581,7 @@ window.onload = async function() {
   const allowed = await checkAccess();
   if (!allowed) return;
 
+  loadGraphWtPresetFromStorage();
   applyAppRoleUi();
   loadShiftScheduleFromStorage();
   ensureShiftScheduleModal();
@@ -4469,6 +4634,7 @@ window.onload = async function() {
     }
     updateMonitorDataNotice();
   } else {
+    syncGraphWtControl();
     // Reload scan history from Sheet after refresh (main screen).
     loadLiveData();
     if (liveDataPollInterval) clearInterval(liveDataPollInterval);
