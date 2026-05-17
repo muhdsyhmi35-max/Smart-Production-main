@@ -737,7 +737,8 @@ function syncGraphWtControl() {
 
   const inGraph = document.body.classList.contains("graph-mode");
   if (inGraph) return;
-  const parent = document.querySelector(".controls");
+  const actions = document.querySelector(".control-actions");
+  const parent = actions || document.querySelector(".controls");
   if (!parent) return;
 
   const wrap = document.createElement("div");
@@ -754,7 +755,8 @@ function syncGraphWtControl() {
     </div>
   `;
 
-  parent.appendChild(wrap);
+  if (actions) actions.insertBefore(wrap, actions.firstChild);
+  else parent.appendChild(wrap);
   applyGraphWtControlUi();
   syncGraphWtDropdownAria();
   if (isNonProductionMode()) applyNonProductionMode();

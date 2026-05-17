@@ -287,6 +287,60 @@ body::-webkit-scrollbar{
 
 .controls-wt-wrap{
   margin-left:auto;
+  z-index:10052;
+  align-self:flex-start;
+}
+
+/* Compact working-time control in the controls bar (opens up so it does not cover dashboard cards). */
+.controls-wt-wrap .header-wt-trigger.header-pill{
+  padding:6px 10px;
+  font-size:11px;
+  gap:5px;
+  border-radius:7px;
+  max-width:152px;
+  line-height:1.1;
+}
+
+.controls-wt-wrap .header-wt-trigger .header-pill-icon{
+  font-size:12px;
+}
+
+.controls-wt-wrap #graphWtLabel{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.controls-wt-wrap .header-wt-caret{
+  font-size:9px;
+  margin-left:1px;
+}
+
+.controls-wt-wrap .header-wt-dropdown{
+  top:auto;
+  bottom:calc(100% + 6px);
+  min-width:138px;
+  padding:4px;
+  border-radius:8px;
+  gap:2px;
+  transform:translateY(6px) scale(.98);
+  transform-origin:bottom right;
+  z-index:10053;
+}
+
+.controls-wt-wrap .header-wt-dropdown.open{
+  transform:translateY(0) scale(1);
+}
+
+.controls-wt-wrap .header-wt-option{
+  padding:7px 9px;
+  font-size:11px;
+  border-radius:6px;
+}
+
+.control-actions .controls-wt-wrap{
+  margin-left:0;
+  margin-right:clamp(8px, 1.2vw, 12px);
 }
 
 .header-role-trigger.header-pill:focus-visible,
@@ -573,6 +627,9 @@ body.role-operator .menu-btn{
   box-shadow:0 8px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.02);
   box-sizing:border-box;
   min-height:clamp(88px, 11vh, 138px);
+  position:relative;
+  z-index:30;
+  overflow:visible;
 }
 
 .controls-fields{
@@ -995,6 +1052,8 @@ body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-mini-c
   margin-bottom:0;
   margin-left:clamp(12px, 2vw, 18px);
   margin-right:clamp(12px, 2vw, 18px);
+  position:relative;
+  z-index:1;
 }
 
 .card h3{
