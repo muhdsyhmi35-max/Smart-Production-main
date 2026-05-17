@@ -1625,90 +1625,24 @@ function toggleOvertimeFromMenu() {
 
 /* ================= STRICT GLOBAL LOCK ================= */
 
-const DEVICE_ID_STORAGE_KEY = "DEVICE_ID";
-const LOCK_HOLDER_STORAGE_KEY = "TF2_LOCK_DEVICE_ID";
-
-function getOrCreateDeviceId() {
-  let deviceId = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
-  if (!deviceId) {
-    deviceId = "DEV-" + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
-    localStorage.setItem(DEVICE_ID_STORAGE_KEY, deviceId);
-  }
-  return deviceId;
-}
-
-function getRemoteLockDeviceId(data) {
-  if (!data || typeof data !== "object") return "";
-  return String(
-    data.deviceId || data.lockDeviceId || data.lockedBy || data.lockOwner || ""
-  ).trim();
-}
-
-/** True when this browser already holds (or re-opens) the production lock — e.g. F5 refresh. */
-function isLockHeldByThisDevice(data, deviceId) {
-  const remoteId = getRemoteLockDeviceId(data);
-  if (remoteId && remoteId === deviceId) return true;
-  return localStorage.getItem(LOCK_HOLDER_STORAGE_KEY) === deviceId;
-}
-
-async function acquireDeviceLock(deviceId) {
-  await fetch(API_URL, {
-    method: "POST",
-    mode: "no-cors",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ lockRequest: true, deviceId })
-  });
-  localStorage.setItem(LOCK_HOLDER_STORAGE_KEY, deviceId);
-}
-
-function releaseDeviceLockBeacon() {
-  const deviceId = getOrCreateDeviceId();
-  if (localStorage.getItem(LOCK_HOLDER_STORAGE_KEY) !== deviceId) return;
-  const payload = JSON.stringify({ unlock: true, lockRelease: true, deviceId });
-  try {
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon(API_URL, new Blob([payload], { type: "application/json" }));
-    } else {
-      fetch(API_URL, {
-        method: "POST",
-        mode: "no-cors",
-        keepalive: true,
-        headers: { "Content-Type": "application/json" },
-        body: payload
-      });
-    }
-  } catch (_) {
-    /* ignore */
-  }
-  // Keep LOCK_HOLDER in localStorage so F5 on this PC still recognizes same device.
-}
-
-function bindDeviceLockLifecycle() {
-  if (window.__tf2LockLifecycleBound) return;
-  window.__tf2LockLifecycleBound = true;
-  window.addEventListener("pagehide", releaseDeviceLockBeacon);
-}
-
 async function checkAccess() {
-  // Allow monitor screen (read-only, no production lock).
+  // ✅ Allow monitor screen
   if (window.location.search.includes("monitor")) {
     return true;
   }
 
-  bindDeviceLockLifecycle();
-  const deviceId = getOrCreateDeviceId();
+  // Restore one-device lock using Apps Script lock endpoints.
+  let deviceId = localStorage.getItem("DEVICE_ID");
+  if (!deviceId) {
+    deviceId = "DEV-" + Math.random().toString(36).substring(2);
+    localStorage.setItem("DEVICE_ID", deviceId);
+  }
 
   try {
-    const checkUrl = `${API_URL}?checkLock=true&deviceId=${encodeURIComponent(deviceId)}`;
-    const res = await fetch(checkUrl, { cache: "no-store" });
+    const res = await fetch(API_URL + "?checkLock=true");
     const data = await res.json();
-    const locked = !!(data && data.lock);
-    const remoteId = getRemoteLockDeviceId(data);
-    const heldByThisDevice = isLockHeldByThisDevice(data, deviceId);
-    const heldByOther = locked && remoteId && remoteId !== deviceId;
-    const blocked = locked && !heldByThisDevice && (heldByOther || !remoteId);
 
-    if (blocked) {
+    if (data.lock) {
       document.body.innerHTML = `
         <h1 style="
           color:red;
@@ -1722,7 +1656,17 @@ async function checkAccess() {
       return false;
     }
 
-    await acquireDeviceLock(deviceId);
+    await fetch(API_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        lockRequest: true,
+        deviceId: deviceId
+      })
+    });
   } catch (err) {
     console.log("Lock error:", err);
   }
