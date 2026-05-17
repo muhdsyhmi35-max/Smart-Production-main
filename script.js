@@ -896,6 +896,26 @@ function renumberScanTable() {
   });
 }
 
+/** Duplicate checks use only completed rows (full 4-scan cycle), not partial in-progress scans. */
+function rebuildScannedSetsFromTable() {
+  scannedChassis.clear();
+  scannedModel.clear();
+  scannedEngine.clear();
+  scannedKey.clear();
+  document.querySelectorAll("#scanTable tr").forEach(row => {
+    const cells = row.cells;
+    if (!cells || cells.length < 8) return;
+    const model = (cells[4]?.innerText || "").trim();
+    const chassis = (cells[5]?.innerText || "").trim();
+    const engine = (cells[6]?.innerText || "").trim();
+    const key = (cells[7]?.innerText || "").trim();
+    if (model && model !== "-") scannedModel.add(model);
+    if (chassis && chassis !== "-") scannedChassis.add(chassis);
+    if (engine && engine !== "-") scannedEngine.add(engine);
+    if (key && key !== "-") scannedKey.add(key);
+  });
+}
+
 /** Heading + number turn red whenever accumulated downtime &gt; 0 (not only live DOWN TIME). */
 function syncDowntimeAccumulatedHighlight() {
   const card = document.getElementById("downtimeCard");
@@ -2164,7 +2184,6 @@ document.getElementById("chassisInput").addEventListener("keydown", function(e) 
 
     duplicateLock = false;
     pendingChassis = value;
-    scannedChassis.add(value);
 
     this.value = "";
     document.getElementById("modelInput").focus();
@@ -2181,7 +2200,6 @@ document.getElementById("modelInput").addEventListener("keydown", function(e) {
 
     duplicateLock = false;
     pendingModel = model;
-    scannedModel.add(model);
 
     this.value = "";
     document.getElementById("engineInput").focus();
@@ -2206,7 +2224,6 @@ document.getElementById("engineInput").addEventListener("keydown", function(e) {
 
     duplicateLock = false;
     pendingEngine = value;
-    scannedEngine.add(value);
 
     this.value = "";
     document.getElementById("keyInput").focus();
@@ -2226,10 +2243,34 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
 
     const key = this.value.trim();
 
-    /* ===== DUPLICATE CHECK KEY ===== */
+    /* ===== DUPLICATE CHECK (completed units only) ===== */
+    if (scannedChassis.has(pendingChassis)) {
+      duplicateLock = true;
+      setStatus("DUPLICATE CHASSIS", "status-red blink");
+      pendingChassis = "";
+      pendingModel = "";
+      pendingEngine = "";
+      pendingKey = "";
+      this.value = "";
+      return;
+    }
+    if (scannedEngine.has(pendingEngine)) {
+      duplicateLock = true;
+      setStatus("DUPLICATE ENGINE", "status-red blink");
+      pendingChassis = "";
+      pendingModel = "";
+      pendingEngine = "";
+      pendingKey = "";
+      this.value = "";
+      return;
+    }
     if (scannedKey.has(key)) {
       duplicateLock = true;
       setStatus("DUPLICATE KEY", "status-red blink");
+      pendingChassis = "";
+      pendingModel = "";
+      pendingEngine = "";
+      pendingKey = "";
       this.value = "";
       return;
     }
@@ -2237,7 +2278,6 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
     duplicateLock = false;
 
     pendingKey = key;
-    scannedKey.add(key);
 
     /* --- START COUNTDOWN ONLY AFTER ALL 4 SCANS COMPLETE --- */
     if (!timer) {
@@ -2332,6 +2372,7 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
     row.dataset.scanMs = String(now.getTime());
     row.dataset.scanPlan = String(planForRow);
     renumberScanTable();
+    rebuildScannedSetsFromTable();
 
     // One completed 4-scan cycle = one actual unit.
     actualCount++;
@@ -2425,6 +2466,14 @@ function updateDisplay() {
   }
 
   /* ================= LOGIK STATUS BARU ================= */
+  if (
+    pendingChassis === "" &&
+    pendingModel === "" &&
+    pendingEngine === "" &&
+    pendingKey === ""
+  ) {
+    duplicateLock = false;
+  }
   if (isBreakTime()) {
     setStatus("BREAK TIME", "status-orange");
   } else if (duplicateLock) {
@@ -4274,6 +4323,7 @@ function loadLiveData() {
           newRow.dataset.scanPlan = Number.isFinite(planVal) && planVal > 0 ? String(planVal) : "";
         });
         renumberScanTable();
+        rebuildScannedSetsFromTable();
         applyHistoryDateFilter();
         syncDowntimeSecondsFromTable();
         refreshDowntimeCardFromTable();
