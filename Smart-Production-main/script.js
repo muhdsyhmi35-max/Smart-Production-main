@@ -3058,6 +3058,44 @@ function parseHourFromTimeText(timeText) {
   return hour;
 }
 
+function formatBarChartValue(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "0";
+  if (Number.isInteger(n)) return String(n);
+  return String(Math.round(n * 10) / 10).replace(/\.0$/, "");
+}
+
+/** Count-up labels on bar charts after bars finish growing. */
+function animateSummaryBarValues(container) {
+  if (!container) return;
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  container.querySelectorAll(".summary-bar-value[data-value]").forEach(el => {
+    const target = parseFloat(el.getAttribute("data-value") || "0");
+    const suffix = el.getAttribute("data-suffix") || "";
+    const delay = parseInt(el.getAttribute("data-delay-ms") || "0", 10);
+    const duration = 520;
+    const finalText = `${formatBarChartValue(target)}${suffix}`;
+    if (reduceMotion || target <= 0) {
+      el.textContent = finalText;
+      return;
+    }
+    el.textContent = `0${suffix}`;
+    const startAt = performance.now() + delay;
+    const tick = now => {
+      if (now < startAt) {
+        requestAnimationFrame(tick);
+        return;
+      }
+      const t = Math.min(1, (now - startAt) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      el.textContent = `${formatBarChartValue(target * eased)}${suffix}`;
+      if (t < 1) requestAnimationFrame(tick);
+      else el.textContent = finalText;
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
 function buildSummaryBarChart(title, labels, values, color, valueSuffix = "", yAxisLabel = "") {
   if (!labels.length || !values.length) {
     return `<div class="summary-graph-empty">No data</div>`;
@@ -3082,10 +3120,14 @@ function buildSummaryBarChart(title, labels, values, color, valueSuffix = "", yA
     const h = Math.max((v / maxVal) * chartH, v > 0 ? 2 : 0);
     const y = topPad + (chartH - h);
     const showLabel = i % labelStride === 0 || i === labels.length - 1;
+    const cx = (x + (barW / 2)).toFixed(2);
+    const valueY = (Math.max(y - 5, 12)).toFixed(2);
+    const barDelayMs = i * 90;
+    const valueDelayMs = barDelayMs + 580;
     return `
-      <rect class="summary-bar" style="animation-delay:${i * 90}ms" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="${color}" opacity="0.9"></rect>
-      ${showLabel ? `<text x="${(x + (barW / 2)).toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>` : ""}
-      <text x="${(x + (barW / 2)).toFixed(2)}" y="${(Math.max(y - 3, 10)).toFixed(2)}" text-anchor="middle" fill="#e2e8f0" font-size="9">${v}${valueSuffix}</text>
+      <rect class="summary-bar" style="animation-delay:${barDelayMs}ms" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="${color}" opacity="0.9"></rect>
+      ${showLabel ? `<text class="summary-bar-axis-label" x="${cx}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>` : ""}
+      <text class="summary-bar-value" style="animation-delay:${valueDelayMs}ms" data-delay-ms="${valueDelayMs}" data-value="${v}" data-suffix="${valueSuffix}" x="${cx}" y="${valueY}" text-anchor="middle" fill="#f8fafc" font-size="10" font-weight="700">0${valueSuffix}</text>
     `;
   }).join("");
   const yTicks = 4;
@@ -3839,6 +3881,7 @@ function renderGraphCharts() {
       <div class="summary-graph-card">${oeeChart}</div>
     </div>
   `;
+  animateSummaryBarValues(graphBody);
   } catch (err) {
     console.error("renderGraphCharts failed:", err);
     const detail = String(err?.message || err || "Unknown error");

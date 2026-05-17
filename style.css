@@ -2079,6 +2079,26 @@ body.graph-mode{
   to{transform:scaleY(1);}
 }
 
+.summary-chart-svg .summary-bar-value{
+  opacity:0;
+  transform-box:fill-box;
+  transform-origin:center bottom;
+  transform:translateY(6px);
+  will-change:opacity, transform;
+  animation:summaryBarValueIn .5s var(--ease-smooth) forwards;
+}
+
+@keyframes summaryBarValueIn{
+  from{
+    opacity:0;
+    transform:translateY(6px);
+  }
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
+}
+
 .enter-anim{
   will-change:transform, opacity;
   backface-visibility:hidden;
