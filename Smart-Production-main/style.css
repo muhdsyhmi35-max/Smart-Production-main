@@ -316,19 +316,15 @@ body::-webkit-scrollbar{
 }
 
 .controls-wt-wrap .header-wt-dropdown{
-  top:auto;
-  bottom:calc(100% + 6px);
   min-width:138px;
   padding:4px;
   border-radius:8px;
   gap:2px;
-  transform:translateY(6px) scale(.98);
-  transform-origin:bottom right;
   z-index:10053;
 }
 
-.controls-wt-wrap .header-wt-dropdown.open{
-  transform:translateY(0) scale(1);
+.controls:has(.controls-wt-wrap .header-wt-dropdown.open){
+  z-index:10045;
 }
 
 .controls-wt-wrap .header-wt-option{
@@ -1060,6 +1056,10 @@ body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-mini-c
   margin-right:clamp(12px, 2vw, 18px);
   position:relative;
   z-index:1;
+}
+
+.dashboard .card{
+  z-index:0;
 }
 
 .card h3{
