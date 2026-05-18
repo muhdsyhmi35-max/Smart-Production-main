@@ -73,6 +73,11 @@ let scannedChassis = new Set();
 let scannedModel = new Set();
 let scannedEngine = new Set();
 let scannedKey = new Set();
+
+/** Same value in sheet vs scanner may differ by case/spaces; use for duplicate checks only. */
+function normalizeScanId(value) {
+  return String(value || "").trim().toUpperCase();
+}
 const GRAPH_WT_PRESET_MINS = {
   normal: 460,
   halfday: 300,
@@ -1051,10 +1056,10 @@ function rebuildScannedSetsFromTable() {
     const chassis = (cells[5]?.innerText || "").trim();
     const engine = (cells[6]?.innerText || "").trim();
     const key = (cells[7]?.innerText || "").trim();
-    if (model && model !== "-") scannedModel.add(model);
-    if (chassis && chassis !== "-") scannedChassis.add(chassis);
-    if (engine && engine !== "-") scannedEngine.add(engine);
-    if (key && key !== "-") scannedKey.add(key);
+    if (model && model !== "-") scannedModel.add(normalizeScanId(model));
+    if (chassis && chassis !== "-") scannedChassis.add(normalizeScanId(chassis));
+    if (engine && engine !== "-") scannedEngine.add(normalizeScanId(engine));
+    if (key && key !== "-") scannedKey.add(normalizeScanId(key));
   });
 }
 
@@ -2338,9 +2343,9 @@ document.getElementById("chassisInput").addEventListener("keydown", function(e) 
     const value = this.value.trim();
 
     /* DUPLICATE CHECK */
-    if (scannedChassis.has(value)) {
+    if (scannedChassis.has(normalizeScanId(value))) {
       duplicateLock = true;
-      setStatus("DUPLICATE CHASSIS", "status-red blink");
+      setStatus("DUPLICATE CHASSIS: " + value, "status-red blink");
       this.value = "";
       return;
     }
@@ -2386,9 +2391,9 @@ document.getElementById("engineInput").addEventListener("keydown", function(e) {
     const value = this.value.trim();
 
     /* DUPLICATE CHECK */
-    if (scannedEngine.has(value)) {
+    if (scannedEngine.has(normalizeScanId(value))) {
       duplicateLock = true;
-      setStatus("DUPLICATE ENGINE", "status-red blink");
+      setStatus("DUPLICATE ENGINE: " + value, "status-red blink");
       this.value = "";
       return;
     }
@@ -2417,11 +2422,14 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
     if (pendingChassis === "" || pendingModel === "" || pendingEngine === "") return;
 
     const key = this.value.trim();
+    const keyId = normalizeScanId(key);
+    const chassisId = normalizeScanId(pendingChassis);
+    const engineId = normalizeScanId(pendingEngine);
 
     /* ===== DUPLICATE CHECK (completed units only) ===== */
-    if (scannedChassis.has(pendingChassis)) {
+    if (scannedChassis.has(chassisId)) {
       duplicateLock = true;
-      setStatus("DUPLICATE CHASSIS", "status-red blink");
+      setStatus("DUPLICATE CHASSIS: " + pendingChassis, "status-red blink");
       pendingChassis = "";
       pendingModel = "";
       pendingEngine = "";
@@ -2429,9 +2437,9 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
       this.value = "";
       return;
     }
-    if (scannedEngine.has(pendingEngine)) {
+    if (scannedEngine.has(engineId)) {
       duplicateLock = true;
-      setStatus("DUPLICATE ENGINE", "status-red blink");
+      setStatus("DUPLICATE ENGINE: " + pendingEngine, "status-red blink");
       pendingChassis = "";
       pendingModel = "";
       pendingEngine = "";
@@ -2439,9 +2447,9 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
       this.value = "";
       return;
     }
-    if (scannedKey.has(key)) {
+    if (scannedKey.has(keyId)) {
       duplicateLock = true;
-      setStatus("DUPLICATE KEY", "status-red blink");
+      setStatus("DUPLICATE KEY: " + key, "status-red blink");
       pendingChassis = "";
       pendingModel = "";
       pendingEngine = "";
@@ -4532,8 +4540,11 @@ function loadLiveData() {
       const idxModel = getIdx("model");
       const idxChassis = getIdx("chassis");
       const idxEngine = getIdx("engine", "engine no", "engine no.");
-      const idxKey = getIdx("key", "key no", "key no.");
+      const idxKey = getIdx("key no", "key no.", "key");
       const idxStatusByHeader = getIdx("status", "state");
+      if (idxKey >= 0 && (idxKey === idxEngine || idxKey === idxChassis || idxKey === idxModel)) {
+        console.warn("Google Sheet: Key column header matches the wrong column. Fix sheet headers.");
+      }
       const idxStatus = idxStatusByHeader >= 0 ? idxStatusByHeader : inferStatusColumnIndex(scanRows);
       const idxDowntime = resolveDowntimeEventColumnIndex(scanHeader);
       const downtimeCandidateIdxs = resolveDowntimeCandidateIndices(scanHeader);
