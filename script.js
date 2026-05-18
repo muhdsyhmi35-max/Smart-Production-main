@@ -850,6 +850,7 @@ function onHistoryDayFilterChange() {
   const todayK = toIsoDateLocal(new Date());
   historyFilterDate = v && v !== todayK ? v : null;
   applyHistoryDateFilter();
+  rebuildScannedSetsFromTable();
   refreshDowntimeCardFromTable();
 }
 
@@ -857,6 +858,7 @@ function onHistoryDayTodayClick() {
   historyFilterDate = null;
   syncHistoryDayPickerUi();
   applyHistoryDateFilter();
+  rebuildScannedSetsFromTable();
   refreshDowntimeCardFromTable();
 }
 
@@ -1027,13 +1029,22 @@ function renumberScanTable() {
   });
 }
 
-/** Duplicate checks use only completed rows (full 4-scan cycle), not partial in-progress scans. */
+/** True when a history row belongs to the active History date filter (today when cleared). */
+function scanTableRowMatchesActiveDay(tr) {
+  if (!tr || !tr.cells || tr.cells.length < 2) return false;
+  const rowDay = tr.dataset.scanDate || parseDisplayDateToIsoKey(tr.cells[1]?.innerText);
+  const dayKey = getActiveHistoryDayKey();
+  return !!rowDay && rowDay === dayKey;
+}
+
+/** Duplicate checks use only completed rows for the active history day (matches visible table). */
 function rebuildScannedSetsFromTable() {
   scannedChassis.clear();
   scannedModel.clear();
   scannedEngine.clear();
   scannedKey.clear();
   document.querySelectorAll("#scanTable tr").forEach(row => {
+    if (!scanTableRowMatchesActiveDay(row)) return;
     const cells = row.cells;
     if (!cells || cells.length < 8) return;
     const model = (cells[4]?.innerText || "").trim();
