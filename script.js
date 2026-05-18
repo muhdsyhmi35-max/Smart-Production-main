@@ -3159,7 +3159,12 @@ function animateTrendLines(container) {
       } catch (_) {
         len = 0;
       }
-      if (!Number.isFinite(len) || len <= 0) return;
+      if (!Number.isFinite(len) || len <= 0) {
+        path.style.strokeDasharray = "";
+        path.style.strokeDashoffset = "";
+        path.style.animation = "none";
+        return;
+      }
 
       const durationSec = Math.min(1.75, Math.max(0.9, len / 320));
       const baseDelayMs = lineIdx * 90;
@@ -3372,6 +3377,39 @@ function buildSummaryLineChart(title, labels, values, color, valueSuffix = "", y
   `;
 }
 
+function getTrendChartPeriodLabel(rangeStart, rangeEnd, period) {
+  if (rangeStart === rangeEnd) return "Day";
+  return period === "month" ? "Month" : "Week";
+}
+
+/** X/Y points for trend lines; single-day view centers on the chart (Today button). */
+function layoutTrendSeriesPoints(values, leftPad, chartW, toY) {
+  if (!values.length) return [];
+  if (values.length === 1) {
+    const cx = leftPad + chartW / 2;
+    const v = values[0] || 0;
+    return [{ x: cx, y: toY(v), value: v }];
+  }
+  const xStep = chartW / (values.length - 1);
+  return values.map((v, i) => ({
+    x: leftPad + xStep * i,
+    y: toY(v || 0),
+    value: v || 0
+  }));
+}
+
+/** SVG path for actual line; one-day charts use a short horizontal segment so the line is visible. */
+function buildTrendLinePath(points, yBase) {
+  if (!points.length) return "";
+  if (points.length === 1) {
+    const p = points[0];
+    if (!(p.value > 0)) return "";
+    const halfW = 32;
+    return `M ${(p.x - halfW).toFixed(2)} ${p.y.toFixed(2)} L ${(p.x + halfW).toFixed(2)} ${p.y.toFixed(2)}`;
+  }
+  return points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+}
+
 function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valueSuffix = "%", yAxisLabel = "%") {
   if (!labels.length || !actualValues.length) {
     return `<div class="summary-graph-empty">No data</div>`;
@@ -3385,26 +3423,28 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
   const chartW = width - leftPad - rightPad;
   const chartH = height - topPad - bottomPad;
   const maxVal = Math.max(1, ...actualValues, ...(planValues || []));
-  const stepX = labels.length <= 1 ? chartW : (chartW / (labels.length - 1));
   const yBase = topPad + chartH;
   const toY = (v) => yBase - ((v / maxVal) * chartH);
+  const planPoints = layoutTrendSeriesPoints(
+    labels.map((_, i) => planValues?.[i] || 0),
+    leftPad,
+    chartW,
+    toY
+  );
+  const stepX = labels.length <= 1 ? chartW : (chartW / (labels.length - 1));
 
   const planBarW = Math.max(Math.min((stepX || 12) * 0.34, 16), 6);
   const planBarOffsetX = Math.min((stepX || 0) * 0.18, 9);
   const planBars = labels.map((_, i) => {
     const v = planValues?.[i] || 0;
-    const x = leftPad + (stepX * i) - (planBarW / 2) + planBarOffsetX;
+    const x = (planPoints[i]?.x ?? (leftPad + stepX * i)) - (planBarW / 2) + planBarOffsetX;
     const y = toY(v);
     const h = Math.max(yBase - y, v > 0 ? 2 : 0);
     return `<rect class="summary-bar" style="animation-delay:${i * 35}ms" x="${x.toFixed(2)}" y="${(yBase - h).toFixed(2)}" width="${planBarW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="#3b82f6" opacity=".9"><title>Plan EFF: ${v.toFixed(1)}${valueSuffix}</title></rect>`;
   }).join("");
 
-  const points = actualValues.map((v, i) => ({
-    x: leftPad + (stepX * i),
-    y: toY(v),
-    value: v
-  }));
-  const path = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+  const points = layoutTrendSeriesPoints(actualValues, leftPad, chartW, toY);
+  const path = buildTrendLinePath(points, yBase);
   const areaPath = points.length
     ? `${path} L ${points[points.length - 1].x.toFixed(2)} ${yBase.toFixed(2)} L ${points[0].x.toFixed(2)} ${yBase.toFixed(2)} Z`
     : "";
@@ -3417,7 +3457,8 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
   const labelStride = labels.length > 24 ? 3 : labels.length > 16 ? 2 : 1;
   const xLabels = labels.map((label, i) => {
     if (i % labelStride !== 0 && i !== labels.length - 1) return "";
-    return `<text x="${(leftPad + stepX * i).toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>`;
+    const x = points[i]?.x ?? (leftPad + stepX * i);
+    return `<text x="${x.toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>`;
   }).join("");
   const yTicks = 4;
   const yGrid = Array.from({ length: yTicks + 1 }, (_, i) => {
@@ -3551,7 +3592,7 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
   const rangeLabel = formatIsoRangeAsDdMmYy(range.start, range.end);
   const dayKeys = getDayKeysBetween(range.start, range.end);
   const daySet = new Set(dayKeys);
-  const periodLabel = period === "month" ? "Month" : "Week";
+  const periodLabel = getTrendChartPeriodLabel(range.start, range.end, period);
 
   const dailyActualMap = {};
   const rows = document.querySelectorAll("#scanTable tr");
@@ -3616,22 +3657,22 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
     yTickStep = 50;
     maxVal = Math.ceil(seriesMax / yTickStep) * yTickStep;
   }
-  const xStep = dayKeys.length <= 1 ? chartW : (chartW / (dayKeys.length - 1));
+  const dayCount = dayKeys.length;
+  const xStep = dayCount <= 1 ? chartW : (chartW / (dayCount - 1));
   const yBase = topPad + chartH;
   const toY = (v) => yBase - ((v / maxVal) * chartH);
   const formatNum = (n) => Number(n || 0).toLocaleString();
 
-  const actualPoints = dayKeys.map((_, i) => ({
-    x: leftPad + (xStep * i),
-    y: toY(actualSeries[i] || 0),
-    value: actualSeries[i] || 0
-  }));
-  const targetPoints = dayKeys.map((_, i) => ({
-    x: leftPad + (xStep * i),
-    y: toY(targetSeries[i] || 0),
-    value: targetSeries[i] || 0
-  }));
-  const actualPath = actualPoints.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+  const actualPoints = layoutTrendSeriesPoints(actualSeries, leftPad, chartW, toY);
+  const targetPoints = dayKeys.map((_, i) => {
+    const x = dayCount <= 1 ? leftPad + chartW / 2 : leftPad + xStep * i;
+    return {
+      x,
+      y: toY(targetSeries[i] || 0),
+      value: targetSeries[i] || 0
+    };
+  });
+  const actualPath = buildTrendLinePath(actualPoints, yBase);
   const targetBarW = Math.max(Math.min((xStep || 12) * 0.34, 16), 6);
   const targetBarOffsetX = Math.min((xStep || 0) * 0.18, 9);
   const targetBars = targetPoints.map((p, i) => {
@@ -3667,7 +3708,7 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
     if (i % labelStride !== 0 && i !== dayKeys.length - 1) return "";
     const d = new Date(`${k}T00:00:00`);
     const label = d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
-    const x = leftPad + (xStep * i);
+    const x = dayCount <= 1 ? leftPad + chartW / 2 : leftPad + xStep * i;
     return `<text x="${x.toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>`;
   }).join("");
   const actualDots = actualPoints.map((p, i) => {
@@ -3934,7 +3975,7 @@ function renderGraphCharts() {
   const range = getActiveGraphRange();
   const rangeLabel = formatIsoRangeAsDdMmYy(range.start, range.end);
   const { labels, downtimeMins } = collectHourlyGraphData(activeDay, graphPeriod);
-  const periodLabel = graphPeriod === "month" ? "Month" : "Week";
+  const periodLabel = getTrendChartPeriodLabel(range.start, range.end, graphPeriod);
   const periodKeys = getDayKeysBetween(range.start, range.end);
   if (graphFocusedDayKey && !periodKeys.includes(graphFocusedDayKey)) {
     graphFocusedDayKey = null;
@@ -3965,7 +4006,7 @@ function renderGraphCharts() {
     periodKeys,
     dayProduced,
     dayTarget,
-    periodLabel: graphPeriod === "month" ? "Month" : "Week",
+    periodLabel: getTrendChartPeriodLabel(range.start, range.end, graphPeriod),
     rangeLabel: formatIsoRangeAsDdMmYy(range.start, range.end)
   };
   const totalProduced = periodKeys.reduce((s, k) => s + (dayProduced[k] || 0), 0);
