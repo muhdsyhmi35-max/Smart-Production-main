@@ -2137,8 +2137,6 @@ body.graph-mode{
 
 path.trend-line,
 path.trend-line-actual{
-  stroke-dasharray:var(--trend-len, 1200);
-  stroke-dashoffset:var(--trend-len, 1200);
   will-change:stroke-dashoffset;
 }
 
