@@ -3261,8 +3261,9 @@ function initPlanActualChartTooltips(container) {
       tip.style.top = `${topY}px`;
 
       const tipKind = (el.getAttribute("data-tip-kind") || "").toLowerCase();
-      tip.classList.toggle("is-target", tipKind === "target");
+      tip.classList.toggle("is-target", tipKind === "target" || tipKind === "plan");
       tip.classList.toggle("is-actual", tipKind === "actual");
+      tip.classList.toggle("is-efficiency", svg.classList.contains("summary-chart-efficiency"));
     };
 
     const showTip = el => {
@@ -3516,7 +3517,8 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
     const x = (planPoints[i]?.x ?? (leftPad + stepX * i)) - (planBarW / 2) + planBarOffsetX;
     const y = toY(v);
     const h = Math.max(yBase - y, v > 0 ? 2 : 0);
-    return `<rect class="summary-bar" style="animation-delay:${i * 35}ms" x="${x.toFixed(2)}" y="${(yBase - h).toFixed(2)}" width="${planBarW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="#3b82f6" opacity=".9"><title>Plan EFF: ${v.toFixed(1)}${valueSuffix}</title></rect>`;
+    const vTxt = `${v.toFixed(1)}${valueSuffix}`;
+    return `<rect class="summary-bar" data-chart-tip data-tip-kind="Target" data-tip-label="${labels[i]}" data-tip-value="${vTxt}" style="animation-delay:${i * 35}ms; cursor:pointer" x="${x.toFixed(2)}" y="${(yBase - h).toFixed(2)}" width="${planBarW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="#7c3aed" opacity=".9"></rect>`;
   }).join("");
 
   const points = layoutTrendSeriesPoints(actualValues, leftPad, chartW, toY);
@@ -3524,11 +3526,10 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
   const areaPath = points.length
     ? `${path} L ${points[points.length - 1].x.toFixed(2)} ${yBase.toFixed(2)} L ${points[0].x.toFixed(2)} ${yBase.toFixed(2)} Z`
     : "";
-  const circles = points.map((p, i) => `
-    <circle class="trend-dot" style="animation-delay:${i * 45}ms" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="3.8" fill="#a855f7">
-      <title>${labels[i]}: ${p.value}${valueSuffix}</title>
-    </circle>
-  `).join("");
+  const circles = points.map((p, i) => {
+    const vTxt = `${Number(p.value).toFixed(1)}${valueSuffix}`;
+    return `<circle class="trend-dot" data-chart-tip data-tip-kind="Actual" data-tip-label="${labels[i]}" data-tip-value="${vTxt}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="3.8" fill="#a855f7"></circle>`;
+  }).join("");
 
   const labelStride = labels.length > 24 ? 3 : labels.length > 16 ? 2 : 1;
   const xLabels = labels.map((label, i) => {
@@ -3566,7 +3567,7 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
       </div>
     </div>
     ${yAxisLabel ? `<div class="trend-units">${yAxisLabel}</div>` : ""}
-    <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg summary-chart-plan-actual" role="img" aria-label="${title}">
+    <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg summary-chart-plan-actual summary-chart-efficiency" role="img" aria-label="${title}">
       <defs>
         <linearGradient id="effTrendFill" x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stop-color="rgba(168,85,247,.34)"></stop>
