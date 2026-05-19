@@ -4155,11 +4155,7 @@ function renderGraphCharts() {
     const actualWtMins = calcActualWtMinsForDay(k, target);
     return calcActualEffPct(target, produced, planWtMins, actualWtMins) ?? 0;
   });
-  const planEffValues = effTrendKeys.map(k => {
-    if (!isWeekendIsoDay(k)) return 98;
-    const weekendDailyPlan = getHistoricalPlanForDay(k);
-    return Number.isFinite(weekendDailyPlan) && weekendDailyPlan > 0 ? 98 : 0;
-  });
+  const planEffValues = effTrendKeys.map(k => ((dayTarget[k] || 0) > 0 ? PLAN_EFF_PCT : 0));
   const oeeChart = buildEfficiencyTrendChart(`EFFICIENCY TREND (${periodLabel}: ${rangeLabel})`, oeeLabels, oeeValues, planEffValues, "%", "%");
   graphBody.innerHTML = `
     <div class="report-kpi-grid">
