@@ -81,11 +81,9 @@ body.is-fullscreen .fullscreen-btn{
   .report-eff-wt-grid{
     gap:3px;
   }
-  .report-eff-wt-card span{
-    font-size:12px;
-  }
-  .report-eff-wt-card strong{
-    font-size:clamp(24px, 3.8vh, 34px);
+  .report-eff-wt-card{
+    --eff-wt-label-size:clamp(12px, 1.35vh, 15px);
+    --eff-wt-value-size:clamp(20px, 2.8vh, 26px);
   }
 }
 
@@ -1969,12 +1967,14 @@ body.graph-mode{
 }
 
 .report-eff-wt-card{
+  --eff-wt-label-size:clamp(14px, 1.55vh, 17px);
+  --eff-wt-value-size:clamp(24px, 3.4vh, 30px);
   display:flex;
   flex-direction:column;
   justify-content:center;
   align-items:center;
   text-align:center;
-  gap:4px;
+  gap:5px;
   border:1px solid rgba(71,85,105,.45);
   border-radius:4px;
   background:rgba(15,23,42,.58);
@@ -1984,18 +1984,19 @@ body.graph-mode{
 }
 
 .report-eff-wt-card span{
-  font-size:13px;
+  font-size:var(--eff-wt-label-size);
+  font-weight:700;
   color:#93c5fd;
   text-transform:uppercase;
   letter-spacing:.45px;
-  line-height:1.15;
+  line-height:1.2;
 }
 
 .report-eff-wt-card strong{
-  font-size:clamp(28px, 4.8vh, 44px);
-  font-weight:900;
+  font-size:var(--eff-wt-value-size);
+  font-weight:800;
   color:#ffffff;
-  line-height:1;
+  line-height:1.05;
 }
 
 .report-bottom-grid > .summary-graph-card .summary-chart-svg{
