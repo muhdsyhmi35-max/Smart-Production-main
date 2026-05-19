@@ -2133,8 +2133,12 @@ body.graph-mode{
 .trend-chart-tooltip.is-actual .trend-chart-tooltip-kind{ color:#86efac; }
 .trend-chart-tooltip.is-eff-chart.is-actual .trend-chart-tooltip-kind{ color:#c4b5fd; }
 
-.summary-chart-eff-trend .trend-dot[data-chart-tip]:hover{
+.summary-chart-eff-trend .trend-dot-met[data-chart-tip]:hover{
   filter:drop-shadow(0 0 4px rgba(168,85,247,.65));
+}
+
+.summary-chart-eff-trend .trend-dot-behind[data-chart-tip]:hover{
+  filter:drop-shadow(0 0 4px rgba(239,68,68,.65));
 }
 
 .summary-chart-plan-actual .summary-bar[data-chart-tip]{

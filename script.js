@@ -3531,7 +3531,12 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
   const circles = points.map((p, i) => {
     const label = labels[i] || "";
     const valTxt = `${p.value}${valueSuffix}`;
-    return `<circle class="trend-dot" data-chart-tip data-tip-kind="Actual" data-tip-label="${label}" data-tip-value="${valTxt}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="3.8" fill="#a855f7"></circle>`;
+    const actual = p.value;
+    const target = planValues?.[i] ?? 0;
+    const behind = target > 0 && actual < target;
+    const dotClass = behind ? "trend-dot trend-dot-behind" : "trend-dot trend-dot-met";
+    const dotFill = behind ? "#ef4444" : "#a855f7";
+    return `<circle class="${dotClass}" data-chart-tip data-tip-kind="Actual" data-tip-label="${label}" data-tip-value="${valTxt}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="3.8" fill="${dotFill}"></circle>`;
   }).join("");
 
   const labelStride = labels.length > 24 ? 3 : labels.length > 16 ? 2 : 1;
