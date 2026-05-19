@@ -4045,20 +4045,36 @@ function getPlanWtMinsForDay(dayKey) {
   return GRAPH_WT_PRESET_MINS[presetKey] || GRAPH_WT_PRESET_MINS.normal;
 }
 
+/** Plan EFF baseline; Actual EFF stays at 98% when on/above plan within plan W/T, drops only if actual W/T exceeds plan. */
+const PLAN_EFF_PCT = 98;
+
+function calcActualEffPct(planUnits, actualUnits, planWtMins, actualWtMins) {
+  if (!Number.isFinite(planUnits) || planUnits <= 0) return null;
+  if (actualWtMins == null || !Number.isFinite(actualWtMins) || actualWtMins <= 0) return null;
+  if (!Number.isFinite(planWtMins) || planWtMins <= 0) return null;
+
+  const unitsRatio = Math.max(0, actualUnits / planUnits);
+
+  if (actualWtMins > planWtMins) {
+    const wtFactor = planWtMins / actualWtMins;
+    let eff = PLAN_EFF_PCT * wtFactor;
+    if (unitsRatio < 1) eff *= unitsRatio;
+    return Number(Math.max(0, eff).toFixed(1));
+  }
+
+  if (unitsRatio >= 1) return PLAN_EFF_PCT;
+  return Number(Math.max(0, unitsRatio * PLAN_EFF_PCT).toFixed(1));
+}
+
 function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, rangeLabel) {
-  const planEffPct = 98;
+  const planEffPct = PLAN_EFF_PCT;
   const planWtMins = getPlanWtMinsForDay(dayKey);
 
   const planUnits = dayTarget?.[dayKey] || 0;
   const actualUnits = dayProduced?.[dayKey] || 0;
   const actualWtMins = calcActualWtMinsForDay(dayKey, planUnits);
 
-  let actualEffPct = null;
-  if (planUnits > 0 && actualWtMins != null && actualWtMins > 0) {
-    // Company formula: (actual unit/plan unit) * (Working time plan / Working time actual) * 98%
-    const rawEff = (actualUnits / planUnits) * (planWtMins / actualWtMins) * 98;
-    actualEffPct = Number(Math.max(0, rawEff).toFixed(1));
-  }
+  const actualEffPct = calcActualEffPct(planUnits, actualUnits, planWtMins, actualWtMins);
 
   const titleDay = dayKey ? formatIsoDateAsDdMmYy(dayKey) : `${periodLabel}: ${rangeLabel}`;
   return `
@@ -4177,9 +4193,7 @@ function renderGraphCharts() {
     const produced = dayProduced[k] || 0;
     const planWtMins = getPlanWtMinsForDay(k);
     const actualWtMins = calcActualWtMinsForDay(k, target);
-    if (target <= 0 || actualWtMins == null || actualWtMins <= 0) return 0;
-    const rawEff = (produced / target) * (planWtMins / actualWtMins) * 98;
-    return Number(Math.max(0, rawEff).toFixed(1));
+    return calcActualEffPct(target, produced, planWtMins, actualWtMins) ?? 0;
   });
   const planEffValues = effTrendKeys.map(k => {
     if (!isWeekendIsoDay(k)) return 98;
