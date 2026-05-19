@@ -687,12 +687,84 @@ function getActiveGraphRange() {
   return getDefaultGraphRangeFromPeriod();
 }
 
+const datePickerRegistry = new WeakMap();
+
+function destroyDatePicker(el) {
+  const fp = datePickerRegistry.get(el);
+  if (fp) {
+    fp.destroy();
+    datePickerRegistry.delete(el);
+  }
+}
+
+function setDatePickerValue(el, isoDate) {
+  if (!el) return;
+  const fp = datePickerRegistry.get(el);
+  if (fp) {
+    if (isoDate) fp.setDate(isoDate, false);
+    else fp.clear();
+    return;
+  }
+  el.value = isoDate || "";
+}
+
+function initDatePicker(el, options = {}) {
+  if (!el || typeof flatpickr !== "function") return null;
+  destroyDatePicker(el);
+  const userOnChange = options.onChange;
+  const fp = flatpickr(el, {
+    dateFormat: "Y-m-d",
+    altInput: true,
+    altFormat: "d/m/Y",
+    altInputClass: "app-date-input",
+    allowInput: false,
+    disableMobile: true,
+    monthSelectorType: "dropdown",
+    animate: !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    ...options,
+    onChange(selectedDates, dateStr, instance) {
+      if (typeof userOnChange === "function") userOnChange(selectedDates, dateStr, instance);
+    }
+  });
+  datePickerRegistry.set(el, fp);
+  return fp;
+}
+
+function initGraphRangeDatePickers() {
+  const startEl = document.getElementById("graphRangeStart");
+  const endEl = document.getElementById("graphRangeEnd");
+  if (!startEl || !endEl) return;
+
+  let startFp;
+  let endFp;
+
+  endFp = initDatePicker(endEl, {
+    onChange() {
+      if (endEl.value) startFp?.set("maxDate", endEl.value);
+      onGraphRangeFilterChange();
+    }
+  });
+  startFp = initDatePicker(startEl, {
+    onChange() {
+      if (endEl.value) endFp?.set("minDate", startEl.value);
+      onGraphRangeFilterChange();
+    }
+  });
+
+  if (startEl.value) endFp.set("minDate", startEl.value);
+  if (endEl.value) startFp.set("maxDate", endEl.value);
+}
+
+function initSingleDayDatePicker(el, onChange) {
+  return initDatePicker(el, { onChange });
+}
+
 function syncGraphRangePickerUi() {
   const startEl = document.getElementById("graphRangeStart");
   const endEl = document.getElementById("graphRangeEnd");
   const range = getActiveGraphRange();
-  if (startEl) startEl.value = range.start;
-  if (endEl) endEl.value = range.end;
+  setDatePickerValue(startEl, range.start);
+  setDatePickerValue(endEl, range.end);
 }
 
 function onGraphRangeFilterChange() {
@@ -829,7 +901,7 @@ function getActiveHistoryDayKey() {
 
 function syncHistoryDayPickerUi() {
   const el = document.getElementById("historyDayFilter");
-  if (el) el.value = getActiveHistoryDayKey();
+  setDatePickerValue(el, getActiveHistoryDayKey());
 }
 
 function applyHistoryDateFilter() {
@@ -873,7 +945,7 @@ function getActiveSummaryDayKey() {
 
 function syncSummaryDayPickerUi() {
   const el = document.getElementById("summaryDayFilter");
-  if (el) el.value = getActiveSummaryDayKey();
+  setDatePickerValue(el, getActiveSummaryDayKey());
 }
 
 function onSummaryDayFilterChange() {
@@ -4217,9 +4289,9 @@ function showGraphPage() {
       <div class="graph-range-box">
         <span class="graph-range-label">DATE RANGE</span>
         <div class="graph-range-inputs">
-          <input type="date" id="graphRangeStart" title="Graph range start date">
+          <input type="text" class="app-date-input" id="graphRangeStart" title="Graph range start date" placeholder="dd/mm/yyyy" readonly>
           <span class="graph-range-sep">-</span>
-          <input type="date" id="graphRangeEnd" title="Graph range end date">
+          <input type="text" class="app-date-input" id="graphRangeEnd" title="Graph range end date" placeholder="dd/mm/yyyy" readonly>
           <button type="button" id="graphRangeTodayBtn" class="graph-today-btn">Today</button>
         </div>
       </div>
@@ -4229,13 +4301,12 @@ function showGraphPage() {
   `;
   syncGraphRangePickerUi();
   syncGraphPeriodButtonsUi();
+  initGraphRangeDatePickers();
   const graphRangeStart = document.getElementById("graphRangeStart");
   const graphRangeEnd = document.getElementById("graphRangeEnd");
   const graphRangeTodayBtn = document.getElementById("graphRangeTodayBtn");
   const graphPeriodWeekBtn = document.getElementById("graphPeriodWeekBtn");
   const graphPeriodMonthBtn = document.getElementById("graphPeriodMonthBtn");
-  if (graphRangeStart) graphRangeStart.addEventListener("change", onGraphRangeFilterChange);
-  if (graphRangeEnd) graphRangeEnd.addEventListener("change", onGraphRangeFilterChange);
   if (graphRangeTodayBtn) graphRangeTodayBtn.addEventListener("click", onGraphRangeTodayClick);
   if (graphPeriodWeekBtn) graphPeriodWeekBtn.addEventListener("click", () => onGraphPeriodChange("week"));
   if (graphPeriodMonthBtn) graphPeriodMonthBtn.addEventListener("click", () => onGraphPeriodChange("month"));
@@ -4323,7 +4394,7 @@ function showSummaryPage() {
       <div class="summary-head">Daily Summary</div>
       <div class="summary-filter-row">
         <label for="summaryDayFilter">Date</label>
-        <input type="date" id="summaryDayFilter" title="Select date for daily summary">
+        <input type="text" class="app-date-input" id="summaryDayFilter" title="Select date for daily summary" placeholder="dd/mm/yyyy" readonly>
         <button type="button" id="summaryDayTodayBtn" class="summary-today-btn">Today</button>
       </div>
     </div>
@@ -4350,7 +4421,7 @@ function showSummaryPage() {
   syncSummaryDayPickerUi();
   const summaryDayFilter = document.getElementById("summaryDayFilter");
   const summaryDayTodayBtn = document.getElementById("summaryDayTodayBtn");
-  if (summaryDayFilter) summaryDayFilter.addEventListener("change", onSummaryDayFilterChange);
+  if (summaryDayFilter) initSingleDayDatePicker(summaryDayFilter, onSummaryDayFilterChange);
   if (summaryDayTodayBtn) summaryDayTodayBtn.addEventListener("click", onSummaryDayTodayClick);
 
   document.body.classList.add("summary-mode");
@@ -4814,9 +4885,7 @@ document.getElementById("lotInput").addEventListener("input", () => {
 
 const historyDayFilterEl = document.getElementById("historyDayFilter");
 const historyDayTodayBtn = document.getElementById("historyDayTodayBtn");
-if (historyDayFilterEl) {
-  historyDayFilterEl.addEventListener("change", onHistoryDayFilterChange);
-}
+if (historyDayFilterEl) initSingleDayDatePicker(historyDayFilterEl, onHistoryDayFilterChange);
 if (historyDayTodayBtn) {
   historyDayTodayBtn.addEventListener("click", onHistoryDayTodayClick);
 }
