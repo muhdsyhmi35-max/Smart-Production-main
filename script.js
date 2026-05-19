@@ -3216,6 +3216,83 @@ function animateTrendLines(container) {
   requestAnimationFrame(() => requestAnimationFrame(run));
 }
 
+/** Smooth HTML tooltip for Production Trend target / actual hover. */
+function initPlanActualChartTooltips(container) {
+  if (!container) return;
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  container.querySelectorAll("svg.summary-chart-plan-actual").forEach(svg => {
+    const host = svg.closest(".summary-graph-card");
+    if (!host) return;
+
+    host.classList.add("trend-chart-host");
+
+    let tip = host.querySelector(".trend-chart-tooltip");
+    if (!tip) {
+      tip = document.createElement("motion");
+      tip = document.createElement("div");
+      tip.className = "trend-chart-tooltip";
+      tip.setAttribute("role", "tooltip");
+      tip.innerHTML = `
+        <span class="trend-chart-tooltip-kind"></span>
+        <span class="trend-chart-tooltip-value"></span>
+      `;
+      host.appendChild(tip);
+    }
+
+    let activeEl = null;
+    let hideTimer = null;
+
+    const positionTip = el => {
+      const kindEl = tip.querySelector(".trend-chart-tooltip-kind");
+      const valueEl = tip.querySelector(".trend-chart-tooltip-value");
+      if (kindEl) kindEl.textContent = el.getAttribute("data-tip-kind") || "";
+      if (valueEl) {
+        const label = el.getAttribute("data-tip-label") || "";
+        const value = el.getAttribute("data-tip-value") || "";
+        valueEl.textContent = label ? `${label}: ${value}` : value;
+      }
+
+      const hostRect = host.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const centerX = elRect.left + elRect.width / 2 - hostRect.left;
+      const topY = elRect.top - hostRect.top - 10;
+
+      tip.style.left = `${centerX}px`;
+      tip.style.top = `${topY}px`;
+
+      const tipKind = (el.getAttribute("data-tip-kind") || "").toLowerCase();
+      tip.classList.toggle("is-target", tipKind === "target");
+      tip.classList.toggle("is-actual", tipKind === "actual");
+    };
+
+    const showTip = el => {
+      if (!el) return;
+      clearTimeout(hideTimer);
+      activeEl = el;
+      positionTip(el);
+      tip.hidden = false;
+      requestAnimationFrame(() => tip.classList.add("is-visible"));
+    };
+
+    const hideTip = () => {
+      activeEl = null;
+      tip.classList.remove("is-visible");
+      const delay = reduceMotion ? 0 : 220;
+      hideTimer = setTimeout(() => {
+        if (!activeEl) tip.hidden = true;
+      }, delay);
+    };
+
+    svg.querySelectorAll("[data-chart-tip]").forEach(el => {
+      el.addEventListener("mouseenter", () => showTip(el));
+      el.addEventListener("focus", () => showTip(el));
+      el.addEventListener("mouseleave", hideTip);
+      el.addEventListener("blur", hideTip);
+    });
+  });
+}
+
 /** Count-up labels on bar charts after bars finish growing. */
 function animateSummaryBarValues(container) {
   if (!container) return;
@@ -3681,7 +3758,7 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
     const y = yBase - barH;
     const dTxt = formatIsoDateAsDdMmYy(dayKeys[i]);
     const vTxt = formatNum(targetSeries[i] || 0);
-    return `<rect class="summary-bar" data-report-day="${dayKeys[i]}" style="animation-delay:${i * 35}ms; cursor:pointer" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${targetBarW.toFixed(2)}" height="${barH.toFixed(2)}" rx="2" fill="#3b82f6" opacity=".92" onclick="focusGraphDay('${dayKeys[i]}')"><title>Target\n${dTxt}: ${vTxt}</title></rect>`;
+    return `<rect class="summary-bar" data-chart-tip data-tip-kind="Target" data-tip-label="${dTxt}" data-tip-value="${vTxt}" data-report-day="${dayKeys[i]}" style="animation-delay:${i * 35}ms; cursor:pointer" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${targetBarW.toFixed(2)}" height="${barH.toFixed(2)}" rx="2" fill="#3b82f6" opacity=".92" onclick="focusGraphDay('${dayKeys[i]}')"></rect>`;
   }).join("");
   const areaPath = actualPoints.length
     ? `${actualPath} L ${actualPoints[actualPoints.length - 1].x.toFixed(2)} ${yBase.toFixed(2)} L ${actualPoints[0].x.toFixed(2)} ${yBase.toFixed(2)} Z`
@@ -3714,7 +3791,7 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
   const actualDots = actualPoints.map((p, i) => {
     const dTxt = formatIsoDateAsDdMmYy(dayKeys[i]);
     const vTxt = formatNum(p.value);
-    return `<circle class="trend-dot" data-report-day="${dayKeys[i]}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="4.2" fill="#4ade80" onclick="focusGraphDay('${dayKeys[i]}')"><title>Actual\n${dTxt}: ${vTxt}</title></circle>`;
+    return `<circle class="trend-dot" data-chart-tip data-tip-kind="Actual" data-tip-label="${dTxt}" data-tip-value="${vTxt}" data-report-day="${dayKeys[i]}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="4.2" fill="#4ade80" onclick="focusGraphDay('${dayKeys[i]}')"></circle>`;
   }).join("");
 
   return `
@@ -4071,6 +4148,7 @@ function renderGraphCharts() {
   `;
   animateSummaryBarValues(graphBody);
   animateTrendLines(graphBody);
+  initPlanActualChartTooltips(graphBody);
   } catch (err) {
     console.error("renderGraphCharts failed:", err);
     const detail = String(err?.message || err || "Unknown error");
