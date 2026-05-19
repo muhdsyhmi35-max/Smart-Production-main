@@ -1931,46 +1931,6 @@ body.graph-mode{
   flex-direction:column;
 }
 
-.report-plan-actual-unit-wrap{
-  margin-top:6px;
-  padding-top:6px;
-  border-top:1px solid rgba(71,85,105,.4);
-  flex-shrink:0;
-}
-
-.report-plan-actual-unit-title{
-  margin-bottom:4px;
-  font-size:11px;
-}
-
-.report-plan-actual-unit-grid{
-  min-height:72px;
-}
-
-.report-plan-actual-unit-grid .report-eff-wt-card{
-  min-height:64px;
-}
-
-.report-plan-actual-unit-grid .report-eff-wt-card span{
-  font-size:13px;
-}
-
-.report-plan-actual-unit-grid .report-eff-wt-card strong{
-  font-size:clamp(28px, 3.2vh, 40px);
-}
-
-.report-plan-actual-unit-grid .report-eff-wt-card strong.unit-pos{
-  color:#4ade80;
-}
-
-.report-plan-actual-unit-grid .report-eff-wt-card strong.unit-neg{
-  color:#f87171;
-}
-
-.report-chart-grid > .summary-graph-card{
-  overflow:visible;
-}
-
 .report-eff-wt-wrap{
   padding:4px;
 }
