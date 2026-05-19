@@ -3794,7 +3794,12 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
   const actualDots = actualPoints.map((p, i) => {
     const dTxt = formatIsoDateAsDdMmYy(dayKeys[i]);
     const vTxt = formatNum(p.value);
-    return `<circle class="trend-dot" data-chart-tip data-tip-kind="Actual" data-tip-label="${dTxt}" data-tip-value="${vTxt}" data-report-day="${dayKeys[i]}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="4.2" fill="#4ade80" onclick="focusGraphDay('${dayKeys[i]}')"></circle>`;
+    const actual = actualSeries[i] || 0;
+    const target = targetSeries[i] || 0;
+    const behind = target > 0 && actual < target;
+    const dotClass = behind ? "trend-dot trend-dot-behind" : "trend-dot trend-dot-met";
+    const dotFill = behind ? "#ef4444" : "#4ade80";
+    return `<circle class="${dotClass}" data-chart-tip data-tip-kind="Actual" data-tip-label="${dTxt}" data-tip-value="${vTxt}" data-report-day="${dayKeys[i]}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="4.2" fill="${dotFill}" onclick="focusGraphDay('${dayKeys[i]}')"></circle>`;
   }).join("");
 
   return `
@@ -4020,6 +4025,11 @@ function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, 
   const actualWtMins = calcActualWtMinsForDay(dayKey, planUnits);
 
   const actualEffPct = calcActualEffPct(planUnits, actualUnits, planWtMins, actualWtMins);
+  const actualEffClass = actualEffPct == null
+    ? ""
+    : actualEffPct < planEffPct
+      ? "neg"
+      : "pos";
 
   const titleDay = dayKey ? formatIsoDateAsDdMmYy(dayKey) : `${periodLabel}: ${rangeLabel}`;
   return `
@@ -4031,7 +4041,7 @@ function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, 
       </div>
       <div class="report-eff-wt-card">
         <span>Actual EFF</span>
-        <strong>${actualEffPct == null ? "—" : `${actualEffPct}%`}</strong>
+        <strong class="${actualEffClass}">${actualEffPct == null ? "—" : `${actualEffPct}%`}</strong>
       </div>
       <div class="report-eff-wt-card">
         <span>Plan W/T (MINS)</span>

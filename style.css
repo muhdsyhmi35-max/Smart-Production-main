@@ -1973,6 +1973,14 @@ body.graph-mode{
   line-height:1;
 }
 
+.report-eff-wt-card strong.neg{
+  color:#ef4444;
+}
+
+.report-eff-wt-card strong.pos{
+  color:#22c55e;
+}
+
 .report-bottom-grid > .summary-graph-card .summary-chart-svg{
   flex:1 1 auto;
   width:100%;
@@ -2142,8 +2150,12 @@ body.graph-mode{
   transition:filter .2s var(--ease-smooth), r .2s var(--ease-smooth);
 }
 
-.summary-chart-plan-actual .trend-dot[data-chart-tip]:hover{
+.summary-chart-plan-actual .trend-dot-met[data-chart-tip]:hover{
   filter:drop-shadow(0 0 4px rgba(74,222,128,.65));
+}
+
+.summary-chart-plan-actual .trend-dot-behind[data-chart-tip]:hover{
+  filter:drop-shadow(0 0 4px rgba(239,68,68,.65));
 }
 
 .trend-header{
