@@ -75,17 +75,17 @@ body.is-fullscreen .fullscreen-btn{
     font-size:9px;
   }
   .report-eff-wt-wrap .summary-graph-card-title{
-    font-size:8px;
-    margin-bottom:1px;
+    font-size:10px;
+    margin-bottom:2px;
   }
   .report-eff-wt-grid{
     gap:3px;
   }
   .report-eff-wt-card span{
-    font-size:8px;
+    font-size:10px;
   }
   .report-eff-wt-card strong{
-    font-size:clamp(12px, 1.7vh, 18px);
+    font-size:clamp(18px, 2.6vh, 26px);
   }
 }
 
@@ -1952,8 +1952,8 @@ body.graph-mode{
 }
 
 .report-eff-wt-wrap .summary-graph-card-title{
-  margin-bottom:2px;
-  font-size:10px;
+  margin-bottom:3px;
+  font-size:11px;
   line-height:1.2;
   flex:0 0 auto;
 }
@@ -1974,26 +1974,26 @@ body.graph-mode{
   justify-content:center;
   align-items:center;
   text-align:center;
-  gap:2px;
+  gap:4px;
   border:1px solid rgba(71,85,105,.45);
   border-radius:4px;
   background:rgba(15,23,42,.58);
-  padding:2px 4px;
+  padding:4px 6px;
   min-height:0;
   overflow:hidden;
 }
 
 .report-eff-wt-card span{
-  font-size:9px;
+  font-size:11px;
   color:#93c5fd;
   text-transform:uppercase;
-  letter-spacing:.3px;
-  line-height:1.1;
+  letter-spacing:.4px;
+  line-height:1.15;
 }
 
 .report-eff-wt-card strong{
-  font-size:clamp(14px, 2vh, 22px);
-  font-weight:800;
+  font-size:clamp(22px, 3.2vh, 34px);
+  font-weight:900;
   color:#ffffff;
   line-height:1;
 }
