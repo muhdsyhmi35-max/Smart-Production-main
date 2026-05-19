@@ -3146,23 +3146,6 @@ function formatBarChartValue(v) {
   return String(Math.round(n * 10) / 10).replace(/\.0$/, "");
 }
 
-/** Replay target/actual bar grow after chart HTML is replaced. */
-function animateSummaryBars(container) {
-  if (!container) return;
-  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (reduceMotion) return;
-  const run = () => {
-    container.querySelectorAll(".summary-bar").forEach((bar, i) => {
-      const delayMatch = String(bar.style.animationDelay || "").match(/([\d.]+)ms/);
-      const delayMs = delayMatch ? parseFloat(delayMatch[1]) : i * 35;
-      bar.style.animation = "none";
-      void bar.getBoundingClientRect();
-      bar.style.animation = `summaryBarGrow .95s var(--ease-smooth) ${delayMs}ms forwards`;
-    });
-  };
-  requestAnimationFrame(() => requestAnimationFrame(run));
-}
-
 /** Green / purple actual trend lines: stroke draw + dots timed along the path. */
 function animateTrendLines(container) {
   if (!container) return;
@@ -3355,7 +3338,7 @@ function buildSummaryLineChart(title, labels, values, color, valueSuffix = "", y
     y: toY(v),
     value: v
   }));
-  const path = buildTrendLinePath(points);
+  const path = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
   const circles = points.map((p, i) => `
     <circle class="trend-dot" style="animation-delay:${i * 45}ms" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="3.8" fill="${color}">
       <title>${labels[i]}: ${p.value}${valueSuffix}</title>
@@ -3415,33 +3398,6 @@ function layoutTrendSeriesPoints(values, leftPad, chartW, toY) {
   }));
 }
 
-/** Cubic Catmull-Rom spline through chart points (smooth curves, passes through each dot). */
-function buildSmoothLinePathFromPoints(points) {
-  if (!points.length) return "";
-  if (points.length === 1) {
-    const p = points[0];
-    return `M ${p.x.toFixed(2)} ${p.y.toFixed(2)}`;
-  }
-  if (points.length === 2) {
-    return `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)} L ${points[1].x.toFixed(2)} ${points[1].y.toFixed(2)}`;
-  }
-  const parts = [`M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`];
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[Math.max(0, i - 1)];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[Math.min(points.length - 1, i + 2)];
-    const cp1x = p1.x + (p2.x - p0.x) / 6;
-    const cp1y = p1.y + (p2.y - p0.y) / 6;
-    const cp2x = p2.x - (p3.x - p1.x) / 6;
-    const cp2y = p2.y - (p3.y - p1.y) / 6;
-    parts.push(
-      `C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)} ${cp2x.toFixed(2)} ${cp2y.toFixed(2)} ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`
-    );
-  }
-  return parts.join(" ");
-}
-
 /** SVG path for actual line; one-day charts use a short horizontal segment so the line is visible. */
 function buildTrendLinePath(points, yBase) {
   if (!points.length) return "";
@@ -3451,7 +3407,7 @@ function buildTrendLinePath(points, yBase) {
     const halfW = 32;
     return `M ${(p.x - halfW).toFixed(2)} ${p.y.toFixed(2)} L ${(p.x + halfW).toFixed(2)} ${p.y.toFixed(2)}`;
   }
-  return buildSmoothLinePathFromPoints(points);
+  return points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
 }
 
 function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valueSuffix = "%", yAxisLabel = "%") {
@@ -4113,7 +4069,6 @@ function renderGraphCharts() {
       <div class="summary-graph-card">${oeeChart}</div>
     </div>
   `;
-  animateSummaryBars(graphBody);
   animateSummaryBarValues(graphBody);
   animateTrendLines(graphBody);
   } catch (err) {
