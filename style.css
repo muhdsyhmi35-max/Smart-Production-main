@@ -74,6 +74,19 @@ body.is-fullscreen .fullscreen-btn{
   .plan-actual-sub{
     font-size:9px;
   }
+  .report-eff-wt-wrap .summary-graph-card-title{
+    font-size:8px;
+    margin-bottom:1px;
+  }
+  .report-eff-wt-grid{
+    gap:3px;
+  }
+  .report-eff-wt-card span{
+    font-size:8px;
+  }
+  .report-eff-wt-card strong{
+    font-size:clamp(12px, 1.7vh, 18px);
+  }
 }
 
 @media (max-width: 1200px){
@@ -1934,15 +1947,25 @@ body.graph-mode{
 }
 
 .report-eff-wt-wrap{
-  padding:4px;
+  padding:3px;
+  min-height:0;
+}
+
+.report-eff-wt-wrap .summary-graph-card-title{
+  margin-bottom:2px;
+  font-size:10px;
+  line-height:1.2;
+  flex:0 0 auto;
 }
 
 .report-eff-wt-grid{
   display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:5px;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  grid-template-rows:repeat(2, minmax(0, 1fr));
+  gap:4px;
   margin-top:0;
   flex:1 1 auto;
+  min-height:0;
 }
 
 .report-eff-wt-card{
@@ -1951,24 +1974,26 @@ body.graph-mode{
   justify-content:center;
   align-items:center;
   text-align:center;
-  gap:8px;
+  gap:2px;
   border:1px solid rgba(71,85,105,.45);
-  border-radius:6px;
+  border-radius:4px;
   background:rgba(15,23,42,.58);
-  padding:4px 6px;
-  min-height:84px;
+  padding:2px 4px;
+  min-height:0;
+  overflow:hidden;
 }
 
 .report-eff-wt-card span{
-  font-size:16px;
+  font-size:9px;
   color:#93c5fd;
   text-transform:uppercase;
-  letter-spacing:.6px;
+  letter-spacing:.3px;
+  line-height:1.1;
 }
 
 .report-eff-wt-card strong{
-  font-size:clamp(34px, 4vh, 46px);
-  font-weight:900;
+  font-size:clamp(14px, 2vh, 22px);
+  font-weight:800;
   color:#ffffff;
   line-height:1;
 }
