@@ -4041,14 +4041,6 @@ function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, 
         <span>Actual W/T (MINS)</span>
         <strong>${actualWtMins == null ? "—" : actualWtMins.toFixed(1)}</strong>
       </div>
-      <div class="report-eff-wt-card">
-        <span>Plan Unit</span>
-        <strong>${planUnits}</strong>
-      </div>
-      <div class="report-eff-wt-card">
-        <span>Actual Unit</span>
-        <strong>${actualUnits}</strong>
-      </div>
     </div>
   `;
 }
