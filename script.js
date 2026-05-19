@@ -3229,7 +3229,6 @@ function initPlanActualChartTooltips(container) {
 
     let tip = host.querySelector(".trend-chart-tooltip");
     if (!tip) {
-      tip = document.createElement("motion");
       tip = document.createElement("div");
       tip.className = "trend-chart-tooltip";
       tip.setAttribute("role", "tooltip");

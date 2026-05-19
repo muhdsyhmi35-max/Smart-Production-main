@@ -2067,6 +2067,80 @@ body.graph-mode{
   max-height:24vh;
 }
 
+.trend-chart-host{
+  position:relative;
+}
+
+.trend-chart-tooltip{
+  position:absolute;
+  z-index:8;
+  left:0;
+  top:0;
+  transform:translate(-50%, calc(-100% - 6px)) scale(.94);
+  transform-origin:center bottom;
+  pointer-events:none;
+  visibility:hidden;
+  opacity:0;
+  padding:7px 11px;
+  border-radius:10px;
+  background:rgba(15,23,42,.96);
+  border:1px solid rgba(148,163,184,.42);
+  box-shadow:0 10px 28px rgba(0,0,0,.38);
+  color:#f8fafc;
+  font-size:11px;
+  line-height:1.35;
+  white-space:nowrap;
+  transition:
+    opacity .24s var(--ease-smooth),
+    transform .24s var(--ease-smooth),
+    left .32s var(--ease-smooth),
+    top .32s var(--ease-smooth),
+    visibility .24s var(--ease-smooth);
+}
+
+.trend-chart-tooltip.is-visible{
+  visibility:visible;
+  opacity:1;
+  transform:translate(-50%, calc(-100% - 6px)) scale(1);
+}
+
+.trend-chart-tooltip-kind{
+  display:block;
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.03em;
+  text-transform:uppercase;
+  color:#94a3b8;
+  margin-bottom:2px;
+}
+
+.trend-chart-tooltip-value{
+  display:block;
+  font-size:12px;
+  font-weight:700;
+  color:#f8fafc;
+}
+
+.trend-chart-tooltip.is-target .trend-chart-tooltip-kind{ color:#93c5fd; }
+.trend-chart-tooltip.is-actual .trend-chart-tooltip-kind{ color:#86efac; }
+
+.summary-chart-plan-actual .summary-bar[data-chart-tip]{
+  transition:opacity .2s var(--ease-smooth), filter .2s var(--ease-smooth);
+}
+
+.summary-chart-plan-actual .summary-bar[data-chart-tip]:hover{
+  opacity:1 !important;
+  filter:brightness(1.12);
+}
+
+.summary-chart-plan-actual .trend-dot[data-chart-tip]{
+  transition:filter .2s var(--ease-smooth), r .2s var(--ease-smooth);
+}
+
+.summary-chart-plan-actual .trend-dot[data-chart-tip]:hover{
+  filter:drop-shadow(0 0 4px rgba(74,222,128,.65));
+}
+
 .trend-header{
   display:flex;
   align-items:flex-start;
