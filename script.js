@@ -3827,6 +3827,7 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
         ${actualDots}
         ${xLabels}
       </svg>
+      ${buildPlanActualUnitCardsHtml(graphFocusedDayKey || dayKey, dailyActualMap, dayTarget)}
   `;
 }
 
@@ -4011,6 +4012,33 @@ function calcActualEffPct(planUnits, actualUnits, planWtMins, actualWtMins) {
   return Number(Math.max(0, unitsRatio * PLAN_EFF_PCT).toFixed(1));
 }
 
+function buildPlanActualUnitCardsInner(dayKey, dayProduced, dayTarget) {
+  const planUnits = dayKey && dayTarget ? (dayTarget[dayKey] || 0) : 0;
+  const actualUnits = dayKey && dayProduced ? (dayProduced[dayKey] || 0) : 0;
+  return `
+      <div class="report-eff-wt-card">
+        <span>Plan Unit</span>
+        <strong>${planUnits}</strong>
+      </div>
+      <div class="report-eff-wt-card">
+        <span>Actual Unit</span>
+        <strong class="${actualUnits >= planUnits && planUnits > 0 ? "unit-pos" : actualUnits < planUnits && planUnits > 0 ? "unit-neg" : ""}">${actualUnits}</strong>
+      </div>
+  `;
+}
+
+function buildPlanActualUnitCardsHtml(dayKey, dayProduced, dayTarget) {
+  const titleDay = dayKey ? formatIsoDateAsDdMmYy(dayKey) : "—";
+  return `
+    <div class="report-plan-actual-unit-wrap" id="graphPlanActualUnitCardsWrap">
+      <div class="summary-graph-card-title report-plan-actual-unit-title">Units (${titleDay})</div>
+      <div class="report-eff-wt-grid report-plan-actual-unit-grid">
+        ${buildPlanActualUnitCardsInner(dayKey, dayProduced, dayTarget)}
+      </div>
+    </div>
+  `;
+}
+
 function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, rangeLabel) {
   const planEffPct = PLAN_EFF_PCT;
   const planWtMins = getPlanWtMinsForDay(dayKey);
@@ -4058,9 +4086,44 @@ function updateGraphWtCardsFromFocus() {
   );
 }
 
+function updateGraphPlanActualUnitCardsFromFocus() {
+  const wrapEl = document.getElementById("graphPlanActualUnitCardsWrap");
+  if (!wrapEl || !graphReportCache) return;
+  const scopeDayKey = graphFocusedDayKey || graphReportCache.anchorDay;
+  const titleEl = wrapEl.querySelector(".report-plan-actual-unit-title");
+  if (titleEl) {
+    titleEl.textContent = `Units (${scopeDayKey ? formatIsoDateAsDdMmYy(scopeDayKey) : "—"})`;
+  }
+  const gridEl = wrapEl.querySelector(".report-plan-actual-unit-grid");
+  if (gridEl) {
+    gridEl.innerHTML = buildPlanActualUnitCardsInner(
+      scopeDayKey,
+      graphReportCache.dayProduced,
+      graphReportCache.dayTarget
+    );
+  }
+}
+
+function highlightGraphFocusedDay(dayKey) {
+  const svg = document.querySelector("svg.summary-chart-plan-actual:not(.summary-chart-eff-trend)");
+  if (!svg) return;
+  svg.querySelectorAll("[data-report-day]").forEach(el => {
+    const focused = el.getAttribute("data-report-day") === dayKey;
+    if (el.tagName === "rect") {
+      el.setAttribute("stroke", focused ? "#f8fafc" : "none");
+      el.setAttribute("stroke-width", focused ? "2" : "0");
+    } else if (el.tagName === "circle") {
+      el.setAttribute("stroke", focused ? "#f8fafc" : "none");
+      el.setAttribute("stroke-width", focused ? "2.5" : "0");
+    }
+  });
+}
+
 function focusGraphDay(dayKey) {
   graphFocusedDayKey = dayKey;
   updateGraphWtCardsFromFocus();
+  updateGraphPlanActualUnitCardsFromFocus();
+  highlightGraphFocusedDay(dayKey);
 }
 
 function renderGraphCharts() {
@@ -4166,6 +4229,7 @@ function renderGraphCharts() {
   animateSummaryBarValues(graphBody);
   animateTrendLines(graphBody);
   initPlanActualChartTooltips(graphBody);
+  highlightGraphFocusedDay(graphFocusedDayKey || activeDay);
   } catch (err) {
     console.error("renderGraphCharts failed:", err);
     const detail = String(err?.message || err || "Unknown error");
