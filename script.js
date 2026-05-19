@@ -1859,24 +1859,27 @@ function getTotalDowntimeSec() {
   return getBookedDowntimeSec();
 }
 
-function applyEfficiencyColorClass(el, pct) {
+function applyActualEffColorClass(el, pct) {
   if (!Number.isFinite(pct)) {
     el.className = "big-number status-blue";
     return;
   }
-  if (pct < 90) el.className = "big-number status-red";
-  else if (pct < 100) el.className = "big-number status-orange";
+  if (pct < PLAN_EFF_PCT) el.className = "big-number status-red";
   else el.className = "big-number status-green";
+}
+
+function getTodayActualEffPct() {
+  const dayKey = toIsoDateLocal(new Date());
+  const planUnits = parseInt(document.getElementById("dailyPlanTarget")?.value || "0", 10) || 0;
+  const planWtMins = getPlanWtMinsForDay(dayKey);
+  const actualWtMins = calcActualWtMinsForDay(dayKey, planUnits);
+  return calcActualEffPct(planUnits, actualCount, planWtMins, actualWtMins);
 }
 
 function syncEfficiencyCardDom() {
   const effEl = document.getElementById("efficiency");
   if (!effEl) return;
-  const expectedShown = parseInt(document.getElementById("expected")?.innerText, 10) || 0;
-  let pct = null;
-  if (expectedShown > 0) {
-    pct = Math.min(100, Math.max(0, Math.round((actualCount / expectedShown) * 100)));
-  }
+  const pct = getTodayActualEffPct();
   if (!isMonitor) {
     efficiencyPercent = pct != null ? pct : 0;
   } else if (pct != null) {
@@ -1887,8 +1890,8 @@ function syncEfficiencyCardDom() {
     effEl.className = "big-number status-blue";
     return;
   }
-  effEl.innerText = pct + "%";
-  applyEfficiencyColorClass(effEl, pct);
+  effEl.innerText = `${pct}%`;
+  applyActualEffColorClass(effEl, pct);
 }
 
 /* ===== STATUS ===== */
