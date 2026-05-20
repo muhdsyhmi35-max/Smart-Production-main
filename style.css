@@ -2420,6 +2420,14 @@ path.trend-area-fill{
   animation:summaryBarValueIn .5s var(--ease-smooth) forwards;
 }
 
+.summary-chart-downtime .summary-bar{
+  animation-duration:.45s;
+}
+
+.summary-chart-downtime .summary-bar-value{
+  animation-duration:.26s;
+}
+
 @keyframes summaryBarValueIn{
   from{
     opacity:0;
