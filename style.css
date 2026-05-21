@@ -1196,6 +1196,11 @@ tr:nth-child(even){background:#0b1220;}
   text-align:center;
 }
 
+body.non-production-mode #status,
+#status.status-orange{
+  color:var(--orange);
+}
+
 .bottom-row > .card.wide:last-child{
   justify-content:flex-start;
 }

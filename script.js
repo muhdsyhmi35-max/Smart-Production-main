@@ -84,6 +84,7 @@ const GRAPH_WT_PRESET_MINS = {
   friday: 400
 };
 const GRAPH_WT_PRESET_STORAGE_KEY = "TF2_GRAPH_WT_PRESET";
+const NON_PRODUCTION_DAYS_KEY = "TF2_NON_PRODUCTION_DAYS";
 let duplicateLock = false;
 let lastUpdateTime = 0;
 let lastTableData = "";
@@ -285,6 +286,42 @@ function isNonProductionMode() {
   return graphWtPreset === "nonproduction";
 }
 
+function loadNonProductionDaysSet() {
+  try {
+    const raw = localStorage.getItem(NON_PRODUCTION_DAYS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(arr) ? arr.filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)) : []);
+  } catch (_) {
+    return new Set();
+  }
+}
+
+function saveNonProductionDaysSet(daySet) {
+  try {
+    localStorage.setItem(NON_PRODUCTION_DAYS_KEY, JSON.stringify([...daySet]));
+  } catch (_) {}
+}
+
+function markNonProductionDay(dayKey, active) {
+  if (!dayKey) return;
+  const set = loadNonProductionDaysSet();
+  if (active) set.add(dayKey);
+  else set.delete(dayKey);
+  saveNonProductionDaysSet(set);
+}
+
+function syncNonProductionDayMarkForToday() {
+  markNonProductionDay(toIsoDateLocal(new Date()), isNonProductionMode());
+}
+
+/** True for ISO day keys marked non-production (includes today while mode is active). */
+function isNonProductionDay(dayKey) {
+  if (!dayKey) return isNonProductionMode();
+  const today = toIsoDateLocal(new Date());
+  if (dayKey === today && isNonProductionMode()) return true;
+  return loadNonProductionDaysSet().has(dayKey);
+}
+
 function normalizeGraphWtPreset(v) {
   const x = String(v || "").trim().toLowerCase();
   if (x === "halfday" || x === "half-day") return "halfday";
@@ -304,6 +341,7 @@ function loadGraphWtPresetFromStorage() {
     if (stored) graphWtPreset = normalizeGraphWtPreset(stored);
   } catch (_) {}
   if (graphWtPreset === "friday") graphWtPreset = "normal";
+  syncNonProductionDayMarkForToday();
 }
 
 function saveGraphWtPresetToStorage() {
@@ -406,6 +444,7 @@ function onGraphWtOptionClick(event, preset) {
   const prev = graphWtPreset;
   graphWtPreset = p;
   saveGraphWtPresetToStorage();
+  syncNonProductionDayMarkForToday();
   applyGraphWtControlUi();
   applyGraphWtPresetEffects(prev);
   renderGraphCharts();
@@ -1870,6 +1909,7 @@ function applyActualEffColorClass(el, pct) {
 
 function getTodayActualEffPct() {
   const dayKey = toIsoDateLocal(new Date());
+  if (isNonProductionDay(dayKey)) return 0;
   const planUnits = parseInt(document.getElementById("dailyPlanTarget")?.value || "0", 10) || 0;
   const planWtMins = getPlanWtMinsForDay(dayKey);
   const actualWtMins = calcActualWtMinsForDay(dayKey, planUnits);
@@ -2672,6 +2712,30 @@ function updateDisplay() {
   const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
   const balance = actualCount - plan;
   const displayBalance = balance > 0 ? ("+" + balance) : balance;
+
+  if (isNonProductionMode()) {
+    const delayEl = document.getElementById("delay");
+    document.getElementById("expected").innerText = "0";
+    document.getElementById("actual").innerText = actualCount;
+    document.getElementById("plan").innerText = plan;
+    document.getElementById("countdown").innerText = format(countdownValue);
+    refreshDowntimeCardFromTable();
+    const balanceEl = document.getElementById("balance");
+    if (balance < 0) balanceEl.className = "big-number status-red";
+    else if (balance > 0) balanceEl.className = "big-number status-green";
+    else balanceEl.className = "big-number status-blue";
+    balanceEl.innerText = displayBalance;
+    delayEl.className = "big-number status-blue";
+    delayEl.innerText = "0";
+    setStatus("NON PRODUCTION", "status-orange");
+    syncEfficiencyCardDom();
+    const downtimeCard = document.getElementById("downtimeCard");
+    const downtimeText = document.getElementById("downtime");
+    downtimeCard.classList.remove("downtime-alert", "blink");
+    downtimeText.classList.remove("status-red", "blink");
+    syncDowntimeAccumulatedHighlight();
+    return;
+  }
 
   // EXPECTED CALCULATION
   let expected = calculateExpectedOutput();
@@ -3569,10 +3633,30 @@ function buildTrendLinePath(points, yBase) {
   return points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
 }
 
-function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valueSuffix = "%", yAxisLabel = "%") {
+/** Line path with gaps on skipped day indices (e.g. non-production). */
+function buildTrendLinePathWithSkips(points, dayKeys, skipDayFn, yBase) {
+  if (!points.length || !dayKeys.length) return "";
+  const segments = [];
+  let seg = [];
+  points.forEach((p, i) => {
+    if (skipDayFn(dayKeys[i])) {
+      if (seg.length) {
+        segments.push(seg);
+        seg = [];
+      }
+    } else {
+      seg.push(p);
+    }
+  });
+  if (seg.length) segments.push(seg);
+  return segments.map(s => buildTrendLinePath(s, yBase)).filter(Boolean).join(" ");
+}
+
+function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valueSuffix = "%", yAxisLabel = "%", dayKeys = null) {
   if (!labels.length || !actualValues.length) {
     return `<div class="summary-graph-empty">No data</div>`;
   }
+  const skipNpIdx = i => dayKeys && isNonProductionDay(dayKeys[i]);
   const width = 500;
   const height = 170;
   const leftPad = 36;
@@ -3581,7 +3665,9 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
   const bottomPad = 28;
   const chartW = width - leftPad - rightPad;
   const chartH = height - topPad - bottomPad;
-  const maxVal = Math.max(1, ...actualValues, ...(planValues || []));
+  const visibleActual = actualValues.filter((_, i) => !skipNpIdx(i));
+  const visiblePlan = (planValues || []).filter((_, i) => !skipNpIdx(i));
+  const maxVal = Math.max(1, ...visibleActual, ...visiblePlan);
   const yBase = topPad + chartH;
   const toY = (v) => yBase - ((v / maxVal) * chartH);
   const planPoints = layoutTrendSeriesPoints(
@@ -3595,6 +3681,7 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
   const planBarW = Math.max(Math.min((stepX || 12) * 0.34, 16), 6);
   const planBarOffsetX = Math.min((stepX || 0) * 0.18, 9);
   const planBars = labels.map((_, i) => {
+    if (skipNpIdx(i)) return "";
     const v = planValues?.[i] || 0;
     const x = (planPoints[i]?.x ?? (leftPad + stepX * i)) - (planBarW / 2) + planBarOffsetX;
     const y = toY(v);
@@ -3605,11 +3692,16 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
   }).join("");
 
   const points = layoutTrendSeriesPoints(actualValues, leftPad, chartW, toY);
-  const path = buildTrendLinePath(points, yBase);
-  const areaPath = points.length
-    ? `${path} L ${points[points.length - 1].x.toFixed(2)} ${yBase.toFixed(2)} L ${points[0].x.toFixed(2)} ${yBase.toFixed(2)} Z`
+  const skipNpKey = k => dayKeys ? isNonProductionDay(k) : false;
+  const path = dayKeys
+    ? buildTrendLinePathWithSkips(points, dayKeys, skipNpKey, yBase)
+    : buildTrendLinePath(points, yBase);
+  const visiblePts = dayKeys ? points.filter((_, i) => !skipNpIdx(i)) : points;
+  const areaPath = visiblePts.length && path
+    ? `${path} L ${visiblePts[visiblePts.length - 1].x.toFixed(2)} ${yBase.toFixed(2)} L ${visiblePts[0].x.toFixed(2)} ${yBase.toFixed(2)} Z`
     : "";
   const circles = points.map((p, i) => {
+    if (skipNpIdx(i)) return "";
     const label = labels[i] || "";
     const valTxt = `${p.value}${valueSuffix}`;
     const actual = p.value;
@@ -3775,13 +3867,14 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
     fallbackDayPlan = parseInt(document.getElementById("dailyPlanTarget")?.value || "0", 10) || 0;
   }
   const dayTarget = computeDayTargetsForReport(dayKeys, dailyActualMap, fallbackDayPlan);
-  const totalPlan = dayKeys.reduce((sum, key) => sum + (dayTarget[key] || 0), 0);
+  const skipNpDay = k => isNonProductionDay(k);
+  const totalPlan = dayKeys.reduce((sum, key) => sum + (skipNpDay(key) ? 0 : (dayTarget[key] || 0)), 0);
 
   // Use per-day values (not cumulative) for both Actual and Target.
   const actualSeries = dayKeys.map(k => dailyActualMap[k] || 0);
   const targetSeries = dayKeys.map(k => dayTarget[k] || 0);
 
-  const totalActual = actualSeries.reduce((a, b) => a + b, 0);
+  const totalActual = actualSeries.reduce((sum, v, i) => sum + (skipNpDay(dayKeys[i]) ? 0 : v), 0);
   const diff = totalActual - totalPlan;
   const diffNote = totalPlan > 0
     ? (diff === 0 ? "On target" : diff > 0 ? `Ahead by ${diff}` : `Behind by ${Math.abs(diff)}`)
@@ -3801,7 +3894,11 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
   const bottomPad = 28;
   const chartW = width - leftPad - rightPad;
   const chartH = height - topPad - bottomPad;
-  const seriesMax = Math.max(0, ...actualSeries, ...targetSeries);
+  const seriesMax = Math.max(
+    0,
+    ...actualSeries.filter((_, i) => !skipNpDay(dayKeys[i])),
+    ...targetSeries.filter((_, i) => !skipNpDay(dayKeys[i]))
+  );
   let yTickStep;
   let maxVal;
   if (seriesMax <= 0) {
@@ -3838,10 +3935,11 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
       value: targetSeries[i] || 0
     };
   });
-  const actualPath = buildTrendLinePath(actualPoints, yBase);
+  const actualPath = buildTrendLinePathWithSkips(actualPoints, dayKeys, skipNpDay, yBase);
   const targetBarW = Math.max(Math.min((xStep || 12) * 0.34, 16), 6);
   const targetBarOffsetX = Math.min((xStep || 0) * 0.18, 9);
   const targetBars = targetPoints.map((p, i) => {
+    if (skipNpDay(dayKeys[i])) return "";
     const barH = Math.max(yBase - p.y, targetSeries[i] > 0 ? 2 : 0);
     const x = p.x - (targetBarW / 2) + targetBarOffsetX;
     const y = yBase - barH;
@@ -3849,8 +3947,9 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
     const vTxt = formatNum(targetSeries[i] || 0);
     return `<rect class="summary-bar" data-chart-tip data-tip-kind="Target" data-tip-label="${dTxt}" data-tip-value="${vTxt}" data-report-day="${dayKeys[i]}" style="animation-delay:${i * 35}ms; cursor:pointer" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${targetBarW.toFixed(2)}" height="${barH.toFixed(2)}" rx="2" fill="#3b82f6" opacity=".92" onclick="focusGraphDay('${dayKeys[i]}')"></rect>`;
   }).join("");
-  const areaPath = actualPoints.length
-    ? `${actualPath} L ${actualPoints[actualPoints.length - 1].x.toFixed(2)} ${yBase.toFixed(2)} L ${actualPoints[0].x.toFixed(2)} ${yBase.toFixed(2)} Z`
+  const visibleActualPts = actualPoints.filter((_, i) => !skipNpDay(dayKeys[i]));
+  const areaPath = visibleActualPts.length && actualPath
+    ? `${actualPath} L ${visibleActualPts[visibleActualPts.length - 1].x.toFixed(2)} ${yBase.toFixed(2)} L ${visibleActualPts[0].x.toFixed(2)} ${yBase.toFixed(2)} Z`
     : "";
   const yTickValues = [];
   for (let v = 0; v <= maxVal + 1e-9; v += yTickStep) {
@@ -3878,6 +3977,7 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
     return `<text x="${x.toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>`;
   }).join("");
   const actualDots = actualPoints.map((p, i) => {
+    if (skipNpDay(dayKeys[i])) return "";
     const dTxt = formatIsoDateAsDdMmYy(dayKeys[i]);
     const vTxt = formatNum(p.value);
     const actual = actualSeries[i] || 0;
@@ -4105,17 +4205,20 @@ function calcActualEffPct(planUnits, actualUnits, planWtMins, actualWtMins) {
 function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, rangeLabel) {
   const planEffPct = PLAN_EFF_PCT;
   const planWtMins = getPlanWtMinsForDay(dayKey);
+  const nonProdDay = dayKey && isNonProductionDay(dayKey);
 
   const planUnits = dayTarget?.[dayKey] || 0;
   const actualUnits = dayProduced?.[dayKey] || 0;
-  const actualWtMins = calcActualWtMinsForDay(dayKey, planUnits);
+  const actualWtMins = nonProdDay ? 0 : calcActualWtMinsForDay(dayKey, planUnits);
 
-  const actualEffPct = calcActualEffPct(planUnits, actualUnits, planWtMins, actualWtMins);
-  const actualEffClass = actualEffPct == null
-    ? ""
-    : actualEffPct < planEffPct
-      ? "neg"
-      : "pos";
+  const actualEffPct = nonProdDay ? 0 : calcActualEffPct(planUnits, actualUnits, planWtMins, actualWtMins);
+  const actualEffClass = nonProdDay
+    ? "neg"
+    : actualEffPct == null
+      ? ""
+      : actualEffPct < planEffPct
+        ? "neg"
+        : "pos";
 
   const titleDay = dayKey ? formatIsoDateAsDdMmYy(dayKey) : `${periodLabel}: ${rangeLabel}`;
   return `
@@ -4243,14 +4346,26 @@ function renderGraphCharts() {
     return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
   });
   const oeeValues = effTrendKeys.map(k => {
+    if (isNonProductionDay(k)) return 0;
     const target = dayTarget[k] || 0;
     const produced = dayProduced[k] || 0;
     const planWtMins = getPlanWtMinsForDay(k);
     const actualWtMins = calcActualWtMinsForDay(k, target);
     return calcActualEffPct(target, produced, planWtMins, actualWtMins) ?? 0;
   });
-  const planEffValues = effTrendKeys.map(k => ((dayTarget[k] || 0) > 0 ? PLAN_EFF_PCT : 0));
-  const oeeChart = buildEfficiencyTrendChart(`EFFICIENCY TREND (${periodLabel}: ${rangeLabel})`, oeeLabels, oeeValues, planEffValues, "%", "%");
+  const planEffValues = effTrendKeys.map(k => {
+    if (isNonProductionDay(k)) return 0;
+    return (dayTarget[k] || 0) > 0 ? PLAN_EFF_PCT : 0;
+  });
+  const oeeChart = buildEfficiencyTrendChart(
+    `EFFICIENCY TREND (${periodLabel}: ${rangeLabel})`,
+    oeeLabels,
+    oeeValues,
+    planEffValues,
+    "%",
+    "%",
+    effTrendKeys
+  );
   graphBody.innerHTML = `
     <div class="report-kpi-grid">
       <div class="report-kpi"><span>Total Produced</span><strong class="pos">${totalProduced}</strong><em>units</em></div>
@@ -4535,7 +4650,13 @@ function updateLiveStateOnly() {
   if (plan > 0) {
     expected = Math.min(expected, plan);
   }
+  if (isNonProductionMode()) {
+    expected = 0;
+  }
   let delay = actual - expected;
+  if (isNonProductionMode()) {
+    delay = 0;
+  }
 
   const efficiency = efficiencyPercent;
 
