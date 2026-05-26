@@ -3715,9 +3715,9 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
     const x = (planPoints[i]?.x ?? (leftPad + stepX * i)) - (planBarW / 2) + planBarOffsetX;
     const y = toY(v);
     const h = Math.max(yBase - y, v > 0 ? 2 : 0);
-    const label = labels[i] || "";
+    const tipLabel = dayKeys?.[i] ? formatIsoDateAsDdMmYy(dayKeys[i]) : (labels[i] || "");
     const valTxt = `${v.toFixed(1)}${valueSuffix}`;
-    return `<rect class="summary-bar" data-chart-tip data-tip-kind="Target" data-tip-label="${label}" data-tip-value="${valTxt}" style="animation-delay:${i * 35}ms; cursor:pointer" x="${x.toFixed(2)}" y="${(yBase - h).toFixed(2)}" width="${planBarW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="#3b82f6" opacity=".9"></rect>`;
+    return `<rect class="summary-bar" data-chart-tip data-tip-kind="Target" data-tip-label="${tipLabel}" data-tip-value="${valTxt}" style="animation-delay:${i * 35}ms; cursor:pointer" x="${x.toFixed(2)}" y="${(yBase - h).toFixed(2)}" width="${planBarW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="#3b82f6" opacity=".9"></rect>`;
   }).join("");
 
   const points = layoutTrendSeriesPoints(actualValues, leftPad, chartW, toY);
@@ -3730,7 +3730,7 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
     ? `${path} L ${visiblePts[visiblePts.length - 1].x.toFixed(2)} ${yBase.toFixed(2)} L ${visiblePts[0].x.toFixed(2)} ${yBase.toFixed(2)} Z`
     : "";
   const circles = points.map((p, i) => {
-    const label = labels[i] || "";
+    const tipLabel = dayKeys?.[i] ? formatIsoDateAsDdMmYy(dayKeys[i]) : (labels[i] || "");
     const isNp = skipNpIdx(i);
     const actual = isNp ? 0 : p.value;
     const cy = isNp ? yBase : p.y;
@@ -3742,7 +3742,7 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
       ? "trend-dot trend-dot-np"
       : (behind ? "trend-dot trend-dot-behind" : "trend-dot trend-dot-met");
     const dotFill = isNp ? "#94a3b8" : (behind ? "#ef4444" : "#a855f7");
-    return `<circle class="${dotClass}" data-chart-tip data-tip-kind="${tipKind}" data-tip-label="${label}" data-tip-value="${isNp ? "" : valTxt}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${cy.toFixed(2)}" r="3.8" fill="${dotFill}"></circle>`;
+    return `<circle class="${dotClass}" data-chart-tip data-tip-kind="${tipKind}" data-tip-label="${tipLabel}" data-tip-value="${isNp ? "" : valTxt}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${cy.toFixed(2)}" r="3.8" fill="${dotFill}"></circle>`;
   }).join("");
 
   const labelStride = labels.length > 24 ? 3 : labels.length > 16 ? 2 : 1;
