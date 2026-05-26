@@ -102,7 +102,6 @@ let liveCountdownInterval = null;
 let clockInterval = null;
 let liveDataPollInterval = null;
 let liveStatePollInterval = null;
-let graphReportLiveInterval = null;
 let monitorFirebaseNetConnected = false;
 let monitorLiveStateReceived = false;
 let monitorLiveStateError = null;
@@ -2680,7 +2679,6 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
     isDowntime = false;
 
     updateDisplay();
-    refreshProductionReportIfOpen();
 
     sendToSheet(
       chassis,
@@ -3171,7 +3169,6 @@ function toggleHistoryPanel(forceOpen) {
     const summaryPage = document.getElementById("summaryPage");
     if (summaryPage) summaryPage.classList.remove("open");
     document.body.classList.remove("graph-mode");
-    stopProductionReportLiveRefresh();
     const graphPage = document.getElementById("graphPage");
     if (graphPage) graphPage.classList.remove("open");
     document.body.classList.add("history-mode");
@@ -3254,7 +3251,6 @@ function toggleViewFromMenu() {
 
 function showMainPage() {
   toggleMenuDropdown(false);
-  stopProductionReportLiveRefresh();
   document.body.classList.remove("summary-mode");
   document.body.classList.remove("graph-mode");
   document.body.classList.remove("history-mode");
@@ -4319,37 +4315,6 @@ function focusGraphDay(dayKey) {
   updateGraphWtCardsFromFocus();
 }
 
-function isProductionReportOpen() {
-  const graphPage = document.getElementById("graphPage");
-  return !!(graphPage && graphPage.classList.contains("open"));
-}
-
-function stopProductionReportLiveRefresh() {
-  if (graphReportLiveInterval) {
-    clearInterval(graphReportLiveInterval);
-    graphReportLiveInterval = null;
-  }
-}
-
-/** Re-render KPIs + charts while Production Report is open (sheet sync, scans, W/T clock). */
-function refreshProductionReportIfOpen() {
-  if (isProductionReportOpen() && document.getElementById("graphChartsBody")) {
-    renderGraphCharts();
-  }
-}
-
-function startProductionReportLiveRefresh() {
-  stopProductionReportLiveRefresh();
-  if (!isProductionReportOpen()) return;
-  graphReportLiveInterval = setInterval(() => {
-    if (!isProductionReportOpen()) {
-      stopProductionReportLiveRefresh();
-      return;
-    }
-    refreshProductionReportIfOpen();
-  }, 3000);
-}
-
 function renderGraphCharts() {
   const graphBody = document.getElementById("graphChartsBody");
   if (!graphBody) return;
@@ -4552,7 +4517,6 @@ function showGraphPage() {
   graphPage.classList.add("open");
   triggerEnterAnimation(graphPage);
   updateViewToggleMenuItem();
-  startProductionReportLiveRefresh();
 }
 
 function showSummaryPage() {
@@ -4651,7 +4615,6 @@ function showSummaryPage() {
   document.body.classList.add("summary-mode");
   document.body.classList.remove("graph-mode");
   document.body.classList.remove("history-mode");
-  stopProductionReportLiveRefresh();
   const graphPage = document.getElementById("graphPage");
   if (graphPage) graphPage.classList.remove("open");
   const historyPanel = document.getElementById("historyPanel");
@@ -5081,12 +5044,10 @@ function loadLiveData() {
         applyHistoryDateFilter();
         syncDowntimeSecondsFromTable();
         refreshDowntimeCardFromTable();
-        refreshProductionReportIfOpen();
       }
       // Always keep accumulated downtime card synced to rendered rows,
       // even when table data payload is unchanged (e.g. timer stopped/target achieved).
       refreshDowntimeCardFromTable();
-      refreshProductionReportIfOpen();
     })
     .catch(err => console.log("Monitor load error:", err));
 }
