@@ -3724,15 +3724,18 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
     ? `${path} L ${visiblePts[visiblePts.length - 1].x.toFixed(2)} ${yBase.toFixed(2)} L ${visiblePts[0].x.toFixed(2)} ${yBase.toFixed(2)} Z`
     : "";
   const circles = points.map((p, i) => {
-    if (skipNpIdx(i)) return "";
     const label = labels[i] || "";
-    const valTxt = `${p.value}${valueSuffix}`;
-    const actual = p.value;
+    const isNp = skipNpIdx(i);
+    const actual = isNp ? 0 : p.value;
+    const cy = isNp ? yBase : p.y;
+    const valTxt = `${actual}${valueSuffix}`;
     const target = planValues?.[i] ?? 0;
     const behind = target > 0 && actual < target;
-    const dotClass = behind ? "trend-dot trend-dot-behind" : "trend-dot trend-dot-met";
-    const dotFill = behind ? "#ef4444" : "#a855f7";
-    return `<circle class="${dotClass}" data-chart-tip data-tip-kind="Actual" data-tip-label="${label}" data-tip-value="${valTxt}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="3.8" fill="${dotFill}"></circle>`;
+    const dotClass = isNp
+      ? "trend-dot trend-dot-np"
+      : (behind ? "trend-dot trend-dot-behind" : "trend-dot trend-dot-met");
+    const dotFill = isNp ? "#94a3b8" : (behind ? "#ef4444" : "#a855f7");
+    return `<circle class="${dotClass}" data-chart-tip data-tip-kind="Actual" data-tip-label="${label}" data-tip-value="${valTxt}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${cy.toFixed(2)}" r="3.8" fill="${dotFill}"></circle>`;
   }).join("");
 
   const labelStride = labels.length > 24 ? 3 : labels.length > 16 ? 2 : 1;
@@ -4002,15 +4005,18 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
     return `<text x="${x.toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>`;
   }).join("");
   const actualDots = actualPoints.map((p, i) => {
-    if (skipNpDay(dayKeys[i])) return "";
     const dTxt = formatIsoDateAsDdMmYy(dayKeys[i]);
-    const vTxt = formatNum(p.value);
-    const actual = actualSeries[i] || 0;
+    const isNp = skipNpDay(dayKeys[i]);
+    const actual = isNp ? 0 : (actualSeries[i] || 0);
+    const vTxt = formatNum(actual);
     const target = targetSeries[i] || 0;
     const behind = target > 0 && actual < target;
-    const dotClass = behind ? "trend-dot trend-dot-behind" : "trend-dot trend-dot-met";
-    const dotFill = behind ? "#ef4444" : "#4ade80";
-    return `<circle class="${dotClass}" data-chart-tip data-tip-kind="Actual" data-tip-label="${dTxt}" data-tip-value="${vTxt}" data-report-day="${dayKeys[i]}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="4.2" fill="${dotFill}" onclick="focusGraphDay('${dayKeys[i]}')"></circle>`;
+    const dotClass = isNp
+      ? "trend-dot trend-dot-np"
+      : (behind ? "trend-dot trend-dot-behind" : "trend-dot trend-dot-met");
+    const dotFill = isNp ? "#94a3b8" : (behind ? "#ef4444" : "#4ade80");
+    const cy = isNp ? yBase : p.y;
+    return `<circle class="${dotClass}" data-chart-tip data-tip-kind="Actual" data-tip-label="${dTxt}" data-tip-value="${vTxt}" data-report-day="${dayKeys[i]}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${cy.toFixed(2)}" r="4.2" fill="${dotFill}" onclick="focusGraphDay('${dayKeys[i]}')"></circle>`;
   }).join("");
 
   return `
