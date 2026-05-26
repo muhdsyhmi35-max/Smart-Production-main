@@ -69,14 +69,26 @@ let pendingChassis = "";
 let pendingModel = "";
 let pendingEngine = "";
 let pendingKey = "";
-let scannedChassis = new Set();
-let scannedModel = new Set();
-let scannedEngine = new Set();
-let scannedKey = new Set();
+/** Completed 4-scan units for today (visible history rows only). */
+let scannedUnits = new Set();
 
 /** Same value in sheet vs scanner may differ by case/spaces; use for duplicate checks only. */
 function normalizeScanId(value) {
   return String(value || "").trim().toUpperCase();
+}
+
+function isUsableScanId(value) {
+  const id = normalizeScanId(value);
+  return id.length > 0 && id !== "-";
+}
+
+/** Fingerprint of one completed 4-scan unit (chassis + engine + key). */
+function unitScanFingerprint(chassis, engine, key) {
+  return [
+    normalizeScanId(chassis),
+    normalizeScanId(engine),
+    normalizeScanId(key)
+  ].join("|");
 }
 const GRAPH_WT_PRESET_MINS = {
   normal: 460,
@@ -1148,6 +1160,7 @@ function renumberScanTable() {
 /** True when a history row belongs to the active History date filter (today when cleared). */
 function scanTableRowMatchesActiveDay(tr) {
   if (!tr || !tr.cells || tr.cells.length < 2) return false;
+  if (tr.style.display === "none") return false;
   const rowDay = tr.dataset.scanDate || parseDisplayDateToIsoKey(tr.cells[1]?.innerText);
   const dayKey = getActiveHistoryDayKey();
   return !!rowDay && rowDay === dayKey;
@@ -1155,23 +1168,27 @@ function scanTableRowMatchesActiveDay(tr) {
 
 /** Duplicate checks use only completed rows for the active history day (matches visible table). */
 function rebuildScannedSetsFromTable() {
-  scannedChassis.clear();
-  scannedModel.clear();
-  scannedEngine.clear();
-  scannedKey.clear();
+  scannedUnits.clear();
   document.querySelectorAll("#scanTable tr").forEach(row => {
     if (!scanTableRowMatchesActiveDay(row)) return;
     const cells = row.cells;
     if (!cells || cells.length < 8) return;
-    const model = (cells[4]?.innerText || "").trim();
     const chassis = (cells[5]?.innerText || "").trim();
     const engine = (cells[6]?.innerText || "").trim();
     const key = (cells[7]?.innerText || "").trim();
-    if (model && model !== "-") scannedModel.add(normalizeScanId(model));
-    if (chassis && chassis !== "-") scannedChassis.add(normalizeScanId(chassis));
-    if (engine && engine !== "-") scannedEngine.add(normalizeScanId(engine));
-    if (key && key !== "-") scannedKey.add(normalizeScanId(key));
+    if (isUsableScanId(chassis) && isUsableScanId(engine) && isUsableScanId(key)) {
+      scannedUnits.add(unitScanFingerprint(chassis, engine, key));
+    }
   });
+}
+
+function rejectDuplicateScan(message) {
+  duplicateLock = true;
+  setStatus(message, "status-red blink");
+  pendingChassis = "";
+  pendingModel = "";
+  pendingEngine = "";
+  pendingKey = "";
 }
 
 /** Heading + number turn red whenever accumulated downtime &gt; 0 (not only live DOWN TIME). */
@@ -2434,10 +2451,7 @@ function resetProduction(shouldSync = true) {
   pendingModel = "";
   pendingEngine = "";
   pendingKey = "";
-  scannedChassis.clear();
-  scannedModel.clear();
-  scannedEngine.clear();
-  scannedKey.clear();
+  scannedUnits.clear();
   isDowntime = false;
   duplicateLock = false;
   document.getElementById("scanTable").innerHTML = "";
@@ -2456,14 +2470,6 @@ document.getElementById("chassisInput").addEventListener("keydown", function(e) 
       return;
     }
     const value = this.value.trim();
-
-    /* DUPLICATE CHECK */
-    if (scannedChassis.has(normalizeScanId(value))) {
-      duplicateLock = true;
-      setStatus("DUPLICATE CHASSIS: " + value, "status-red blink");
-      this.value = "";
-      return;
-    }
 
     duplicateLock = false;
     pendingChassis = value;
@@ -2505,14 +2511,6 @@ document.getElementById("engineInput").addEventListener("keydown", function(e) {
 
     const value = this.value.trim();
 
-    /* DUPLICATE CHECK */
-    if (scannedEngine.has(normalizeScanId(value))) {
-      duplicateLock = true;
-      setStatus("DUPLICATE ENGINE: " + value, "status-red blink");
-      this.value = "";
-      return;
-    }
-
     duplicateLock = false;
     pendingEngine = value;
 
@@ -2537,38 +2535,11 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
     if (pendingChassis === "" || pendingModel === "" || pendingEngine === "") return;
 
     const key = this.value.trim();
-    const keyId = normalizeScanId(key);
-    const chassisId = normalizeScanId(pendingChassis);
-    const engineId = normalizeScanId(pendingEngine);
+    const unitId = unitScanFingerprint(pendingChassis, pendingEngine, key);
 
-    /* ===== DUPLICATE CHECK (completed units only) ===== */
-    if (scannedChassis.has(chassisId)) {
-      duplicateLock = true;
-      setStatus("DUPLICATE CHASSIS: " + pendingChassis, "status-red blink");
-      pendingChassis = "";
-      pendingModel = "";
-      pendingEngine = "";
-      pendingKey = "";
-      this.value = "";
-      return;
-    }
-    if (scannedEngine.has(engineId)) {
-      duplicateLock = true;
-      setStatus("DUPLICATE ENGINE: " + pendingEngine, "status-red blink");
-      pendingChassis = "";
-      pendingModel = "";
-      pendingEngine = "";
-      pendingKey = "";
-      this.value = "";
-      return;
-    }
-    if (scannedKey.has(keyId)) {
-      duplicateLock = true;
-      setStatus("DUPLICATE KEY: " + key, "status-red blink");
-      pendingChassis = "";
-      pendingModel = "";
-      pendingEngine = "";
-      pendingKey = "";
+    /* ===== DUPLICATE CHECK (completed units only, after all 4 scans) ===== */
+    if (scannedUnits.has(unitId)) {
+      rejectDuplicateScan("DUPLICATE SCAN (same chassis, engine & key already logged today)");
       this.value = "";
       return;
     }
