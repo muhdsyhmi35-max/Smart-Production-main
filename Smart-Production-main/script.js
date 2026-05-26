@@ -3786,21 +3786,22 @@ function getPlanActualForPeriod(anchorDay, period = "day") {
     }
   });
 
+  const planRaw = String(document.getElementById("plan")?.innerText || "").trim();
+  const planCard = parseInt(planRaw, 10);
+  const planInput = parseInt(document.getElementById("dailyPlanTarget")?.value || "0", 10) || 0;
+  const fallbackDayPlan = Number.isFinite(planCard) && planCard > 0 ? planCard : planInput;
+
   let plan = 0;
   periodKeys.forEach(day => {
-    if (Number.isFinite(planByDay[day]) && planByDay[day] > 0) {
+    const resolved = resolveReportPlanForDay(day, fallbackDayPlan);
+    if (Number.isFinite(resolved) && resolved > 0) {
+      plan += resolved;
+    } else if (Number.isFinite(planByDay[day]) && planByDay[day] > 0) {
       plan += planByDay[day];
-    } else {
-      const hist = getHistoricalPlanForDay(day);
-      if (Number.isFinite(hist) && hist > 0) plan += hist;
     }
   });
 
   if (plan <= 0) {
-    const planRaw = String(document.getElementById("plan")?.innerText || "").trim();
-    const planCard = parseInt(planRaw, 10);
-    const planInput = parseInt(document.getElementById("dailyPlanTarget")?.value || "0", 10) || 0;
-    const fallbackDayPlan = Number.isFinite(planCard) && planCard > 0 ? planCard : planInput;
     const multiplier = Math.max(periodKeys.length, 1);
     plan = Math.max(0, fallbackDayPlan * multiplier);
   }
@@ -3817,7 +3818,8 @@ function isWeekendIsoDay(dayKey) {
 
 /**
  * Per-day target for Production Report KPIs, tables, and PRODUCTION TREND.
- * Saved plan on a row → that number. Day has scans → compare to Daily Plan (fallback).
+ * Today → current Daily Plan (operator can revise before/during shift).
+ * Past days → plan saved on scan rows. Day has scans → compare to Daily Plan (fallback).
  * Otherwise → 0 unless legacy implicit weekday plan is enabled in SETTINGS.
  */
 function computeDayTargetsForReport(dayKeys, dailyActualMap, fallbackDayPlan) {
@@ -3826,10 +3828,10 @@ function computeDayTargetsForReport(dayKeys, dailyActualMap, fallbackDayPlan) {
   const zWeekend = SETTINGS.productionTrend?.zeroTargetOnInactiveWeekends !== false;
   const dayTarget = {};
   dayKeys.forEach(k => {
-    const hist = getHistoricalPlanForDay(k);
+    const resolved = resolveReportPlanForDay(k, fallbackDayPlan);
     const dayActual = dailyActualMap[k] || 0;
-    if (Number.isFinite(hist) && hist > 0) {
-      dayTarget[k] = hist;
+    if (Number.isFinite(resolved) && resolved > 0) {
+      dayTarget[k] = resolved;
     } else if (dayActual > 0) {
       dayTarget[k] = fallbackDayPlan;
     } else if (legacyImplicitWeekday) {
@@ -4032,6 +4034,28 @@ function getHistoricalPlanForDay(dayKey) {
     if (Number.isFinite(planVal) && planVal > 0) return planVal;
   }
   return null;
+}
+
+/** Today uses live Daily Plan; past days use plan frozen on scan rows. */
+function resolveReportPlanForDay(dayKey, fallbackDayPlan) {
+  const today = toIsoDateLocal(new Date());
+  if (dayKey === today && Number.isFinite(fallbackDayPlan) && fallbackDayPlan > 0) {
+    return fallbackDayPlan;
+  }
+  return getHistoricalPlanForDay(dayKey);
+}
+
+/** Keep today's history rows aligned when operator revises Daily Plan mid-shift. */
+function syncTodayScanPlanOnRows(plan) {
+  if (!Number.isFinite(plan) || plan <= 0) return;
+  const today = toIsoDateLocal(new Date());
+  const planStr = String(plan);
+  document.querySelectorAll("#scanTable tr").forEach(row => {
+    const cells = row.querySelectorAll("td");
+    if (!cells.length) return;
+    const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
+    if (rowDay === today) row.dataset.scanPlan = planStr;
+  });
 }
 
 function collectHourlyGraphData(dayKey = getActiveGraphDayKey(), period = graphPeriod) {
@@ -4473,13 +4497,11 @@ function showSummaryPage() {
   }
   toggleMenuDropdown(false);
   const activeDay = getActiveSummaryDayKey();
-  let plan = getHistoricalPlanForDay(activeDay);
-  if (!Number.isFinite(plan) || plan < 0) {
-    plan = parseInt(document.getElementById("plan").innerText, 10) || 0;
-  }
-  if (!Number.isFinite(plan) || plan < 0) {
-    plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
-  }
+  const planCard = parseInt(document.getElementById("plan").innerText, 10) || 0;
+  const planInput = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+  const fallbackDayPlan = planCard > 0 ? planCard : planInput;
+  let plan = resolveReportPlanForDay(activeDay, fallbackDayPlan);
+  if (!Number.isFinite(plan) || plan < 0) plan = fallbackDayPlan;
 
   let actual = 0;
   let downtimeSec = 0;
@@ -5016,9 +5038,12 @@ document.getElementById("cycleTarget").addEventListener("input", () => {
 });
 
 document.getElementById("dailyPlanTarget").addEventListener("input", () => {
+  const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+  syncTodayScanPlanOnRows(plan);
   hasLocalSession = true;
   updateDisplay();
   updateLiveStateOnly();
+  if (document.getElementById("graphChartsBody")) renderGraphCharts();
 });
 
 document.getElementById("lotInput").addEventListener("input", () => {
