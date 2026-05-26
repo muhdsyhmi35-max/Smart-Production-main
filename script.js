@@ -3652,6 +3652,16 @@ function buildTrendLinePathWithSkips(points, dayKeys, skipDayFn, yBase) {
   return segments.map(s => buildTrendLinePath(s, yBase)).filter(Boolean).join(" ");
 }
 
+/**
+ * Line path that CONNECTS across skipped days (e.g. non-production).
+ * We still hide bars/dots on skipped indices, but the line stays continuous.
+ */
+function buildTrendLinePathConnectAcrossSkips(points, dayKeys, skipDayFn, yBase) {
+  if (!points.length || !dayKeys?.length) return "";
+  const kept = points.filter((_, i) => !skipDayFn(dayKeys[i]));
+  return buildTrendLinePath(kept, yBase);
+}
+
 function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valueSuffix = "%", yAxisLabel = "%", dayKeys = null) {
   if (!labels.length || !actualValues.length) {
     return `<div class="summary-graph-empty">No data</div>`;
@@ -3694,7 +3704,7 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
   const points = layoutTrendSeriesPoints(actualValues, leftPad, chartW, toY);
   const skipNpKey = k => dayKeys ? isNonProductionDay(k) : false;
   const path = dayKeys
-    ? buildTrendLinePathWithSkips(points, dayKeys, skipNpKey, yBase)
+    ? buildTrendLinePathConnectAcrossSkips(points, dayKeys, skipNpKey, yBase)
     : buildTrendLinePath(points, yBase);
   const visiblePts = dayKeys ? points.filter((_, i) => !skipNpIdx(i)) : points;
   const areaPath = visiblePts.length && path
@@ -3937,7 +3947,7 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
       value: targetSeries[i] || 0
     };
   });
-  const actualPath = buildTrendLinePathWithSkips(actualPoints, dayKeys, skipNpDay, yBase);
+  const actualPath = buildTrendLinePathConnectAcrossSkips(actualPoints, dayKeys, skipNpDay, yBase);
   const targetBarW = Math.max(Math.min((xStep || 12) * 0.34, 16), 6);
   const targetBarOffsetX = Math.min((xStep || 0) * 0.18, 9);
   const targetBars = targetPoints.map((p, i) => {
