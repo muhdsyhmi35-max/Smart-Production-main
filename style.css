@@ -2255,6 +2255,7 @@ span.flatpickr-weekday{
 .trend-chart-tooltip.is-target .trend-chart-tooltip-kind{ color:#93c5fd; }
 .trend-chart-tooltip.is-actual .trend-chart-tooltip-kind{ color:#86efac; }
 .trend-chart-tooltip.is-eff-chart.is-actual .trend-chart-tooltip-kind{ color:#c4b5fd; }
+.trend-chart-tooltip.is-no-production .trend-chart-tooltip-kind{ color:#94a3b8; }
 
 .summary-chart-eff-trend .trend-dot-met[data-chart-tip]:hover{
   filter:drop-shadow(0 0 4px rgba(168,85,247,.65));
