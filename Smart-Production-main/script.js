@@ -3728,7 +3728,7 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
     const isNp = skipNpIdx(i);
     const actual = isNp ? 0 : p.value;
     const cy = isNp ? yBase : p.y;
-    const valTxt = `${actual}${valueSuffix}`;
+    const valTxt = isNp ? `${actual}${valueSuffix} (Non production day)` : `${actual}${valueSuffix}`;
     const target = planValues?.[i] ?? 0;
     const behind = target > 0 && actual < target;
     const dotClass = isNp
@@ -4008,7 +4008,7 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
     const dTxt = formatIsoDateAsDdMmYy(dayKeys[i]);
     const isNp = skipNpDay(dayKeys[i]);
     const actual = isNp ? 0 : (actualSeries[i] || 0);
-    const vTxt = formatNum(actual);
+    const vTxt = isNp ? `${formatNum(actual)} (Non production day)` : formatNum(actual);
     const target = targetSeries[i] || 0;
     const behind = target > 0 && actual < target;
     const dotClass = isNp
