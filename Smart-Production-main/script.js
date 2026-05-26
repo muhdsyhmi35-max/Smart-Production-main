@@ -102,7 +102,6 @@ let liveCountdownInterval = null;
 let clockInterval = null;
 let liveDataPollInterval = null;
 let liveStatePollInterval = null;
-let graphReportLiveInterval = null;
 let monitorFirebaseNetConnected = false;
 let monitorLiveStateReceived = false;
 let monitorLiveStateError = null;
@@ -2680,7 +2679,6 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
     isDowntime = false;
 
     updateDisplay();
-    refreshProductionReportIfOpen();
 
     sendToSheet(
       chassis,
@@ -3171,7 +3169,6 @@ function toggleHistoryPanel(forceOpen) {
     const summaryPage = document.getElementById("summaryPage");
     if (summaryPage) summaryPage.classList.remove("open");
     document.body.classList.remove("graph-mode");
-    stopProductionReportLiveRefresh();
     const graphPage = document.getElementById("graphPage");
     if (graphPage) graphPage.classList.remove("open");
     document.body.classList.add("history-mode");
@@ -3254,7 +3251,6 @@ function toggleViewFromMenu() {
 
 function showMainPage() {
   toggleMenuDropdown(false);
-  stopProductionReportLiveRefresh();
   document.body.classList.remove("summary-mode");
   document.body.classList.remove("graph-mode");
   document.body.classList.remove("history-mode");
@@ -3392,7 +3388,12 @@ function initPlanActualChartTooltips(container) {
       if (valueEl) {
         const label = el.getAttribute("data-tip-label") || "";
         const value = el.getAttribute("data-tip-value") || "";
-        valueEl.textContent = label ? `${label}: ${value}` : value;
+        const tipKind = (el.getAttribute("data-tip-kind") || "").toLowerCase();
+        if (tipKind === "no production") {
+          valueEl.textContent = label;
+        } else {
+          valueEl.textContent = label ? `${label}: ${value}` : value;
+        }
       }
 
       const hostRect = host.getBoundingClientRect();
@@ -3408,6 +3409,7 @@ function initPlanActualChartTooltips(container) {
       tip.classList.toggle("is-eff-chart", isEffChart);
       tip.classList.toggle("is-target", tipKind === "target");
       tip.classList.toggle("is-actual", tipKind === "actual");
+      tip.classList.toggle("is-no-production", tipKind === "no production");
     };
 
     const showTip = el => {
@@ -3732,14 +3734,15 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
     const isNp = skipNpIdx(i);
     const actual = isNp ? 0 : p.value;
     const cy = isNp ? yBase : p.y;
-    const valTxt = isNp ? `${actual}${valueSuffix} (Non production day)` : `${actual}${valueSuffix}`;
+    const valTxt = `${actual}${valueSuffix}`;
+    const tipKind = isNp ? "No Production" : "Actual";
     const target = planValues?.[i] ?? 0;
     const behind = target > 0 && actual < target;
     const dotClass = isNp
       ? "trend-dot trend-dot-np"
       : (behind ? "trend-dot trend-dot-behind" : "trend-dot trend-dot-met");
     const dotFill = isNp ? "#94a3b8" : (behind ? "#ef4444" : "#a855f7");
-    return `<circle class="${dotClass}" data-chart-tip data-tip-kind="Actual" data-tip-label="${label}" data-tip-value="${valTxt}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${cy.toFixed(2)}" r="3.8" fill="${dotFill}"></circle>`;
+    return `<circle class="${dotClass}" data-chart-tip data-tip-kind="${tipKind}" data-tip-label="${label}" data-tip-value="${isNp ? "" : valTxt}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${cy.toFixed(2)}" r="3.8" fill="${dotFill}"></circle>`;
   }).join("");
 
   const labelStride = labels.length > 24 ? 3 : labels.length > 16 ? 2 : 1;
@@ -4012,7 +4015,8 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
     const dTxt = formatIsoDateAsDdMmYy(dayKeys[i]);
     const isNp = skipNpDay(dayKeys[i]);
     const actual = isNp ? 0 : (actualSeries[i] || 0);
-    const vTxt = isNp ? `${formatNum(actual)} (Non production day)` : formatNum(actual);
+    const vTxt = formatNum(actual);
+    const tipKind = isNp ? "No Production" : "Actual";
     const target = targetSeries[i] || 0;
     const behind = target > 0 && actual < target;
     const dotClass = isNp
@@ -4020,7 +4024,7 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
       : (behind ? "trend-dot trend-dot-behind" : "trend-dot trend-dot-met");
     const dotFill = isNp ? "#94a3b8" : (behind ? "#ef4444" : "#4ade80");
     const cy = isNp ? yBase : p.y;
-    return `<circle class="${dotClass}" data-chart-tip data-tip-kind="Actual" data-tip-label="${dTxt}" data-tip-value="${vTxt}" data-report-day="${dayKeys[i]}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${cy.toFixed(2)}" r="4.2" fill="${dotFill}" onclick="focusGraphDay('${dayKeys[i]}')"></circle>`;
+    return `<circle class="${dotClass}" data-chart-tip data-tip-kind="${tipKind}" data-tip-label="${dTxt}" data-tip-value="${isNp ? "" : vTxt}" data-report-day="${dayKeys[i]}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${cy.toFixed(2)}" r="4.2" fill="${dotFill}" onclick="focusGraphDay('${dayKeys[i]}')"></circle>`;
   }).join("");
 
   return `
@@ -4319,37 +4323,6 @@ function focusGraphDay(dayKey) {
   updateGraphWtCardsFromFocus();
 }
 
-function isProductionReportOpen() {
-  const graphPage = document.getElementById("graphPage");
-  return !!(graphPage && graphPage.classList.contains("open"));
-}
-
-function stopProductionReportLiveRefresh() {
-  if (graphReportLiveInterval) {
-    clearInterval(graphReportLiveInterval);
-    graphReportLiveInterval = null;
-  }
-}
-
-/** Re-render KPIs + charts while Production Report is open (sheet sync, scans, W/T clock). */
-function refreshProductionReportIfOpen() {
-  if (isProductionReportOpen() && document.getElementById("graphChartsBody")) {
-    renderGraphCharts();
-  }
-}
-
-function startProductionReportLiveRefresh() {
-  stopProductionReportLiveRefresh();
-  if (!isProductionReportOpen()) return;
-  graphReportLiveInterval = setInterval(() => {
-    if (!isProductionReportOpen()) {
-      stopProductionReportLiveRefresh();
-      return;
-    }
-    refreshProductionReportIfOpen();
-  }, 3000);
-}
-
 function renderGraphCharts() {
   const graphBody = document.getElementById("graphChartsBody");
   if (!graphBody) return;
@@ -4552,7 +4525,6 @@ function showGraphPage() {
   graphPage.classList.add("open");
   triggerEnterAnimation(graphPage);
   updateViewToggleMenuItem();
-  startProductionReportLiveRefresh();
 }
 
 function showSummaryPage() {
@@ -4651,7 +4623,6 @@ function showSummaryPage() {
   document.body.classList.add("summary-mode");
   document.body.classList.remove("graph-mode");
   document.body.classList.remove("history-mode");
-  stopProductionReportLiveRefresh();
   const graphPage = document.getElementById("graphPage");
   if (graphPage) graphPage.classList.remove("open");
   const historyPanel = document.getElementById("historyPanel");
@@ -5081,12 +5052,10 @@ function loadLiveData() {
         applyHistoryDateFilter();
         syncDowntimeSecondsFromTable();
         refreshDowntimeCardFromTable();
-        refreshProductionReportIfOpen();
       }
       // Always keep accumulated downtime card synced to rendered rows,
       // even when table data payload is unchanged (e.g. timer stopped/target achieved).
       refreshDowntimeCardFromTable();
-      refreshProductionReportIfOpen();
     })
     .catch(err => console.log("Monitor load error:", err));
 }
