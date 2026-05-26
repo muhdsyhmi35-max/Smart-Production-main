@@ -32,9 +32,10 @@ body.is-fullscreen .fullscreen-btn{
   .graph-range-inputs{
     gap:6px;
   }
-  .graph-filter-row input[type="date"]{
-    padding:3px 6px;
+  .graph-filter-row .app-date-input{
+    padding:3px 24px 3px 6px;
     font-size:11px;
+    min-width:104px;
   }
   .graph-period-btn,
   .graph-today-btn{
@@ -291,6 +292,7 @@ body::-webkit-scrollbar{
   align-self:flex-start;
 }
 
+/* Compact working-time control in the controls bar (menu opens down, above dashboard via z-index). */
 .controls-wt-wrap .header-wt-trigger.header-pill{
   padding:6px 10px;
   font-size:11px;
@@ -1194,6 +1196,11 @@ tr:nth-child(even){background:#0b1220;}
   text-align:center;
 }
 
+body.non-production-mode #status,
+#status.status-orange{
+  color:var(--orange);
+}
+
 .bottom-row > .card.wide:last-child{
   justify-content:flex-start;
 }
@@ -1448,6 +1455,7 @@ body.history-mode #historyPanel.open .history-table-wrap{
   max-height:none;
 }
 
+/* Flush header + table: flex gap caused a strip where tbody text looked “bleeding through”. */
 #historyPanel .summary-title-row{
   margin-bottom:0;
   padding-bottom:6px;
@@ -1486,20 +1494,6 @@ body.menu-open.history-mode #historyPanel.open{
   color:#cbd5e1;
 }
 
-.history-filter-row input[type="date"]{
-  padding:4px 8px;
-  border-radius:6px;
-  border:1px solid rgba(71,85,105,.65);
-  background:rgba(2,6,23,.85);
-  color:#e2e8f0;
-  color-scheme:dark;
-}
-
-.history-filter-row input[type="date"]::-webkit-calendar-picker-indicator{
-  cursor:pointer;
-  filter:invert(1) brightness(1.25);
-  opacity:1;
-}
 
 .history-today-btn{
   padding:4px 10px;
@@ -1770,20 +1764,165 @@ body.graph-mode{
   color:#93c5fd;
 }
 
-.graph-filter-row input[type="date"]{
-  padding:4px 8px;
+.app-date-input,
+.app-date-input.form-control.input,
+.graph-filter-row .app-date-input,
+.graph-filter-row input[type="date"],
+.history-filter-row .app-date-input,
+.history-filter-row input[type="date"],
+.summary-filter-row .app-date-input,
+.summary-filter-row input[type="date"]{
+  min-width:118px;
+  padding:5px 28px 5px 10px;
   border-radius:6px;
   border:1px solid rgba(71,85,105,.65);
-  background:rgba(2,6,23,.85);
+  background:rgba(2,6,23,.85) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2393c5fd' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E") no-repeat right 8px center;
   color:#e2e8f0;
-  color-scheme:dark;
+  font-size:12px;
+  font-weight:600;
+  cursor:pointer;
 }
 
+.app-date-input:focus,
+.graph-filter-row .app-date-input:focus,
+.history-filter-row .app-date-input:focus,
+.summary-filter-row .app-date-input:focus{
+  outline:none;
+  border-color:rgba(56,189,248,.55);
+  box-shadow:0 0 0 2px rgba(56,189,248,.18);
+}
 
-.graph-filter-row input[type="date"]::-webkit-calendar-picker-indicator{
-  cursor:pointer;
-  filter:invert(1) brightness(1.25);
-  opacity:1;
+.flatpickr-calendar{
+  border:1px solid rgba(56,189,248,.35);
+  border-radius:10px;
+  background:#0b1220;
+  box-shadow:0 16px 40px rgba(0,0,0,.55);
+  font-family:inherit;
+  overflow:hidden;
+}
+
+.flatpickr-months{
+  padding:8px 8px 4px;
+  background:linear-gradient(180deg, rgba(30,58,138,.35), rgba(15,23,42,.2));
+}
+
+.flatpickr-months .flatpickr-month{
+  height:36px;
+  color:#e2e8f0;
+}
+
+.flatpickr-current-month{
+  font-size:14px;
+  font-weight:700;
+  color:#e2e8f0;
+  padding-top:4px;
+}
+
+.flatpickr-current-month .flatpickr-monthDropdown-months,
+.flatpickr-current-month input.cur-year{
+  font-weight:700;
+  color:#e2e8f0;
+  background:transparent;
+}
+
+.flatpickr-current-month .flatpickr-monthDropdown-months{
+  margin-right:4px;
+}
+
+.flatpickr-current-month input.cur-year{
+  padding:0 4px;
+}
+
+.flatpickr-weekdays{
+  background:rgba(15,23,42,.85);
+}
+
+span.flatpickr-weekday{
+  color:#93c5fd;
+  font-size:11px;
+  font-weight:700;
+}
+
+.flatpickr-days{
+  border:none;
+}
+
+.dayContainer{
+  padding:4px 6px 8px;
+}
+
+.flatpickr-day{
+  color:#cbd5e1;
+  border-radius:6px;
+  font-weight:600;
+  line-height:36px;
+  max-width:36px;
+  height:36px;
+}
+
+.flatpickr-day:hover,
+.flatpickr-day:focus{
+  background:rgba(59,130,246,.22);
+  border-color:rgba(59,130,246,.22);
+  color:#f8fafc;
+}
+
+.flatpickr-day.today{
+  border-color:rgba(56,189,248,.65);
+  color:#93c5fd;
+}
+
+.flatpickr-day.today:hover,
+.flatpickr-day.today:focus{
+  background:rgba(56,189,248,.2);
+  color:#f8fafc;
+}
+
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange,
+.flatpickr-day.selected.inRange,
+.flatpickr-day.startRange.inRange,
+.flatpickr-day.endRange.inRange{
+  background:#3b82f6;
+  border-color:#3b82f6;
+  color:#fff;
+  box-shadow:0 0 0 1px rgba(59,130,246,.35);
+}
+
+.flatpickr-day.inRange{
+  background:rgba(59,130,246,.18);
+  border-color:transparent;
+  box-shadow:none;
+  color:#e2e8f0;
+}
+
+.flatpickr-day.prevMonthDay,
+.flatpickr-day.nextMonthDay{
+  color:#64748b;
+}
+
+.flatpickr-day.flatpickr-disabled,
+.flatpickr-day.flatpickr-disabled:hover{
+  color:#475569;
+}
+
+.flatpickr-months .flatpickr-prev-month,
+.flatpickr-months .flatpickr-next-month{
+  fill:#93c5fd;
+  top:10px;
+}
+
+.flatpickr-months .flatpickr-prev-month:hover svg,
+.flatpickr-months .flatpickr-next-month:hover svg{
+  fill:#e2e8f0;
+}
+
+.flatpickr-calendar.arrowTop::before,
+.flatpickr-calendar.arrowTop::after,
+.flatpickr-calendar.arrowBottom::before,
+.flatpickr-calendar.arrowBottom::after{
+  display:none;
 }
 
 .graph-today-btn{
@@ -1812,20 +1951,6 @@ body.graph-mode{
   font-weight:600;
 }
 
-.summary-filter-row input[type="date"]{
-  padding:4px 8px;
-  border-radius:6px;
-  border:1px solid rgba(71,85,105,.65);
-  background:rgba(2,6,23,.85);
-  color:#e2e8f0;
-  color-scheme:dark;
-}
-
-.summary-filter-row input[type="date"]::-webkit-calendar-picker-indicator{
-  cursor:pointer;
-  filter:invert(1) brightness(1.25);
-  opacity:1;
-}
 
 .summary-today-btn{
   padding:4px 10px;
@@ -1969,6 +2094,14 @@ body.graph-mode{
   font-weight:900;
   color:#ffffff;
   line-height:1;
+}
+
+.report-eff-wt-card strong.neg{
+  color:#ef4444;
+}
+
+.report-eff-wt-card strong.pos{
+  color:#22c55e;
 }
 
 .report-bottom-grid > .summary-graph-card .summary-chart-svg{
@@ -2123,8 +2256,12 @@ body.graph-mode{
 .trend-chart-tooltip.is-actual .trend-chart-tooltip-kind{ color:#86efac; }
 .trend-chart-tooltip.is-eff-chart.is-actual .trend-chart-tooltip-kind{ color:#c4b5fd; }
 
-.summary-chart-eff-trend .trend-dot[data-chart-tip]:hover{
+.summary-chart-eff-trend .trend-dot-met[data-chart-tip]:hover{
   filter:drop-shadow(0 0 4px rgba(168,85,247,.65));
+}
+
+.summary-chart-eff-trend .trend-dot-behind[data-chart-tip]:hover{
+  filter:drop-shadow(0 0 4px rgba(239,68,68,.65));
 }
 
 .summary-chart-plan-actual .summary-bar[data-chart-tip]{
@@ -2140,8 +2277,12 @@ body.graph-mode{
   transition:filter .2s var(--ease-smooth), r .2s var(--ease-smooth);
 }
 
-.summary-chart-plan-actual .trend-dot[data-chart-tip]:hover{
+.summary-chart-plan-actual .trend-dot-met[data-chart-tip]:hover{
   filter:drop-shadow(0 0 4px rgba(74,222,128,.65));
+}
+
+.summary-chart-plan-actual .trend-dot-behind[data-chart-tip]:hover{
+  filter:drop-shadow(0 0 4px rgba(239,68,68,.65));
 }
 
 .trend-header{
@@ -2282,6 +2423,14 @@ path.trend-area-fill{
   transform:translateY(6px);
   will-change:opacity, transform;
   animation:summaryBarValueIn .5s var(--ease-smooth) forwards;
+}
+
+.summary-chart-downtime .summary-bar{
+  animation-duration:.45s;
+}
+
+.summary-chart-downtime .summary-bar-value{
+  animation-duration:.26s;
 }
 
 @keyframes summaryBarValueIn{

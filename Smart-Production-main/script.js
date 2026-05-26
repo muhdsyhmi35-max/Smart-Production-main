@@ -28,8 +28,9 @@ const SETTINGS = {
   },
 
   /**
-   * PRODUCTION TREND / report totals: when to draw Target without per-day plan in history.
-   * Default: no scans + no saved plan → target 0. Legacy: implicitDailyPlanOnInactiveWeekdays true.
+   * PRODUCTION TREND / report totals: when to draw a blue Target bar without a per-day plan in history.
+   * Default: no scans + no saved plan → target 0 (Daily Plan is not copied onto blank weekdays).
+   * Legacy: set implicitDailyPlanOnInactiveWeekdays true to assume Daily Plan on inactive weekdays.
    */
   productionTrend: {
     implicitDailyPlanOnInactiveWeekdays: false,
@@ -49,7 +50,6 @@ let timer = null;
 let countdownValue = 0;
 let actualCount = 0;
 let downtimeSeconds = 0;
-/** null = today in graph filters; else YYYY-MM-DD. */
 let graphFilterDate = null;
 let graphPeriod = "week";
 let graphWtPreset = "normal";
@@ -57,11 +57,10 @@ let graphRangeStartDate = null;
 let graphRangeEndDate = null;
 let graphFocusedDayKey = null; // when clicking Production Trend, cards show this day only
 let graphReportCache = null; // cached maps for the currently rendered Production Report range
-/** null = today in history filter; else YYYY-MM-DD. */
 let historyFilterDate = null;
-/** null = today in summary filter; else YYYY-MM-DD. */
 let summaryFilterDate = null;
 let lastScanTime = null;
+/** Wall-clock ms of last completed key scan; never shifted for breaks (used for downtime + countdown). */
 let lastScanWallMs = null;
 let startTime = null;
 let firstScanAtMs = null;
@@ -74,19 +73,22 @@ let scannedChassis = new Set();
 let scannedModel = new Set();
 let scannedEngine = new Set();
 let scannedKey = new Set();
+
+/** Same value in sheet vs scanner may differ by case/spaces; use for duplicate checks only. */
+function normalizeScanId(value) {
+  return String(value || "").trim().toUpperCase();
+}
 const GRAPH_WT_PRESET_MINS = {
   normal: 460,
   halfday: 300,
   friday: 400
 };
 const GRAPH_WT_PRESET_STORAGE_KEY = "TF2_GRAPH_WT_PRESET";
+const NON_PRODUCTION_DAYS_KEY = "TF2_NON_PRODUCTION_DAYS";
 let duplicateLock = false;
 let lastUpdateTime = 0;
 let lastTableData = "";
 let efficiencyPercent = 0;
-let breakPauseStartMs = null;
-let pauseStartMs = null;
-let lastTimerTickMs = null;
 const DEBUG_DOWNTIME = false;
 let firebaseDb = null;
 let firebaseCommandRef = null;
@@ -94,27 +96,28 @@ let firebaseLiveStateRef = null;
 let firebaseShiftScheduleRef = null;
 let isApplyingRemoteCommand = false;
 let hasLocalSession = false;
+/** Operator: avoid calendar-day reset until first Firebase live-state read completes (prevents stale overwrite). */
+let initialLiveStateHydrated = false;
 let liveCountdownInterval = null;
 let clockInterval = null;
 let liveDataPollInterval = null;
 let liveStatePollInterval = null;
-let monitorDowntimeOverrideSec = null;
 let monitorFirebaseNetConnected = false;
 let monitorLiveStateReceived = false;
 let monitorLiveStateError = null;
-let initialLiveStateLoaded = false;
 let shiftScheduleInterval = null;
 let overtimeUntilMs = null;
-const firebaseSessionStartedAt = Date.now();
-const LOCAL_LIVE_STATE_KEY = "TF2_LIVE_STATE_SNAPSHOT";
 const syncClientId = localStorage.getItem("SYNC_CLIENT_ID") || ("SYNC-" + Math.random().toString(36).slice(2));
 localStorage.setItem("SYNC_CLIENT_ID", syncClientId);
 
 const APP_ROLE_STORAGE_KEY = "TF2_DASHBOARD_ROLE";
 const APP_ADMIN_SESSION_KEY = "TF2_ADMIN_SESSION_OK";
 const SHIFT_SCHEDULE_STORAGE_KEY = "TF2_SHIFT_SCHEDULE";
+/** Tracks crossing into / out of the configured shift window (localStorage). */
 const SHIFT_WINDOW_STATE_KEY = "TF2_SHIFT_WINDOW_STATE";
+/** ISO date + shift bounds — new calendar shift session even if window state was stuck "in". */
 const SHIFT_PERIOD_KEY = "TF2_SHIFT_ACTIVE_PERIOD";
+/** Last local calendar day (YYYY-MM-DD) when operator dashboard was synced — rollover triggers reset. */
 const DASHBOARD_CALENDAR_DAY_KEY = "TF2_DASHBOARD_CALENDAR_DAY";
 
 /** Change these credentials for your deployment (client-side only; not secret from devtools). */
@@ -283,6 +286,42 @@ function isNonProductionMode() {
   return graphWtPreset === "nonproduction";
 }
 
+function loadNonProductionDaysSet() {
+  try {
+    const raw = localStorage.getItem(NON_PRODUCTION_DAYS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(arr) ? arr.filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)) : []);
+  } catch (_) {
+    return new Set();
+  }
+}
+
+function saveNonProductionDaysSet(daySet) {
+  try {
+    localStorage.setItem(NON_PRODUCTION_DAYS_KEY, JSON.stringify([...daySet]));
+  } catch (_) {}
+}
+
+function markNonProductionDay(dayKey, active) {
+  if (!dayKey) return;
+  const set = loadNonProductionDaysSet();
+  if (active) set.add(dayKey);
+  else set.delete(dayKey);
+  saveNonProductionDaysSet(set);
+}
+
+function syncNonProductionDayMarkForToday() {
+  markNonProductionDay(toIsoDateLocal(new Date()), isNonProductionMode());
+}
+
+/** True for ISO day keys marked non-production (includes today while mode is active). */
+function isNonProductionDay(dayKey) {
+  if (!dayKey) return isNonProductionMode();
+  const today = toIsoDateLocal(new Date());
+  if (dayKey === today && isNonProductionMode()) return true;
+  return loadNonProductionDaysSet().has(dayKey);
+}
+
 function normalizeGraphWtPreset(v) {
   const x = String(v || "").trim().toLowerCase();
   if (x === "halfday" || x === "half-day") return "halfday";
@@ -302,6 +341,7 @@ function loadGraphWtPresetFromStorage() {
     if (stored) graphWtPreset = normalizeGraphWtPreset(stored);
   } catch (_) {}
   if (graphWtPreset === "friday") graphWtPreset = "normal";
+  syncNonProductionDayMarkForToday();
 }
 
 function saveGraphWtPresetToStorage() {
@@ -404,6 +444,7 @@ function onGraphWtOptionClick(event, preset) {
   const prev = graphWtPreset;
   graphWtPreset = p;
   saveGraphWtPresetToStorage();
+  syncNonProductionDayMarkForToday();
   applyGraphWtControlUi();
   applyGraphWtPresetEffects(prev);
   renderGraphCharts();
@@ -418,6 +459,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbwwLUYjoT7GH0sfFCGZMJoe
 const isMonitor = window.location.search.includes("monitor");
 const MONITOR_LAYOUT_DATASET_KEY = "monitorLayoutV1";
 const MONITOR_LAYOUT_LEGACY_KEY = "monitorLegacy";
+/** Admin monitor (?monitor): same dashboard + bottom row as operator TV layout (no compact grid). */
 const MONITOR_LAYOUT_OPERATOR_MIRROR_KEY = "monitorOperatorMirror";
 const FIREBASE_COMMAND_PATH = "production/commands/latest";
 const FIREBASE_LIVE_STATE_PATH = "production/liveState";
@@ -444,7 +486,6 @@ function setMonitorConnectionStatus(isConnected) {
   updateMonitorDataNotice();
 }
 
-/** Explains empty monitor KPIs: offline, permission denied, or main PC not publishing yet. */
 function updateMonitorDataNotice() {
   if (!isMonitor) return;
 
@@ -527,6 +568,7 @@ function applyMonitorDashboardLayout() {
   dashboard.appendChild(lineCard);
 }
 
+/** Admin monitor: operator-style 4+4 dashboard cards + CONNECTION STATUS / LINE STATUS bottom row (inputs hidden by monitor-mode). */
 function applyOperatorStyleMonitorDashboard() {
   if (!isMonitor || document.body.dataset.monitorLayout === MONITOR_LAYOUT_OPERATOR_MIRROR_KEY) return;
 
@@ -601,7 +643,6 @@ function getActiveDowntimeDayKey() {
   return getActiveHistoryDayKey();
 }
 
-/** Map table Date cell (e.g. DD/MM/YYYY) to YYYY-MM-DD for filtering. */
 function parseDisplayDateToIsoKey(dateText) {
   const t = String(dateText || "").trim();
   if (!t) return null;
@@ -685,12 +726,84 @@ function getActiveGraphRange() {
   return getDefaultGraphRangeFromPeriod();
 }
 
+const datePickerRegistry = new WeakMap();
+
+function destroyDatePicker(el) {
+  const fp = datePickerRegistry.get(el);
+  if (fp) {
+    fp.destroy();
+    datePickerRegistry.delete(el);
+  }
+}
+
+function setDatePickerValue(el, isoDate) {
+  if (!el) return;
+  const fp = datePickerRegistry.get(el);
+  if (fp) {
+    if (isoDate) fp.setDate(isoDate, false);
+    else fp.clear();
+    return;
+  }
+  el.value = isoDate || "";
+}
+
+function initDatePicker(el, options = {}) {
+  if (!el || typeof flatpickr !== "function") return null;
+  destroyDatePicker(el);
+  const userOnChange = options.onChange;
+  const fp = flatpickr(el, {
+    dateFormat: "Y-m-d",
+    altInput: true,
+    altFormat: "d/m/Y",
+    altInputClass: "app-date-input",
+    allowInput: false,
+    disableMobile: true,
+    monthSelectorType: "dropdown",
+    animate: !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    ...options,
+    onChange(selectedDates, dateStr, instance) {
+      if (typeof userOnChange === "function") userOnChange(selectedDates, dateStr, instance);
+    }
+  });
+  datePickerRegistry.set(el, fp);
+  return fp;
+}
+
+function initGraphRangeDatePickers() {
+  const startEl = document.getElementById("graphRangeStart");
+  const endEl = document.getElementById("graphRangeEnd");
+  if (!startEl || !endEl) return;
+
+  let startFp;
+  let endFp;
+
+  endFp = initDatePicker(endEl, {
+    onChange() {
+      if (endEl.value) startFp?.set("maxDate", endEl.value);
+      onGraphRangeFilterChange();
+    }
+  });
+  startFp = initDatePicker(startEl, {
+    onChange() {
+      if (endEl.value) endFp?.set("minDate", startEl.value);
+      onGraphRangeFilterChange();
+    }
+  });
+
+  if (startEl.value) endFp.set("minDate", startEl.value);
+  if (endEl.value) startFp.set("maxDate", endEl.value);
+}
+
+function initSingleDayDatePicker(el, onChange) {
+  return initDatePicker(el, { onChange });
+}
+
 function syncGraphRangePickerUi() {
   const startEl = document.getElementById("graphRangeStart");
   const endEl = document.getElementById("graphRangeEnd");
   const range = getActiveGraphRange();
-  if (startEl) startEl.value = range.start;
-  if (endEl) endEl.value = range.end;
+  setDatePickerValue(startEl, range.start);
+  setDatePickerValue(endEl, range.end);
 }
 
 function onGraphRangeFilterChange() {
@@ -821,13 +934,57 @@ function getPeriodDayKeys(anchorIso, period) {
   return [anchorIso];
 }
 
+function getActiveHistoryDayKey() {
+  return historyFilterDate || toIsoDateLocal(new Date());
+}
+
+function syncHistoryDayPickerUi() {
+  const el = document.getElementById("historyDayFilter");
+  setDatePickerValue(el, getActiveHistoryDayKey());
+}
+
+function applyHistoryDateFilter() {
+  const table = document.getElementById("scanTable");
+  if (!table) return;
+  const dayKey = getActiveHistoryDayKey();
+  let visibleNo = 1;
+  Array.from(table.rows).forEach(tr => {
+    const rowDay = tr.dataset.scanDate || parseDisplayDateToIsoKey(tr.cells[1]?.innerText);
+    const show = !!rowDay && rowDay === dayKey;
+    tr.style.display = show ? "" : "none";
+    if (show) {
+      const noCell = tr.cells[0];
+      if (noCell) noCell.innerText = String(visibleNo++);
+    }
+  });
+}
+
+function onHistoryDayFilterChange() {
+  const el = document.getElementById("historyDayFilter");
+  if (!el) return;
+  const v = (el.value || "").trim().slice(0, 10);
+  const todayK = toIsoDateLocal(new Date());
+  historyFilterDate = v && v !== todayK ? v : null;
+  applyHistoryDateFilter();
+  rebuildScannedSetsFromTable();
+  refreshDowntimeCardFromTable();
+}
+
+function onHistoryDayTodayClick() {
+  historyFilterDate = null;
+  syncHistoryDayPickerUi();
+  applyHistoryDateFilter();
+  rebuildScannedSetsFromTable();
+  refreshDowntimeCardFromTable();
+}
+
 function getActiveSummaryDayKey() {
   return summaryFilterDate || toIsoDateLocal(new Date());
 }
 
 function syncSummaryDayPickerUi() {
   const el = document.getElementById("summaryDayFilter");
-  if (el) el.value = getActiveSummaryDayKey();
+  setDatePickerValue(el, getActiveSummaryDayKey());
 }
 
 function onSummaryDayFilterChange() {
@@ -869,64 +1026,32 @@ function formatIsoRangeAsDdMmYy(startIso, endIso) {
   return startIso === endIso ? startFmt : `${startFmt} to ${endFmt}`;
 }
 
-function getActiveHistoryDayKey() {
-  return historyFilterDate || toIsoDateLocal(new Date());
-}
-
-function syncHistoryDayPickerUi() {
-  const el = document.getElementById("historyDayFilter");
-  if (el) el.value = getActiveHistoryDayKey();
-}
-
-function applyHistoryDateFilter() {
-  const table = document.getElementById("scanTable");
-  if (!table) return;
-  const dayKey = getActiveHistoryDayKey();
-  let visibleNo = 1;
-  Array.from(table.rows).forEach(tr => {
-    const rowDay = tr.dataset.scanDate || parseDisplayDateToIsoKey(tr.cells[1]?.innerText);
-    const show = !!rowDay && rowDay === dayKey;
-    tr.style.display = show ? "" : "none";
-    if (show) {
-      const noCell = tr.cells[0];
-      if (noCell) noCell.innerText = String(visibleNo++);
-    }
-  });
-}
-
-function onHistoryDayFilterChange() {
-  const el = document.getElementById("historyDayFilter");
-  if (!el) return;
-  const v = (el.value || "").trim().slice(0, 10);
-  const todayK = toIsoDateLocal(new Date());
-  historyFilterDate = v && v !== todayK ? v : null;
-  applyHistoryDateFilter();
-  rebuildScannedSetsFromTable();
-  refreshDowntimeCardFromTable();
-}
-
-function onHistoryDayTodayClick() {
-  historyFilterDate = null;
-  syncHistoryDayPickerUi();
-  applyHistoryDateFilter();
-  rebuildScannedSetsFromTable();
-  refreshDowntimeCardFromTable();
-}
-
 /** Parse "MM:SS" (or "M:SS") from table / sheet display into seconds. */
 function parseMmSsToSeconds(text) {
   if (text == null || text === "") return 0;
   const t = String(text).trim();
   if (!t || t === "00:00" || t === "0:00") return 0;
 
-  // 66:46 / 66.46 / 66:46:00 / 66.46.00 / 1900-01-01T11:50:35.000Z / numeric seconds
-  // Google Sheets duration cells can arrive as day fractions (e.g. 0.003472222 for 00:05).
-  const numeric = Number(t);
-  if (Number.isFinite(numeric)) {
-    if (numeric > 0 && numeric < 1) {
-      return Math.max(Math.round(numeric * 86400), 0);
+  // Google Sheets can return time duration as day-fraction decimal (e.g. 5s = 0.00005787...).
+  // Detect long decimal fractions and convert from days -> seconds.
+  const dayFractionMatch = t.match(/^(\d+)\.(\d+)$/);
+  if (dayFractionMatch) {
+    const whole = parseInt(dayFractionMatch[1], 10);
+    const fraction = dayFractionMatch[2] || "";
+    const asNumber = Number(t);
+    if (Number.isFinite(asNumber) && fraction.length > 2) {
+      const secFromDayFraction = Math.round(asNumber * 86400);
+      return Math.max(secFromDayFraction, 0);
     }
-    return Math.max(Math.round(numeric), 0);
+    if (Number.isFinite(whole) && Number.isFinite(parseInt(fraction, 10))) {
+      return Math.max((whole * 60) + parseInt(fraction, 10), 0);
+    }
+  }
+
+  // Plain numeric values without separators are interpreted as seconds.
+  if (!/[.:]/.test(t) && !isNaN(t)) {
+    const sec = Math.round(Number(t));
+    return Number.isFinite(sec) ? Math.max(sec, 0) : 0;
   }
 
   // Google Sheets date artifacts like 1899/1900 can be serialized as ISO strings.
@@ -1011,7 +1136,6 @@ function syncDowntimeSecondsFromTable() {
   }
 }
 
-/** Row # in column index 0 (top row = 1). Call after rebuild or insertRow(0). */
 function renumberScanTable() {
   const table = document.getElementById("scanTable");
   if (!table) return;
@@ -1043,10 +1167,10 @@ function rebuildScannedSetsFromTable() {
     const chassis = (cells[5]?.innerText || "").trim();
     const engine = (cells[6]?.innerText || "").trim();
     const key = (cells[7]?.innerText || "").trim();
-    if (model && model !== "-") scannedModel.add(model);
-    if (chassis && chassis !== "-") scannedChassis.add(chassis);
-    if (engine && engine !== "-") scannedEngine.add(engine);
-    if (key && key !== "-") scannedKey.add(key);
+    if (model && model !== "-") scannedModel.add(normalizeScanId(model));
+    if (chassis && chassis !== "-") scannedChassis.add(normalizeScanId(chassis));
+    if (engine && engine !== "-") scannedEngine.add(normalizeScanId(engine));
+    if (key && key !== "-") scannedKey.add(normalizeScanId(key));
   });
 }
 
@@ -1063,9 +1187,7 @@ function refreshDowntimeCardFromTable() {
   const table = document.getElementById("scanTable");
   const total = table && table.rows.length > 0
     ? sumBookedDowntimeFromScanTable()
-    : (Number.isFinite(monitorDowntimeOverrideSec) && monitorDowntimeOverrideSec >= 0
-      ? monitorDowntimeOverrideSec
-      : 0);
+    : 0;
   downtimeSeconds = total;
   document.getElementById("downtime").innerText = format(total);
   renderDowntimeDebugPanel();
@@ -1147,9 +1269,10 @@ function updateDateTime() {
   maybeResetDashboardForNewCalendarDay();
 }
 
+/** Operator PC only: full dashboard reset when local calendar date rolls (midnight). */
 function maybeResetDashboardForNewCalendarDay() {
   if (isMonitor) return;
-  if (!initialLiveStateLoaded) return;
+  if (!initialLiveStateHydrated) return;
   const today = toIsoDateLocal(new Date());
   let stored = null;
   try {
@@ -1208,6 +1331,7 @@ function setOffShiftStatus() {
   setStatus(text, cls);
 }
 
+/** Unique key for one scheduled shift session on a calendar day (local operator TZ). */
 function getShiftPeriodKey(d = new Date()) {
   return `${toIsoDateLocal(d)}_${SETTINGS.shiftSchedule.startMinute}_${SETTINGS.shiftSchedule.endMinute}`;
 }
@@ -1687,68 +1811,46 @@ async function checkAccess() {
 
 /* ===== RAMADAN + BREAK ===== */
 
-function getBreakWindowsForDate(dateObj) {
-  const day = dateObj.getDay();
-  let breaks = [];
-
+function getBreakWindowsForLocalDate(d) {
+  const day = d.getDay();
   if (ramadanMode) {
-    if (day === 5) {
-      breaks = SETTINGS.breakTime.ramadan.friday;
-    } else {
-      breaks = SETTINGS.breakTime.ramadan.weekday;
-    }
-  } else if (day === 5) {
-    breaks = SETTINGS.breakTime.normal.friday;
-  } else {
-    breaks = SETTINGS.breakTime.normal.weekday;
+    return day === 5 ? SETTINGS.breakTime.ramadan.friday : SETTINGS.breakTime.ramadan.weekday;
   }
-
-  return breaks;
+  return day === 5 ? SETTINGS.breakTime.normal.friday : SETTINGS.breakTime.normal.weekday;
 }
 
-function isBreakTimeAt(dateObj) {
-  const current = dateObj.getHours() * 60 + dateObj.getMinutes();
-  const breaks = getBreakWindowsForDate(dateObj);
-  for (const b of breaks) {
-    if (current >= b.start && current < b.end) {
-      return true;
+/** Seconds of scheduled break in [startMs, endMs] (local calendar, matches isBreakTime minute windows). */
+function scheduledBreakOverlapSec(startMs, endMs) {
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return 0;
+  let totalMs = 0;
+  let cursor = startMs;
+  let guard = 0;
+  while (cursor < endMs && guard++ < 14) {
+    const dayStart = new Date(cursor);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayStartMs = dayStart.getTime();
+    const nextDayMs = dayStartMs + 86400000;
+    if (dayStartMs >= endMs) break;
+    const windows = getBreakWindowsForLocalDate(dayStart);
+    for (const w of windows) {
+      const segStart = dayStartMs + w.start * 60000;
+      const segEnd = dayStartMs + w.end * 60000;
+      const lo = Math.max(startMs, segStart);
+      const hi = Math.min(endMs, segEnd);
+      if (hi > lo) totalMs += hi - lo;
     }
+    cursor = nextDayMs;
   }
-
-  return false;
+  return Math.floor(totalMs / 1000);
 }
 
 function isBreakTime() {
-  return isBreakTimeAt(new Date());
-}
-
-function getBreakOverlapMs(fromMs, toMs) {
-  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || toMs <= fromMs) return 0;
-  let total = 0;
-  const dayMs = 24 * 60 * 60 * 1000;
-  const cursor = new Date(fromMs);
-  cursor.setHours(0, 0, 0, 0);
-
-  for (let dayStart = cursor.getTime(); dayStart < toMs; dayStart += dayMs) {
-    const dayDate = new Date(dayStart);
-    const breaks = getBreakWindowsForDate(dayDate);
-    breaks.forEach(b => {
-      const breakStartMs = dayStart + (b.start * 60 * 1000);
-      const breakEndMs = dayStart + (b.end * 60 * 1000);
-      const overlapStart = Math.max(fromMs, breakStartMs);
-      const overlapEnd = Math.min(toMs, breakEndMs);
-      if (overlapEnd > overlapStart) {
-        total += (overlapEnd - overlapStart);
-      }
-    });
+  const now = new Date();
+  const current = now.getHours() * 60 + now.getMinutes();
+  for (const b of getBreakWindowsForLocalDate(now)) {
+    if (current >= b.start && current < b.end) return true;
   }
-
-  return total;
-}
-
-// Compatibility helper: keep shared report logic using seconds-based break overlap.
-function scheduledBreakOverlapSec(startMs, endMs) {
-  return Math.floor(getBreakOverlapMs(startMs, endMs) / 1000);
+  return false;
 }
 
 function calculateExpectedOutput() {
@@ -1781,8 +1883,8 @@ function calculateExpectedOutput() {
   const elapsedSec = Math.floor((nowMs - timelineStartMs) / 1000);
   const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
 
-  const breakSeconds = Math.floor(getBreakOverlapMs(timelineStartMs, nowMs) / 1000);
-  const netTime = Math.max(0, elapsedSec - breakSeconds);
+  const breakSec = scheduledBreakOverlapSec(timelineStartMs, nowMs);
+  const netTime = Math.max(0, elapsedSec - breakSec);
 
   let expected = Math.floor(netTime / cycleTimeSec);
   if (plan > 0) {
@@ -1796,24 +1898,28 @@ function getTotalDowntimeSec() {
   return getBookedDowntimeSec();
 }
 
-function applyEfficiencyColorClass(el, pct) {
+function applyActualEffColorClass(el, pct) {
   if (!Number.isFinite(pct)) {
     el.className = "big-number status-blue";
     return;
   }
-  if (pct < 90) el.className = "big-number status-red";
-  else if (pct < 100) el.className = "big-number status-orange";
+  if (pct < PLAN_EFF_PCT) el.className = "big-number status-red";
   else el.className = "big-number status-green";
+}
+
+function getTodayActualEffPct() {
+  const dayKey = toIsoDateLocal(new Date());
+  if (isNonProductionDay(dayKey)) return 0;
+  const planUnits = parseInt(document.getElementById("dailyPlanTarget")?.value || "0", 10) || 0;
+  const planWtMins = getPlanWtMinsForDay(dayKey);
+  const actualWtMins = calcActualWtMinsForDay(dayKey, planUnits);
+  return calcActualEffPct(planUnits, actualCount, planWtMins, actualWtMins);
 }
 
 function syncEfficiencyCardDom() {
   const effEl = document.getElementById("efficiency");
   if (!effEl) return;
-  const expectedShown = parseInt(document.getElementById("expected")?.innerText, 10) || 0;
-  let pct = null;
-  if (expectedShown > 0) {
-    pct = Math.max(0, Math.round((actualCount / expectedShown) * 100));
-  }
+  const pct = getTodayActualEffPct();
   if (!isMonitor) {
     efficiencyPercent = pct != null ? pct : 0;
   } else if (pct != null) {
@@ -1824,8 +1930,8 @@ function syncEfficiencyCardDom() {
     effEl.className = "big-number status-blue";
     return;
   }
-  effEl.innerText = pct + "%";
-  applyEfficiencyColorClass(effEl, pct);
+  effEl.innerText = `${pct}%`;
+  applyActualEffColorClass(effEl, pct);
 }
 
 /* ===== STATUS ===== */
@@ -1876,10 +1982,6 @@ function initFirebaseSync() {
     const command = snapshot.val();
     if (!command || !command.action) return;
     if (command.sender === syncClientId) return;
-    const sentAt = Number(command.sentAt) || 0;
-    // Ignore historical commands when a page first attaches. Replaying an old
-    // stop/reset on reopen can wipe a valid running session before restore.
-    if (sentAt > 0 && sentAt < firebaseSessionStartedAt) return;
     applyRemoteCommand(command.action);
   });
 
@@ -1888,13 +1990,13 @@ function initFirebaseSync() {
       "value",
       snapshot => {
         monitorLiveStateError = null;
-        const liveState = snapshot.val();
+      const liveState = snapshot.val();
         if (!liveState) {
           monitorLiveStateReceived = false;
           updateMonitorDataNotice();
           return;
         }
-        applyLiveState(liveState);
+      applyLiveState(liveState);
       },
       err => {
         monitorLiveStateError = err;
@@ -1936,29 +2038,6 @@ function publishLiveStateToFirebase(state) {
   }).catch(err => {
     console.log("Firebase live state publish error:", err);
   });
-}
-
-function saveLocalLiveStateSnapshot(state) {
-  try {
-    localStorage.setItem(LOCAL_LIVE_STATE_KEY, JSON.stringify({
-      ...state,
-      updatedAt: Date.now()
-    }));
-  } catch (err) {
-    console.log("Local live state save error:", err);
-  }
-}
-
-function readLocalLiveStateSnapshot() {
-  try {
-    const raw = localStorage.getItem(LOCAL_LIVE_STATE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : null;
-  } catch (err) {
-    console.log("Local live state read error:", err);
-    return null;
-  }
 }
 
 function stopLiveCountdownTicker() {
@@ -2011,7 +2090,10 @@ function restoreProductionTimerFromLiveState(status, countdown, expected, synced
   let elapsedInCycle = Math.max(cycleTimeSec - adjustedCountdown, 0);
 
   if (syncedLastScanAtMs) {
-    const elapsedSinceLastScanSec = Math.max(Math.floor((nowMs - Number(syncedLastScanAtMs)) / 1000), 0);
+    const lastMs = Number(syncedLastScanAtMs);
+    const wallSec = Math.max(Math.floor((nowMs - lastMs) / 1000), 0);
+    const breakSec = scheduledBreakOverlapSec(lastMs, nowMs);
+    const elapsedSinceLastScanSec = Math.max(0, wallSec - breakSec);
     adjustedCountdown = Math.max(cycleTimeSec - elapsedSinceLastScanSec, 0);
     elapsedInCycle = Math.max(cycleTimeSec - adjustedCountdown, 0);
   } else {
@@ -2035,10 +2117,7 @@ function restoreProductionTimerFromLiveState(status, countdown, expected, synced
 
   if (actualCount > 0) {
     lastScanTime = syncedLastScanAtMs ? new Date(Number(syncedLastScanAtMs)) : reconstructedBaseTime;
-  } else {
-    // If production was started manually (no completed scan yet), base the countdown
-    // on reconstructed start time so refresh does not "reset" the timer.
-    startTime = reconstructedBaseTime;
+    lastScanWallMs = syncedLastScanAtMs ? Number(syncedLastScanAtMs) : reconstructedBaseTime.getTime();
   }
 
   // Downtime is booked on each completed 4-scan (same as the scan table). Offline gap is
@@ -2114,10 +2193,6 @@ function applyLiveState(state) {
   const expected = parseInt(state.expected, 10) || 0;
   const delay = parseInt(state.delay, 10) || 0;
   const lotNo = state.lotNo || "";
-  const fbTotalDowntime = Number(state.totalDowntime);
-  if (isMonitor && Number.isFinite(fbTotalDowntime) && fbTotalDowntime >= 0) {
-    monitorDowntimeOverrideSec = fbTotalDowntime;
-  }
 
   // Keep local variables aligned so refresh doesn't revert values.
   actualCount = actual;
@@ -2138,9 +2213,10 @@ function applyLiveState(state) {
   syncEfficiencyCardDom();
   startLiveCountdownTicker(countdown, status, state.updatedAt);
   syncDowntimeSecondsFromTable();
-  // Keep card aligned to rendered table values when rows are present.
-  refreshDowntimeCardFromTable();
+  document.getElementById("downtime").innerText = format(getBookedDowntimeSec());
   syncDowntimeAccumulatedHighlight();
+  // Never carry last-scan time when actual is still 0 — stale Firebase lastScanAtMs makes the
+  // first real scan look like a short gap (< one cycle) so downtime does not book.
   if (actual > 0 && state.lastScanAtMs) {
     const ls = Number(state.lastScanAtMs);
     lastScanTime = new Date(ls);
@@ -2212,41 +2288,21 @@ function applyLiveState(state) {
 
 function loadInitialLiveState() {
   if (!firebaseLiveStateRef) {
-    initialLiveStateLoaded = true;
+    initialLiveStateHydrated = true;
     maybeResetDashboardForNewCalendarDay();
     return;
   }
 
   firebaseLiveStateRef.once("value")
     .then(snapshot => {
-      const firebaseState = snapshot.val();
-      const localState = readLocalLiveStateSnapshot();
-      let liveState = firebaseState;
-
-      const firebaseUpdatedAt = Number(firebaseState && firebaseState.updatedAt) || 0;
-      const localUpdatedAt = Number(localState && localState.updatedAt) || 0;
-
-      // Refresh on the same PC should prefer the fresher local snapshot if Firebase
-      // was temporarily overwritten with READY/0 during reload.
-      if (localState && localUpdatedAt > firebaseUpdatedAt) {
-        liveState = {
-          ...(firebaseState || {}),
-          ...localState
-        };
-      }
-
-      if (!liveState) {
-        initialLiveStateLoaded = true;
-        maybeResetDashboardForNewCalendarDay();
-        return;
-      }
-      applyLiveState(liveState);
-      initialLiveStateLoaded = true;
+      const liveState = snapshot.val();
+      if (liveState) applyLiveState(liveState);
+      initialLiveStateHydrated = true;
       maybeResetDashboardForNewCalendarDay();
     })
     .catch(err => {
       console.log("Firebase initial live state error:", err);
-      initialLiveStateLoaded = true;
+      initialLiveStateHydrated = true;
       maybeResetDashboardForNewCalendarDay();
     });
 }
@@ -2308,61 +2364,22 @@ function startProduction(shouldSync = true) {
     startTime = new Date();
   }
 
-  // If resuming from PAUSED, shift base time forward by paused duration
-  // so countdown truly stops while paused.
-  if (pauseStartMs != null) {
-    const pausedMs = Math.max(Date.now() - pauseStartMs, 0);
-    if (lastScanTime) {
-      lastScanTime = new Date(lastScanTime.getTime() + pausedMs);
-    } else if (startTime) {
-      startTime = new Date(startTime.getTime() + pausedMs);
-    }
-    pauseStartMs = null;
-  }
-
   // If no scan yet, set initial countdown
   if (countdownValue === 0) {
     countdownValue = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
   }
 
   timer = setInterval(() => {
+    const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
     const nowMs = Date.now();
-    if (lastTimerTickMs != null) {
-      const breakGapMs = getBreakOverlapMs(lastTimerTickMs, nowMs);
-      if (breakGapMs > 0) {
-        if (lastScanTime) {
-          lastScanTime = new Date(lastScanTime.getTime() + breakGapMs);
-        } else if (startTime) {
-          startTime = new Date(startTime.getTime() + breakGapMs);
-        }
-      }
-    }
-    lastTimerTickMs = nowMs;
-
-    if (isBreakTime()) {
-      if (breakPauseStartMs == null) {
-        breakPauseStartMs = nowMs;
-      }
-      setStatus("BREAK TIME", "status-orange");
+    const baseMs = lastScanWallMs != null ? lastScanWallMs : (startTime ? startTime.getTime() : null);
+    if (baseMs == null) {
       updateDisplay();
       return;
     }
-
-    // Break overlap has already been compensated via getBreakOverlapMs(lastTimerTickMs, nowMs).
-    // Do not add break pause again here, otherwise countdown gets extra time after break.
-    if (breakPauseStartMs != null) {
-      breakPauseStartMs = null;
-    }
-
-    const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
-
-    // 🔥 USE REAL TIME (FIXED)
-    const now = new Date(nowMs);
-
-    // use startTime if no scan yet
-    const baseTime = lastScanTime || startTime;
-
-    const diff = Math.floor((now - baseTime) / 1000);
+    const wallSec = Math.floor((nowMs - baseMs) / 1000);
+    const breakSec = scheduledBreakOverlapSec(baseMs, nowMs);
+    const diff = Math.max(0, wallSec - breakSec);
     countdownValue = Math.max(cycleTimeSec - diff, 0);
 
     if (countdownValue === 0) {
@@ -2387,10 +2404,6 @@ function stopProduction(shouldSync = true) {
 
   clearInterval(timer);
   timer = null;
-  lastTimerTickMs = null;
-  breakPauseStartMs = null;
-  // Remember pause moment; we will compensate on resume.
-  pauseStartMs = Date.now();
   setStatus("PAUSED", "status-orange");
   updateDisplay();
   updateLiveStateOnly();
@@ -2409,7 +2422,6 @@ function resetProduction(shouldSync = true) {
 
   clearInterval(timer);
   timer = null;
-  lastTimerTickMs = null;
   countdownValue = 0;
   actualCount = 0;
   downtimeSeconds = 0;
@@ -2418,8 +2430,6 @@ function resetProduction(shouldSync = true) {
   startTime = null;
   firstScanAtMs = null;
   efficiencyPercent = 0;
-  breakPauseStartMs = null;
-  pauseStartMs = null;
   pendingChassis = "";
   pendingModel = "";
   pendingEngine = "";
@@ -2448,9 +2458,9 @@ document.getElementById("chassisInput").addEventListener("keydown", function(e) 
     const value = this.value.trim();
 
     /* DUPLICATE CHECK */
-    if (scannedChassis.has(value)) {
+    if (scannedChassis.has(normalizeScanId(value))) {
       duplicateLock = true;
-      setStatus("DUPLICATE CHASSIS", "status-red blink");
+      setStatus("DUPLICATE CHASSIS: " + value, "status-red blink");
       this.value = "";
       return;
     }
@@ -2496,9 +2506,9 @@ document.getElementById("engineInput").addEventListener("keydown", function(e) {
     const value = this.value.trim();
 
     /* DUPLICATE CHECK */
-    if (scannedEngine.has(value)) {
+    if (scannedEngine.has(normalizeScanId(value))) {
       duplicateLock = true;
-      setStatus("DUPLICATE ENGINE", "status-red blink");
+      setStatus("DUPLICATE ENGINE: " + value, "status-red blink");
       this.value = "";
       return;
     }
@@ -2527,11 +2537,14 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
     if (pendingChassis === "" || pendingModel === "" || pendingEngine === "") return;
 
     const key = this.value.trim();
+    const keyId = normalizeScanId(key);
+    const chassisId = normalizeScanId(pendingChassis);
+    const engineId = normalizeScanId(pendingEngine);
 
     /* ===== DUPLICATE CHECK (completed units only) ===== */
-    if (scannedChassis.has(pendingChassis)) {
+    if (scannedChassis.has(chassisId)) {
       duplicateLock = true;
-      setStatus("DUPLICATE CHASSIS", "status-red blink");
+      setStatus("DUPLICATE CHASSIS: " + pendingChassis, "status-red blink");
       pendingChassis = "";
       pendingModel = "";
       pendingEngine = "";
@@ -2539,9 +2552,9 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
       this.value = "";
       return;
     }
-    if (scannedEngine.has(pendingEngine)) {
+    if (scannedEngine.has(engineId)) {
       duplicateLock = true;
-      setStatus("DUPLICATE ENGINE", "status-red blink");
+      setStatus("DUPLICATE ENGINE: " + pendingEngine, "status-red blink");
       pendingChassis = "";
       pendingModel = "";
       pendingEngine = "";
@@ -2549,9 +2562,9 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
       this.value = "";
       return;
     }
-    if (scannedKey.has(key)) {
+    if (scannedKey.has(keyId)) {
       duplicateLock = true;
-      setStatus("DUPLICATE KEY", "status-red blink");
+      setStatus("DUPLICATE KEY: " + key, "status-red blink");
       pendingChassis = "";
       pendingModel = "";
       pendingEngine = "";
@@ -2581,24 +2594,28 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
     const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
     let downtimeEvent = "";
 
-    let baselineMs = null;
+    // Baseline: previous unit end; first unit of session uses shift start vs line start (max)
+    // so idle from shift open to first scan books downtime (and stale Firebase lastScan is ignored).
+    let t0Ms = null;
     const firstUnit = actualCount === 0;
-    if (!firstUnit && lastScanTime) {
-      baselineMs = lastScanTime.getTime();
+    if (!firstUnit && lastScanWallMs != null) {
+      t0Ms = lastScanWallMs;
     } else if (firstUnit && SETTINGS.shiftSchedule.enableAutoWindow) {
       const shiftStartMs = getTodayShiftStartMs(now);
       const lineMs = startTime ? startTime.getTime() : shiftStartMs;
-      baselineMs = Math.max(shiftStartMs, lineMs);
-      if (now.getTime() <= baselineMs) baselineMs = null;
+      t0Ms = Math.max(shiftStartMs, lineMs);
+      if (now.getTime() <= t0Ms) t0Ms = null;
     } else if (firstUnit && startTime) {
-      baselineMs = startTime.getTime();
-      if (now.getTime() <= baselineMs) baselineMs = null;
+      t0Ms = startTime.getTime();
+      if (now.getTime() <= t0Ms) t0Ms = null;
     }
 
-    if (baselineMs != null) {
-      const wallSec = Math.floor((now.getTime() - baselineMs) / 1000);
-      const breakSec = Math.floor(getBreakOverlapMs(baselineMs, now.getTime()) / 1000);
+    if (t0Ms != null) {
+      const t1 = now.getTime();
+      const wallSec = Math.floor((t1 - t0Ms) / 1000);
+      const breakSec = scheduledBreakOverlapSec(t0Ms, t1);
       const idleSecExBreak = Math.max(0, wallSec - breakSec);
+      // Match Excel logic: booked downtime is only the amount beyond one cycle.
       if (idleSecExBreak > cycleTimeSec) {
         const actualDowntime = idleSecExBreak - cycleTimeSec;
 
@@ -2696,6 +2713,30 @@ function updateDisplay() {
   const balance = actualCount - plan;
   const displayBalance = balance > 0 ? ("+" + balance) : balance;
 
+  if (isNonProductionMode()) {
+    const delayEl = document.getElementById("delay");
+    document.getElementById("expected").innerText = "0";
+    document.getElementById("actual").innerText = actualCount;
+    document.getElementById("plan").innerText = plan;
+    document.getElementById("countdown").innerText = format(countdownValue);
+    refreshDowntimeCardFromTable();
+    const balanceEl = document.getElementById("balance");
+    if (balance < 0) balanceEl.className = "big-number status-red";
+    else if (balance > 0) balanceEl.className = "big-number status-green";
+    else balanceEl.className = "big-number status-blue";
+    balanceEl.innerText = displayBalance;
+    delayEl.className = "big-number status-blue";
+    delayEl.innerText = "0";
+    setStatus("NON PRODUCTION", "status-orange");
+    syncEfficiencyCardDom();
+    const downtimeCard = document.getElementById("downtimeCard");
+    const downtimeText = document.getElementById("downtime");
+    downtimeCard.classList.remove("downtime-alert", "blink");
+    downtimeText.classList.remove("status-red", "blink");
+    syncDowntimeAccumulatedHighlight();
+    return;
+  }
+
   // EXPECTED CALCULATION
   let expected = calculateExpectedOutput();
   const statusText = document.getElementById("status").innerText.trim();
@@ -2727,6 +2768,8 @@ function updateDisplay() {
 
   delayEl.innerText = delay > 0 ? ("+" + delay) : delay;
 
+  // Display Expected/Actual first, then compute efficiency from cards
+  // so the efficiency value always matches what user sees.
   document.getElementById("expected").innerText = expected;
   document.getElementById("actual").innerText = actualCount;
 
@@ -3255,7 +3298,12 @@ function animateTrendLines(container) {
       } catch (_) {
         len = 0;
       }
-      if (!Number.isFinite(len) || len <= 0) return;
+      if (!Number.isFinite(len) || len <= 0) {
+        path.style.strokeDasharray = "";
+        path.style.strokeDashoffset = "";
+        path.style.animation = "none";
+        return;
+      }
 
       const durationSec = Math.min(1.75, Math.max(0.9, len / 320));
       const baseDelayMs = lineIdx * 90;
@@ -3393,7 +3441,7 @@ function animateSummaryBarValues(container) {
     const target = parseFloat(el.getAttribute("data-value") || "0");
     const suffix = el.getAttribute("data-suffix") || "";
     const delay = parseInt(el.getAttribute("data-delay-ms") || "0", 10);
-    const duration = 520;
+    const duration = parseInt(el.getAttribute("data-count-ms") || "520", 10);
     const finalText = `${formatBarChartValue(target)}${suffix}`;
     if (reduceMotion || target <= 0) {
       el.textContent = finalText;
@@ -3416,10 +3464,16 @@ function animateSummaryBarValues(container) {
   });
 }
 
-function buildSummaryBarChart(title, labels, values, color, valueSuffix = "", yAxisLabel = "") {
+function buildSummaryBarChart(title, labels, values, color, valueSuffix = "", yAxisLabel = "", animOpts = {}) {
   if (!labels.length || !values.length) {
     return `<div class="summary-graph-empty">No data</div>`;
   }
+  const {
+    chartClass = "",
+    barStaggerMs = 90,
+    valueDelayAfterBarMs = 580,
+    valueCountMs = 520
+  } = animOpts;
   const width = 500;
   const height = 190;
   const leftPad = 36;
@@ -3442,12 +3496,12 @@ function buildSummaryBarChart(title, labels, values, color, valueSuffix = "", yA
     const showLabel = i % labelStride === 0 || i === labels.length - 1;
     const cx = (x + (barW / 2)).toFixed(2);
     const valueY = (Math.max(y - 5, 12)).toFixed(2);
-    const barDelayMs = i * 90;
-    const valueDelayMs = barDelayMs + 580;
+    const barDelayMs = i * barStaggerMs;
+    const valueDelayMs = barDelayMs + valueDelayAfterBarMs;
     return `
       <rect class="summary-bar" style="animation-delay:${barDelayMs}ms" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="${color}" opacity="0.9"></rect>
       ${showLabel ? `<text class="summary-bar-axis-label" x="${cx}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>` : ""}
-      <text class="summary-bar-value" style="animation-delay:${valueDelayMs}ms" data-delay-ms="${valueDelayMs}" data-value="${v}" data-suffix="${valueSuffix}" x="${cx}" y="${valueY}" text-anchor="middle" fill="#f8fafc" font-size="10" font-weight="700">0${valueSuffix}</text>
+      <text class="summary-bar-value" style="animation-delay:${valueDelayMs}ms" data-delay-ms="${valueDelayMs}" data-count-ms="${valueCountMs}" data-value="${v}" data-suffix="${valueSuffix}" x="${cx}" y="${valueY}" text-anchor="middle" fill="#f8fafc" font-size="10" font-weight="700">0${valueSuffix}</text>
     `;
   }).join("");
   const yTicks = 4;
@@ -3477,7 +3531,7 @@ function buildSummaryBarChart(title, labels, values, color, valueSuffix = "", yA
       ${titleSub ? `<div class="trend-subtitle">${titleSub}</div>` : ""}
     </div>
     ${yAxisLabel ? `<div class="trend-units">${yAxisLabel}</div>` : ""}
-    <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg" role="img" aria-label="${title}">
+    <svg viewBox="0 0 ${width} ${height}" class="summary-chart-svg${chartClass ? ` ${chartClass}` : ""}" role="img" aria-label="${title}">
       ${yGrid}
       <line x1="${leftPad}" y1="${yBase}" x2="${width - rightPad}" y2="${yBase}" stroke="rgba(148,163,184,.45)" stroke-width="1"></line>
       <line x1="${leftPad}" y1="${topPad}" x2="${leftPad}" y2="${yBase}" stroke="rgba(148,163,184,.45)" stroke-width="1"></line>
@@ -3546,10 +3600,63 @@ function buildSummaryLineChart(title, labels, values, color, valueSuffix = "", y
   `;
 }
 
-function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valueSuffix = "%", yAxisLabel = "%") {
+function getTrendChartPeriodLabel(rangeStart, rangeEnd, period) {
+  if (rangeStart === rangeEnd) return "Day";
+  return period === "month" ? "Month" : "Week";
+}
+
+/** X/Y points for trend lines; single-day view centers on the chart (Today button). */
+function layoutTrendSeriesPoints(values, leftPad, chartW, toY) {
+  if (!values.length) return [];
+  if (values.length === 1) {
+    const cx = leftPad + chartW / 2;
+    const v = values[0] || 0;
+    return [{ x: cx, y: toY(v), value: v }];
+  }
+  const xStep = chartW / (values.length - 1);
+  return values.map((v, i) => ({
+    x: leftPad + xStep * i,
+    y: toY(v || 0),
+    value: v || 0
+  }));
+}
+
+/** SVG path for actual line; one-day charts use a short horizontal segment so the line is visible. */
+function buildTrendLinePath(points, yBase) {
+  if (!points.length) return "";
+  if (points.length === 1) {
+    const p = points[0];
+    if (!(p.value > 0)) return "";
+    const halfW = 32;
+    return `M ${(p.x - halfW).toFixed(2)} ${p.y.toFixed(2)} L ${(p.x + halfW).toFixed(2)} ${p.y.toFixed(2)}`;
+  }
+  return points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+}
+
+/** Line path with gaps on skipped day indices (e.g. non-production). */
+function buildTrendLinePathWithSkips(points, dayKeys, skipDayFn, yBase) {
+  if (!points.length || !dayKeys.length) return "";
+  const segments = [];
+  let seg = [];
+  points.forEach((p, i) => {
+    if (skipDayFn(dayKeys[i])) {
+      if (seg.length) {
+        segments.push(seg);
+        seg = [];
+      }
+    } else {
+      seg.push(p);
+    }
+  });
+  if (seg.length) segments.push(seg);
+  return segments.map(s => buildTrendLinePath(s, yBase)).filter(Boolean).join(" ");
+}
+
+function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valueSuffix = "%", yAxisLabel = "%", dayKeys = null) {
   if (!labels.length || !actualValues.length) {
     return `<div class="summary-graph-empty">No data</div>`;
   }
+  const skipNpIdx = i => dayKeys && isNonProductionDay(dayKeys[i]);
   const width = 500;
   const height = 170;
   const leftPad = 36;
@@ -3558,16 +3665,25 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
   const bottomPad = 28;
   const chartW = width - leftPad - rightPad;
   const chartH = height - topPad - bottomPad;
-  const maxVal = Math.max(1, ...actualValues, ...(planValues || []));
-  const stepX = labels.length <= 1 ? chartW : (chartW / (labels.length - 1));
+  const visibleActual = actualValues.filter((_, i) => !skipNpIdx(i));
+  const visiblePlan = (planValues || []).filter((_, i) => !skipNpIdx(i));
+  const maxVal = Math.max(1, ...visibleActual, ...visiblePlan);
   const yBase = topPad + chartH;
   const toY = (v) => yBase - ((v / maxVal) * chartH);
+  const planPoints = layoutTrendSeriesPoints(
+    labels.map((_, i) => planValues?.[i] || 0),
+    leftPad,
+    chartW,
+    toY
+  );
+  const stepX = labels.length <= 1 ? chartW : (chartW / (labels.length - 1));
 
   const planBarW = Math.max(Math.min((stepX || 12) * 0.34, 16), 6);
   const planBarOffsetX = Math.min((stepX || 0) * 0.18, 9);
   const planBars = labels.map((_, i) => {
+    if (skipNpIdx(i)) return "";
     const v = planValues?.[i] || 0;
-    const x = leftPad + (stepX * i) - (planBarW / 2) + planBarOffsetX;
+    const x = (planPoints[i]?.x ?? (leftPad + stepX * i)) - (planBarW / 2) + planBarOffsetX;
     const y = toY(v);
     const h = Math.max(yBase - y, v > 0 ? 2 : 0);
     const label = labels[i] || "";
@@ -3575,25 +3691,32 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
     return `<rect class="summary-bar" data-chart-tip data-tip-kind="Target" data-tip-label="${label}" data-tip-value="${valTxt}" style="animation-delay:${i * 35}ms; cursor:pointer" x="${x.toFixed(2)}" y="${(yBase - h).toFixed(2)}" width="${planBarW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="#3b82f6" opacity=".9"></rect>`;
   }).join("");
 
-  const points = actualValues.map((v, i) => ({
-    x: leftPad + (stepX * i),
-    y: toY(v),
-    value: v
-  }));
-  const path = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
-  const areaPath = points.length
-    ? `${path} L ${points[points.length - 1].x.toFixed(2)} ${yBase.toFixed(2)} L ${points[0].x.toFixed(2)} ${yBase.toFixed(2)} Z`
+  const points = layoutTrendSeriesPoints(actualValues, leftPad, chartW, toY);
+  const skipNpKey = k => dayKeys ? isNonProductionDay(k) : false;
+  const path = dayKeys
+    ? buildTrendLinePathWithSkips(points, dayKeys, skipNpKey, yBase)
+    : buildTrendLinePath(points, yBase);
+  const visiblePts = dayKeys ? points.filter((_, i) => !skipNpIdx(i)) : points;
+  const areaPath = visiblePts.length && path
+    ? `${path} L ${visiblePts[visiblePts.length - 1].x.toFixed(2)} ${yBase.toFixed(2)} L ${visiblePts[0].x.toFixed(2)} ${yBase.toFixed(2)} Z`
     : "";
   const circles = points.map((p, i) => {
+    if (skipNpIdx(i)) return "";
     const label = labels[i] || "";
     const valTxt = `${p.value}${valueSuffix}`;
-    return `<circle class="trend-dot" data-chart-tip data-tip-kind="Actual" data-tip-label="${label}" data-tip-value="${valTxt}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="3.8" fill="#a855f7"></circle>`;
+    const actual = p.value;
+    const target = planValues?.[i] ?? 0;
+    const behind = target > 0 && actual < target;
+    const dotClass = behind ? "trend-dot trend-dot-behind" : "trend-dot trend-dot-met";
+    const dotFill = behind ? "#ef4444" : "#a855f7";
+    return `<circle class="${dotClass}" data-chart-tip data-tip-kind="Actual" data-tip-label="${label}" data-tip-value="${valTxt}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="3.8" fill="${dotFill}"></circle>`;
   }).join("");
 
   const labelStride = labels.length > 24 ? 3 : labels.length > 16 ? 2 : 1;
   const xLabels = labels.map((label, i) => {
     if (i % labelStride !== 0 && i !== labels.length - 1) return "";
-    return `<text x="${(leftPad + stepX * i).toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>`;
+    const x = points[i]?.x ?? (leftPad + stepX * i);
+    return `<text x="${x.toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>`;
   }).join("");
   const yTicks = 4;
   const yGrid = Array.from({ length: yTicks + 1 }, (_, i) => {
@@ -3727,7 +3850,7 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
   const rangeLabel = formatIsoRangeAsDdMmYy(range.start, range.end);
   const dayKeys = getDayKeysBetween(range.start, range.end);
   const daySet = new Set(dayKeys);
-  const periodLabel = period === "month" ? "Month" : "Week";
+  const periodLabel = getTrendChartPeriodLabel(range.start, range.end, period);
 
   const dailyActualMap = {};
   const rows = document.querySelectorAll("#scanTable tr");
@@ -3744,13 +3867,14 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
     fallbackDayPlan = parseInt(document.getElementById("dailyPlanTarget")?.value || "0", 10) || 0;
   }
   const dayTarget = computeDayTargetsForReport(dayKeys, dailyActualMap, fallbackDayPlan);
-  const totalPlan = dayKeys.reduce((sum, key) => sum + (dayTarget[key] || 0), 0);
+  const skipNpDay = k => isNonProductionDay(k);
+  const totalPlan = dayKeys.reduce((sum, key) => sum + (skipNpDay(key) ? 0 : (dayTarget[key] || 0)), 0);
 
   // Use per-day values (not cumulative) for both Actual and Target.
   const actualSeries = dayKeys.map(k => dailyActualMap[k] || 0);
   const targetSeries = dayKeys.map(k => dayTarget[k] || 0);
 
-  const totalActual = actualSeries.reduce((a, b) => a + b, 0);
+  const totalActual = actualSeries.reduce((sum, v, i) => sum + (skipNpDay(dayKeys[i]) ? 0 : v), 0);
   const diff = totalActual - totalPlan;
   const diffNote = totalPlan > 0
     ? (diff === 0 ? "On target" : diff > 0 ? `Ahead by ${diff}` : `Behind by ${Math.abs(diff)}`)
@@ -3770,7 +3894,11 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
   const bottomPad = 28;
   const chartW = width - leftPad - rightPad;
   const chartH = height - topPad - bottomPad;
-  const seriesMax = Math.max(0, ...actualSeries, ...targetSeries);
+  const seriesMax = Math.max(
+    0,
+    ...actualSeries.filter((_, i) => !skipNpDay(dayKeys[i])),
+    ...targetSeries.filter((_, i) => !skipNpDay(dayKeys[i]))
+  );
   let yTickStep;
   let maxVal;
   if (seriesMax <= 0) {
@@ -3792,25 +3920,26 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
     yTickStep = 50;
     maxVal = Math.ceil(seriesMax / yTickStep) * yTickStep;
   }
-  const xStep = dayKeys.length <= 1 ? chartW : (chartW / (dayKeys.length - 1));
+  const dayCount = dayKeys.length;
+  const xStep = dayCount <= 1 ? chartW : (chartW / (dayCount - 1));
   const yBase = topPad + chartH;
   const toY = (v) => yBase - ((v / maxVal) * chartH);
   const formatNum = (n) => Number(n || 0).toLocaleString();
 
-  const actualPoints = dayKeys.map((_, i) => ({
-    x: leftPad + (xStep * i),
-    y: toY(actualSeries[i] || 0),
-    value: actualSeries[i] || 0
-  }));
-  const targetPoints = dayKeys.map((_, i) => ({
-    x: leftPad + (xStep * i),
-    y: toY(targetSeries[i] || 0),
-    value: targetSeries[i] || 0
-  }));
-  const actualPath = actualPoints.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+  const actualPoints = layoutTrendSeriesPoints(actualSeries, leftPad, chartW, toY);
+  const targetPoints = dayKeys.map((_, i) => {
+    const x = dayCount <= 1 ? leftPad + chartW / 2 : leftPad + xStep * i;
+    return {
+      x,
+      y: toY(targetSeries[i] || 0),
+      value: targetSeries[i] || 0
+    };
+  });
+  const actualPath = buildTrendLinePathWithSkips(actualPoints, dayKeys, skipNpDay, yBase);
   const targetBarW = Math.max(Math.min((xStep || 12) * 0.34, 16), 6);
   const targetBarOffsetX = Math.min((xStep || 0) * 0.18, 9);
   const targetBars = targetPoints.map((p, i) => {
+    if (skipNpDay(dayKeys[i])) return "";
     const barH = Math.max(yBase - p.y, targetSeries[i] > 0 ? 2 : 0);
     const x = p.x - (targetBarW / 2) + targetBarOffsetX;
     const y = yBase - barH;
@@ -3818,8 +3947,9 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
     const vTxt = formatNum(targetSeries[i] || 0);
     return `<rect class="summary-bar" data-chart-tip data-tip-kind="Target" data-tip-label="${dTxt}" data-tip-value="${vTxt}" data-report-day="${dayKeys[i]}" style="animation-delay:${i * 35}ms; cursor:pointer" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${targetBarW.toFixed(2)}" height="${barH.toFixed(2)}" rx="2" fill="#3b82f6" opacity=".92" onclick="focusGraphDay('${dayKeys[i]}')"></rect>`;
   }).join("");
-  const areaPath = actualPoints.length
-    ? `${actualPath} L ${actualPoints[actualPoints.length - 1].x.toFixed(2)} ${yBase.toFixed(2)} L ${actualPoints[0].x.toFixed(2)} ${yBase.toFixed(2)} Z`
+  const visibleActualPts = actualPoints.filter((_, i) => !skipNpDay(dayKeys[i]));
+  const areaPath = visibleActualPts.length && actualPath
+    ? `${actualPath} L ${visibleActualPts[visibleActualPts.length - 1].x.toFixed(2)} ${yBase.toFixed(2)} L ${visibleActualPts[0].x.toFixed(2)} ${yBase.toFixed(2)} Z`
     : "";
   const yTickValues = [];
   for (let v = 0; v <= maxVal + 1e-9; v += yTickStep) {
@@ -3843,13 +3973,19 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
     if (i % labelStride !== 0 && i !== dayKeys.length - 1) return "";
     const d = new Date(`${k}T00:00:00`);
     const label = d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
-    const x = leftPad + (xStep * i);
+    const x = dayCount <= 1 ? leftPad + chartW / 2 : leftPad + xStep * i;
     return `<text x="${x.toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>`;
   }).join("");
   const actualDots = actualPoints.map((p, i) => {
+    if (skipNpDay(dayKeys[i])) return "";
     const dTxt = formatIsoDateAsDdMmYy(dayKeys[i]);
     const vTxt = formatNum(p.value);
-    return `<circle class="trend-dot" data-chart-tip data-tip-kind="Actual" data-tip-label="${dTxt}" data-tip-value="${vTxt}" data-report-day="${dayKeys[i]}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="4.2" fill="#4ade80" onclick="focusGraphDay('${dayKeys[i]}')"></circle>`;
+    const actual = actualSeries[i] || 0;
+    const target = targetSeries[i] || 0;
+    const behind = target > 0 && actual < target;
+    const dotClass = behind ? "trend-dot trend-dot-behind" : "trend-dot trend-dot-met";
+    const dotFill = behind ? "#ef4444" : "#4ade80";
+    return `<circle class="${dotClass}" data-chart-tip data-tip-kind="Actual" data-tip-label="${dTxt}" data-tip-value="${vTxt}" data-report-day="${dayKeys[i]}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="4.2" fill="${dotFill}" onclick="focusGraphDay('${dayKeys[i]}')"></circle>`;
   }).join("");
 
   return `
@@ -4069,12 +4205,20 @@ function calcActualEffPct(planUnits, actualUnits, planWtMins, actualWtMins) {
 function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, rangeLabel) {
   const planEffPct = PLAN_EFF_PCT;
   const planWtMins = getPlanWtMinsForDay(dayKey);
+  const nonProdDay = dayKey && isNonProductionDay(dayKey);
 
   const planUnits = dayTarget?.[dayKey] || 0;
   const actualUnits = dayProduced?.[dayKey] || 0;
-  const actualWtMins = calcActualWtMinsForDay(dayKey, planUnits);
+  const actualWtMins = nonProdDay ? 0 : calcActualWtMinsForDay(dayKey, planUnits);
 
-  const actualEffPct = calcActualEffPct(planUnits, actualUnits, planWtMins, actualWtMins);
+  const actualEffPct = nonProdDay ? 0 : calcActualEffPct(planUnits, actualUnits, planWtMins, actualWtMins);
+  const actualEffClass = nonProdDay
+    ? "neg"
+    : actualEffPct == null
+      ? ""
+      : actualEffPct < planEffPct
+        ? "neg"
+        : "pos";
 
   const titleDay = dayKey ? formatIsoDateAsDdMmYy(dayKey) : `${periodLabel}: ${rangeLabel}`;
   return `
@@ -4086,7 +4230,7 @@ function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, 
       </div>
       <div class="report-eff-wt-card">
         <span>Actual EFF</span>
-        <strong>${actualEffPct == null ? "—" : `${actualEffPct}%`}</strong>
+        <strong class="${actualEffClass}">${actualEffPct == null ? "—" : `${actualEffPct}%`}</strong>
       </div>
       <div class="report-eff-wt-card">
         <span>Plan W/T (MINS)</span>
@@ -4126,7 +4270,7 @@ function renderGraphCharts() {
   const range = getActiveGraphRange();
   const rangeLabel = formatIsoRangeAsDdMmYy(range.start, range.end);
   const { labels, downtimeMins } = collectHourlyGraphData(activeDay, graphPeriod);
-  const periodLabel = graphPeriod === "month" ? "Month" : "Week";
+  const periodLabel = getTrendChartPeriodLabel(range.start, range.end, graphPeriod);
   const periodKeys = getDayKeysBetween(range.start, range.end);
   if (graphFocusedDayKey && !periodKeys.includes(graphFocusedDayKey)) {
     graphFocusedDayKey = null;
@@ -4157,8 +4301,8 @@ function renderGraphCharts() {
     periodKeys,
     dayProduced,
     dayTarget,
-    periodLabel,
-    rangeLabel
+    periodLabel: getTrendChartPeriodLabel(range.start, range.end, graphPeriod),
+    rangeLabel: formatIsoRangeAsDdMmYy(range.start, range.end)
   };
   const totalProduced = periodKeys.reduce((s, k) => s + (dayProduced[k] || 0), 0);
   const totalTarget = periodKeys.reduce((s, k) => s + (dayTarget[k] || 0), 0);
@@ -4180,7 +4324,20 @@ function renderGraphCharts() {
     </tr>`;
   }).join("");
   const planActualChart = buildPlanVsActualChart(activeDay, graphPeriod);
-  const downtimeChart = buildSummaryBarChart(`DOWNTIME TREND (${periodLabel}: ${rangeLabel})`, labels, downtimeMins, "#ef4444", "", "Minutes");
+  const downtimeChart = buildSummaryBarChart(
+    `DOWNTIME TREND (${periodLabel}: ${rangeLabel})`,
+    labels,
+    downtimeMins,
+    "#ef4444",
+    "",
+    "Minutes",
+    {
+      chartClass: "summary-chart-downtime",
+      barStaggerMs: 35,
+      valueDelayAfterBarMs: 220,
+      valueCountMs: 260
+    }
+  );
   const scopeDayKey = graphFocusedDayKey || activeDay;
   const wtCards = buildEffWtCardsHtmlForDay(scopeDayKey, dayProduced, dayTarget, periodLabel, rangeLabel);
   const effTrendKeys = periodKeys;
@@ -4189,6 +4346,7 @@ function renderGraphCharts() {
     return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
   });
   const oeeValues = effTrendKeys.map(k => {
+    if (isNonProductionDay(k)) return 0;
     const target = dayTarget[k] || 0;
     const produced = dayProduced[k] || 0;
     const planWtMins = getPlanWtMinsForDay(k);
@@ -4196,11 +4354,18 @@ function renderGraphCharts() {
     return calcActualEffPct(target, produced, planWtMins, actualWtMins) ?? 0;
   });
   const planEffValues = effTrendKeys.map(k => {
-    if (!isWeekendIsoDay(k)) return 98;
-    const weekendDailyPlan = getHistoricalPlanForDay(k);
-    return Number.isFinite(weekendDailyPlan) && weekendDailyPlan > 0 ? 98 : 0;
+    if (isNonProductionDay(k)) return 0;
+    return (dayTarget[k] || 0) > 0 ? PLAN_EFF_PCT : 0;
   });
-  const oeeChart = buildEfficiencyTrendChart(`EFFICIENCY TREND (${periodLabel}: ${rangeLabel})`, oeeLabels, oeeValues, planEffValues, "%", "%");
+  const oeeChart = buildEfficiencyTrendChart(
+    `EFFICIENCY TREND (${periodLabel}: ${rangeLabel})`,
+    oeeLabels,
+    oeeValues,
+    planEffValues,
+    "%",
+    "%",
+    effTrendKeys
+  );
   graphBody.innerHTML = `
     <div class="report-kpi-grid">
       <div class="report-kpi"><span>Total Produced</span><strong class="pos">${totalProduced}</strong><em>units</em></div>
@@ -4261,9 +4426,9 @@ function showGraphPage() {
       <div class="graph-range-box">
         <span class="graph-range-label">DATE RANGE</span>
         <div class="graph-range-inputs">
-          <input type="date" id="graphRangeStart" title="Graph range start date">
+          <input type="text" class="app-date-input" id="graphRangeStart" title="Graph range start date" placeholder="dd/mm/yyyy" readonly>
           <span class="graph-range-sep">-</span>
-          <input type="date" id="graphRangeEnd" title="Graph range end date">
+          <input type="text" class="app-date-input" id="graphRangeEnd" title="Graph range end date" placeholder="dd/mm/yyyy" readonly>
           <button type="button" id="graphRangeTodayBtn" class="graph-today-btn">Today</button>
         </div>
       </div>
@@ -4273,13 +4438,12 @@ function showGraphPage() {
   `;
   syncGraphRangePickerUi();
   syncGraphPeriodButtonsUi();
+  initGraphRangeDatePickers();
   const graphRangeStart = document.getElementById("graphRangeStart");
   const graphRangeEnd = document.getElementById("graphRangeEnd");
   const graphRangeTodayBtn = document.getElementById("graphRangeTodayBtn");
   const graphPeriodWeekBtn = document.getElementById("graphPeriodWeekBtn");
   const graphPeriodMonthBtn = document.getElementById("graphPeriodMonthBtn");
-  if (graphRangeStart) graphRangeStart.addEventListener("change", onGraphRangeFilterChange);
-  if (graphRangeEnd) graphRangeEnd.addEventListener("change", onGraphRangeFilterChange);
   if (graphRangeTodayBtn) graphRangeTodayBtn.addEventListener("click", onGraphRangeTodayClick);
   if (graphPeriodWeekBtn) graphPeriodWeekBtn.addEventListener("click", () => onGraphPeriodChange("week"));
   if (graphPeriodMonthBtn) graphPeriodMonthBtn.addEventListener("click", () => onGraphPeriodChange("month"));
@@ -4352,7 +4516,7 @@ function showSummaryPage() {
   const downtime = format(downtimeSec);
   const diff = actual - plan;
   const diffDisplaySafe = diff > 0 ? ("+" + diff) : String(diff);
-  const efficiency = plan > 0 ? `${Math.max(0, Math.round((actual / plan) * 100))}%` : "—";
+  const efficiency = plan > 0 ? `${Math.min(100, Math.max(0, Math.round((actual / plan) * 100)))}%` : "—";
 
   let summaryPage = document.getElementById("summaryPage");
   if (!summaryPage) {
@@ -4367,7 +4531,7 @@ function showSummaryPage() {
       <div class="summary-head">Daily Summary</div>
       <div class="summary-filter-row">
         <label for="summaryDayFilter">Date</label>
-        <input type="date" id="summaryDayFilter" title="Select date for daily summary">
+        <input type="text" class="app-date-input" id="summaryDayFilter" title="Select date for daily summary" placeholder="dd/mm/yyyy" readonly>
         <button type="button" id="summaryDayTodayBtn" class="summary-today-btn">Today</button>
       </div>
     </div>
@@ -4394,7 +4558,7 @@ function showSummaryPage() {
   syncSummaryDayPickerUi();
   const summaryDayFilter = document.getElementById("summaryDayFilter");
   const summaryDayTodayBtn = document.getElementById("summaryDayTodayBtn");
-  if (summaryDayFilter) summaryDayFilter.addEventListener("change", onSummaryDayFilterChange);
+  if (summaryDayFilter) initSingleDayDatePicker(summaryDayFilter, onSummaryDayFilterChange);
   if (summaryDayTodayBtn) summaryDayTodayBtn.addEventListener("click", onSummaryDayTodayClick);
 
   document.body.classList.add("summary-mode");
@@ -4486,7 +4650,13 @@ function updateLiveStateOnly() {
   if (plan > 0) {
     expected = Math.min(expected, plan);
   }
+  if (isNonProductionMode()) {
+    expected = 0;
+  }
   let delay = actual - expected;
+  if (isNonProductionMode()) {
+    delay = 0;
+  }
 
   const efficiency = efficiencyPercent;
 
@@ -4518,7 +4688,7 @@ function updateLiveStateOnly() {
     })
   });
 
-  const firebasePayload = {
+  publishLiveStateToFirebase({
     plan: plan,
     dailyPlan: plan,
     cycleTimeMin: cycleTimeMin,
@@ -4535,10 +4705,7 @@ function updateLiveStateOnly() {
     efficiency: efficiency,
     firstScanAtMs: firstScanAtMs,
     lastScanAtMs: lastScanWallMs != null ? lastScanWallMs : null
-  };
-
-  saveLocalLiveStateSnapshot(firebasePayload);
-  publishLiveStateToFirebase(firebasePayload);
+  });
 }
 
 function sendToSheet(chassis, model, engine, key, lot, status, downtimeEvent) {
@@ -4569,7 +4736,10 @@ function sendToSheet(chassis, model, engine, key, lot, status, downtimeEvent) {
 
 function cleanDowntime(raw) {
   if (raw == null || raw === "") return "";
-  const sec = parseMmSsToSeconds(raw);
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return format(Math.max(0, Math.floor(raw)));
+  }
+  const sec = parseMmSsToSeconds(String(raw));
   return format(sec);
 }
 
@@ -4690,8 +4860,11 @@ function pickBestDowntimeValue(row, primaryIdx, candidateIdxs, legacyLayout) {
     return raw;
   }
 
-  // Last fallback when downtime headers are unusable.
-  if (rowBestRaw !== "") return rowBestRaw;
+  // Last fallback only when headers are unusable.
+  // Keep "smallest duration-looking token" behavior for legacy payloads.
+  bestRaw = rowBestRaw;
+  if (bestRaw !== "") return bestRaw;
+
   return "";
 }
 
@@ -4728,8 +4901,11 @@ function loadLiveData() {
       const idxModel = getIdx("model");
       const idxChassis = getIdx("chassis");
       const idxEngine = getIdx("engine", "engine no", "engine no.");
-      const idxKey = getIdx("key", "key no", "key no.");
+      const idxKey = getIdx("key no", "key no.", "key");
       const idxStatusByHeader = getIdx("status", "state");
+      if (idxKey >= 0 && (idxKey === idxEngine || idxKey === idxChassis || idxKey === idxModel)) {
+        console.warn("Google Sheet: Key column header matches the wrong column. Fix sheet headers.");
+      }
       const idxStatus = idxStatusByHeader >= 0 ? idxStatusByHeader : inferStatusColumnIndex(scanRows);
       const idxDowntime = resolveDowntimeEventColumnIndex(scanHeader);
       const downtimeCandidateIdxs = resolveDowntimeCandidateIndices(scanHeader);
@@ -4852,9 +5028,7 @@ document.getElementById("lotInput").addEventListener("input", () => {
 
 const historyDayFilterEl = document.getElementById("historyDayFilter");
 const historyDayTodayBtn = document.getElementById("historyDayTodayBtn");
-if (historyDayFilterEl) {
-  historyDayFilterEl.addEventListener("change", onHistoryDayFilterChange);
-}
+if (historyDayFilterEl) initSingleDayDatePicker(historyDayFilterEl, onHistoryDayFilterChange);
 if (historyDayTodayBtn) {
   historyDayTodayBtn.addEventListener("click", onHistoryDayTodayClick);
 }
@@ -4919,27 +5093,15 @@ window.onload = async function() {
     syncGraphWtControl();
   } else {
     syncGraphWtControl();
-    // IMPORTANT:
-    // On refresh, do not immediately publish "READY + countdown 0" to Firebase,
-    // otherwise it can overwrite an in-progress RUNNING state before we finish
-    // reading and applying the existing live state.
-    //
-    // We only start publishing after user interaction (inputs / scans) sets
-    // hasLocalSession = true, OR after live state has been loaded.
-
     // Reload scan history from Sheet after refresh (main screen).
     loadLiveData();
     if (liveDataPollInterval) clearInterval(liveDataPollInterval);
     liveDataPollInterval = setInterval(loadLiveData, 3000);
     if (liveStatePollInterval) clearInterval(liveStatePollInterval);
-    liveStatePollInterval = setInterval(() => {
-      if (!initialLiveStateLoaded && !hasLocalSession) return;
-      updateLiveStateOnly();
-    }, 2000);
+    liveStatePollInterval = setInterval(updateLiveStateOnly, 2000);
     applyShiftScheduleTick();
     if (shiftScheduleInterval) clearInterval(shiftScheduleInterval);
     shiftScheduleInterval = setInterval(applyShiftScheduleTick, 30000);
   }
   updateViewToggleMenuItem();
 };
-

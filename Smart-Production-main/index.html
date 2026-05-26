@@ -5,8 +5,10 @@
 <title>TF 2 Production Monitoring</title>
 <link rel="icon" href="./favicon.svg" type="image/svg+xml" sizes="any">
 <link rel="stylesheet" href="./style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
 </head>
@@ -57,20 +59,16 @@
 
 <div class="controls">
 <div class="controls-fields">
-<label class="control-field">
-<span class="control-label">Cycle Time (min)</span>
+
+Cycle Time (min):
 <input type="number" id="cycleTarget" min="1">
-</label>
 
-<label class="control-field">
-<span class="control-label">Daily Plan</span>
+Daily Plan:
 <input type="number" id="dailyPlanTarget" min="1">
-</label>
 
-<label class="control-field">
-<span class="control-label">Lot</span>
+Lot:
 <input type="number" id="lotInput" placeholder="Lot No">
-</label>
+
 </div>
 
 <div id="monitorConnectionDock" class="monitor-connection-dock" aria-hidden="true"></div>
@@ -134,7 +132,7 @@
     <div class="summary-head">History</div>
     <div class="summary-filter-row">
       <label for="historyDayFilter">Date</label>
-      <input type="date" id="historyDayFilter" title="Select date for history table">
+      <input type="text" class="app-date-input" id="historyDayFilter" title="Select date for history table" placeholder="dd/mm/yyyy" readonly>
       <button type="button" id="historyDayTodayBtn" class="summary-today-btn">Today</button>
     </div>
   </div>
