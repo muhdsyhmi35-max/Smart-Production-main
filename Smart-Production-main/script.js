@@ -640,7 +640,7 @@ function applyLegacyMonitorDashboardLayout() {
 function format(s) {
   const m = Math.floor(s / 60);
   const sec = s % 60;
-  return (m < 10 ? "0" + m : m) + ":" + (sec < 10 ? "0" + sec : sec);
+  return String(m).padStart(2, "0") + ":" + String(sec).padStart(2, "0");
 }
 
 function toIsoDateLocal(d) {
@@ -1064,6 +1064,16 @@ function parseMmSsToSeconds(text) {
   if (!/[.:]/.test(t) && !isNaN(t)) {
     const sec = Math.round(Number(t));
     return Number.isFinite(sec) ? Math.max(sec, 0) : 0;
+  }
+
+  // Sheets often turns duration "04:27" (4m 27s) into clock time "4:27:00 AM".
+  const sheetsClockDowntime = t.match(/^(\d{1,2}):(\d{2}):00(?:\.0+)?\s*(AM|PM)?$/i);
+  if (sheetsClockDowntime) {
+    const mins = parseInt(sheetsClockDowntime[1], 10);
+    const secs = parseInt(sheetsClockDowntime[2], 10);
+    if (Number.isFinite(mins) && Number.isFinite(secs) && mins < 60 && secs < 60) {
+      return Math.max(mins * 60 + secs, 0);
+    }
   }
 
   // Google Sheets date artifacts like 1899/1900 can be serialized as ISO strings.
@@ -4741,6 +4751,7 @@ function updateLiveStateOnly() {
 function sendToSheet(chassis, model, engine, key, lot, status, downtimeEvent) {
   const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
   const actual = actualCount;
+  const downtimeSec = downtimeEvent ? parseMmSsToSeconds(downtimeEvent) : 0;
 
   fetch(API_URL, {
     method: "POST",
@@ -4758,7 +4769,9 @@ function sendToSheet(chassis, model, engine, key, lot, status, downtimeEvent) {
       plan: plan,
       actual: actual,
       // Keep scan row payload in strict sheet column order.
-      downtimeEvent: downtimeEvent
+      downtimeEvent: downtimeEvent,
+      // Seconds avoids Sheets auto-formatting "04:27" as a clock time (4:27 AM).
+      downtimeEventSeconds: downtimeSec
     })
   })
     .catch(err => console.log("Sheet error:", err));
