@@ -2220,10 +2220,16 @@ function applyLiveState(state) {
   const expected = parseInt(state.expected, 10) || 0;
   const delay = parseInt(state.delay, 10) || 0;
   const lotNo = state.lotNo || "";
+  const firebaseTotalDowntime = parseInt(state.totalDowntime, 10);
+  const hasFirebaseTotalDowntime = Number.isFinite(firebaseTotalDowntime) && firebaseTotalDowntime >= 0;
 
   // Keep local variables aligned so refresh doesn't revert values.
   actualCount = actual;
-  syncDowntimeSecondsFromTable();
+  if (isMonitor && hasFirebaseTotalDowntime) {
+    downtimeSeconds = firebaseTotalDowntime;
+  } else {
+    syncDowntimeSecondsFromTable();
+  }
   firstScanAtMs = state.firstScanAtMs ? Number(state.firstScanAtMs) : firstScanAtMs;
 
   if (!isMonitor) {
@@ -2239,8 +2245,12 @@ function applyLiveState(state) {
   document.getElementById("expected").innerText = expected;
   syncEfficiencyCardDom();
   startLiveCountdownTicker(countdown, status, state.updatedAt);
-  syncDowntimeSecondsFromTable();
-  document.getElementById("downtime").innerText = format(getBookedDowntimeSec());
+  const downtimeSecToDisplay =
+    isMonitor && hasFirebaseTotalDowntime
+      ? firebaseTotalDowntime
+      : getBookedDowntimeSec();
+  downtimeSeconds = downtimeSecToDisplay;
+  document.getElementById("downtime").innerText = format(downtimeSecToDisplay);
   syncDowntimeAccumulatedHighlight();
   // Never carry last-scan time when actual is still 0 — stale Firebase lastScanAtMs makes the
   // first real scan look like a short gap (< one cycle) so downtime does not book.
@@ -4676,6 +4686,8 @@ function toggleRamadan() {
   btn.style.background = "";
 
   updateDisplay();
+  // Persist Ramadhan mode so the backend clock matches the operator's break windows.
+  if (hasLocalSession) updateLiveStateOnly();
 }
 
 function updateLiveStateOnly() {
@@ -4719,6 +4731,7 @@ function updateLiveStateOnly() {
       actual: actual,
       balance: balance,
       status: status,
+      ramadanMode: ramadanMode,
       countdown: countdownValue,
       totalDowntime: bookedDowntime,
       downtimeDay: getActiveDowntimeDayKey(),
@@ -4736,6 +4749,7 @@ function updateLiveStateOnly() {
     balance: balance,
     lotNo: lotNo,
     status: status,
+    ramadanMode: ramadanMode,
     countdown: countdownValue,
     bookedDowntime: bookedDowntime,
     totalDowntime: bookedDowntime,
@@ -4911,6 +4925,76 @@ function pickBestDowntimeValue(row, primaryIdx, candidateIdxs, legacyLayout) {
   return "";
 }
 
+function getCompletedUnitStatsFromScanTableForDay(dayKey) {
+  const table = document.getElementById("scanTable");
+  if (!table) return { count: 0, firstScanMs: null, lastScanMs: null };
+
+  let count = 0;
+  let firstScanMs = null;
+  let lastScanMs = null;
+
+  Array.from(table.rows).forEach(tr => {
+    const rowDay = tr.dataset.scanDate || parseDisplayDateToIsoKey(tr.cells[1]?.innerText);
+    if (!rowDay || rowDay !== dayKey) return;
+
+    const statusCell = tr.cells[8];
+    const statusText = statusCell ? String(statusCell.innerText || "").replace(/\s+/g, " ").trim().toUpperCase() : "";
+    const isCompleted =
+      statusText === "SCANNED" ||
+      statusText === "DOWN TIME" ||
+      statusText === "DOWNTIME";
+    if (!isCompleted) return;
+
+    const scanMs = Number(tr.dataset.scanMs);
+    if (!Number.isFinite(scanMs)) return;
+
+    count++;
+    firstScanMs = firstScanMs == null ? scanMs : Math.min(firstScanMs, scanMs);
+    lastScanMs = lastScanMs == null ? scanMs : Math.max(lastScanMs, scanMs);
+  });
+
+  return { count, firstScanMs, lastScanMs };
+}
+
+function maybeReconcileLocalActualFromSheet() {
+  if (isMonitor) return;
+  if (!initialLiveStateHydrated) return;
+  // Avoid disrupting the live countdown when the operator timer is running.
+  if (timer) return;
+
+  const dayKey = getActiveDowntimeDayKey();
+  const stats = getCompletedUnitStatsFromScanTableForDay(dayKey);
+  if (stats.count <= 0) return;
+  if (stats.count === actualCount) return;
+  if (!Number.isFinite(stats.lastScanMs)) return;
+
+  // Only correct when Firebase is clearly behind the sheet's latest completed scan.
+  const skewMs = 30000;
+  if (lastScanWallMs != null && stats.lastScanMs <= lastScanWallMs + skewMs) return;
+
+  actualCount = stats.count;
+  if (Number.isFinite(stats.firstScanMs)) firstScanAtMs = stats.firstScanMs;
+  lastScanWallMs = stats.lastScanMs;
+  lastScanTime = new Date(lastScanWallMs);
+
+  // If we're currently in an active production state, adjust the countdown display
+  // based on elapsed productive time since the last scan.
+  const statusText = document.getElementById("status")?.innerText?.trim();
+  const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
+  if (statusText === "RUNNING" || statusText === "DOWN TIME" || statusText === "BREAK TIME") {
+    const nowMs = Date.now();
+    const wallSec = Math.max(Math.floor((nowMs - lastScanWallMs) / 1000), 0);
+    const breakSec = scheduledBreakOverlapSec(lastScanWallMs, nowMs);
+    const productiveSec = Math.max(0, wallSec - breakSec);
+    countdownValue = Math.max(cycleTimeSec - productiveSec, 0);
+    isDowntime = countdownValue === 0;
+  }
+
+  hasLocalSession = true;
+  updateDisplay();
+  updateLiveStateOnly();
+}
+
 // Ambil data untuk MONITOR PC
 function loadLiveData() {
   fetch(API_URL, { cache: "no-store" })
@@ -5036,6 +5120,7 @@ function loadLiveData() {
         applyHistoryDateFilter();
         syncDowntimeSecondsFromTable();
         refreshDowntimeCardFromTable();
+        maybeReconcileLocalActualFromSheet();
       }
       // Always keep accumulated downtime card synced to rendered rows,
       // even when table data payload is unchanged (e.g. timer stopped/target achieved).

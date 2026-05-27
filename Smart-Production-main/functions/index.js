@@ -16,6 +16,63 @@ function toNum(value, fallback = 0) {
   return Number.isFinite(num) ? num : fallback;
 }
 
+const BREAK_TIME = {
+  normal: {
+    weekday: [
+      { start: 600, end: 620 },
+      { start: 780, end: 840 }
+    ],
+    friday: [
+      { start: 600, end: 620 },
+      { start: 750, end: 870 }
+    ]
+  },
+  ramadan: {
+    weekday: [
+      { start: 600, end: 610 },
+      { start: 780, end: 830 }
+    ],
+    friday: [
+      { start: 600, end: 610 },
+      { start: 750, end: 860 }
+    ]
+  }
+};
+
+function getBreakWindowsForLocalDate(d, ramadanMode) {
+  const day = d.getDay(); // 0..6 (0=Sun, 5=Fri)
+  if (ramadanMode) {
+    return day === 5 ? BREAK_TIME.ramadan.friday : BREAK_TIME.ramadan.weekday;
+  }
+  return day === 5 ? BREAK_TIME.normal.friday : BREAK_TIME.normal.weekday;
+}
+
+/** Seconds of scheduled break in [startMs, endMs] (local calendar). */
+function scheduledBreakOverlapSec(startMs, endMs, ramadanMode) {
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return 0;
+  let totalMs = 0;
+  let cursor = startMs;
+  let guard = 0;
+  while (cursor < endMs && guard++ < 14) {
+    const dayStart = new Date(cursor);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayStartMs = dayStart.getTime();
+    const nextDayMs = dayStartMs + 86400000;
+    if (dayStartMs >= endMs) break;
+
+    const windows = getBreakWindowsForLocalDate(dayStart, ramadanMode);
+    for (const w of windows) {
+      const segStart = dayStartMs + w.start * 60000;
+      const segEnd = dayStartMs + w.end * 60000;
+      const lo = Math.max(startMs, segStart);
+      const hi = Math.min(endMs, segEnd);
+      if (hi > lo) totalMs += hi - lo;
+    }
+    cursor = nextDayMs;
+  }
+  return Math.floor(totalMs / 1000);
+}
+
 // Keeps countdown/downtime advancing even when no browser is open.
 exports.tickProductionClock = onSchedule("every 1 minutes", async () => {
   const nowMs = Date.now();
@@ -28,6 +85,7 @@ exports.tickProductionClock = onSchedule("every 1 minutes", async () => {
 
   const state = snap.val() || {};
   const status = String(state.status || "READY");
+  const ramadanMode = !!state.ramadanMode;
   if (status !== "RUNNING") {
     return;
   }
@@ -48,15 +106,21 @@ exports.tickProductionClock = onSchedule("every 1 minutes", async () => {
     return;
   }
 
-  const adjustedCountdown = Math.max(previousCountdown - elapsedSec, 0);
-  const extraDowntime = Math.max(elapsedSec - previousCountdown, 0);
+  // Scheduled breaks should pause both the countdown and downtime accrual.
+  const breakSecInInterval = scheduledBreakOverlapSec(previousUpdatedAt, nowMs, ramadanMode);
+  const productiveElapsedSec = Math.max(elapsedSec - breakSecInInterval, 0);
+
+  const adjustedCountdown = Math.max(previousCountdown - productiveElapsedSec, 0);
+  const extraDowntime = Math.max(productiveElapsedSec - previousCountdown, 0);
   const allowDowntime = plan === 0 || actual < plan;
   const totalDowntime = allowDowntime ? previousDowntime + extraDowntime : previousDowntime;
 
   let expected = 0;
   if (firstScanAtMs > 0) {
     const expectedElapsedSec = Math.max(Math.floor((nowMs - firstScanAtMs) / 1000), 0);
-    expected = Math.floor(expectedElapsedSec / cycleTimeSec);
+    const breakSecFromFirstScan = scheduledBreakOverlapSec(firstScanAtMs, nowMs, ramadanMode);
+    const netExpectedElapsedSec = Math.max(0, expectedElapsedSec - breakSecFromFirstScan);
+    expected = Math.floor(netExpectedElapsedSec / cycleTimeSec);
     if (plan > 0) {
       expected = Math.min(expected, plan);
     }
