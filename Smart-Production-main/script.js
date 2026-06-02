@@ -1871,6 +1871,25 @@ function scheduledBreakOverlapSec(startMs, endMs) {
   return Math.floor(totalMs / 1000);
 }
 
+/** RUNNING countdown from last scan (or session start), excluding scheduled breaks — shared by main + monitors. */
+function computeRunningCountdownSec(cycleTimeSec, nowMs = Date.now(), snapshotCountdown, snapshotUpdatedAtMs) {
+  const baseMs = lastScanWallMs != null ? lastScanWallMs : (startTime ? startTime.getTime() : null);
+  if (baseMs != null) {
+    const wallSec = Math.floor((nowMs - baseMs) / 1000);
+    const breakSec = scheduledBreakOverlapSec(baseMs, nowMs);
+    const productiveSec = Math.max(0, wallSec - breakSec);
+    return Math.max(cycleTimeSec - productiveSec, 0);
+  }
+  if (snapshotCountdown != null && snapshotUpdatedAtMs != null) {
+    const syncedAt = Number(snapshotUpdatedAtMs) || nowMs;
+    const wallSec = Math.floor((nowMs - syncedAt) / 1000);
+    const breakSec = scheduledBreakOverlapSec(syncedAt, nowMs);
+    const productiveSec = Math.max(0, wallSec - breakSec);
+    return Math.max((parseInt(snapshotCountdown, 10) || 0) - productiveSec, 0);
+  }
+  return Math.max(parseInt(snapshotCountdown, 10) || 0, 0);
+}
+
 function isBreakTime() {
   const now = new Date();
   const current = now.getHours() * 60 + now.getMinutes();
@@ -2093,11 +2112,17 @@ function startLiveCountdownTicker(baseCountdown, status, updatedAt) {
     return;
   }
 
-  const syncedAt = Number(updatedAt) || Date.now();
+  const snapshotUpdatedAt = Number(updatedAt) || Date.now();
 
   const render = () => {
-    const elapsedSec = Math.floor((Date.now() - syncedAt) / 1000);
-    const adjusted = Math.max(baseCountdown - elapsedSec, 0);
+    const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
+    const nowMs = Date.now();
+    const adjusted = computeRunningCountdownSec(
+      cycleTimeSec,
+      nowMs,
+      baseCountdown,
+      snapshotUpdatedAt
+    );
     countdownValue = adjusted;
     countdownEl.innerText = format(adjusted);
   };
@@ -2125,9 +2150,8 @@ function restoreProductionTimerFromLiveState(status, countdown, expected, synced
     elapsedInCycle = Math.max(cycleTimeSec - adjustedCountdown, 0);
   } else {
     const syncedAtMs = Number(syncedUpdatedAt) || nowMs;
-    const elapsedSinceSyncSec = Math.max(Math.floor((nowMs - syncedAtMs) / 1000), 0);
     const syncedCountdown = parseInt(countdown, 10) || 0;
-    adjustedCountdown = Math.max(syncedCountdown - elapsedSinceSyncSec, 0);
+    adjustedCountdown = computeRunningCountdownSec(cycleTimeSec, nowMs, syncedCountdown, syncedAtMs);
     elapsedInCycle = Math.max(cycleTimeSec - adjustedCountdown, 0);
   }
   const elapsedForExpected = Math.max((parseInt(expected, 10) || 0) * cycleTimeSec, 0);
@@ -2191,6 +2215,10 @@ function applyLiveState(state) {
     if (Number.isFinite(s) && s > 0) return s;
     return fallback;
   };
+
+  if (typeof state.ramadanMode === "boolean") {
+    ramadanMode = state.ramadanMode;
+  }
 
   const plan = parseInt(state.plan, 10) || 0;
   const currentDailyPlan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || SETTINGS.defaultPlan;
@@ -2408,16 +2436,7 @@ function startProduction(shouldSync = true) {
 
   timer = setInterval(() => {
     const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
-    const nowMs = Date.now();
-    const baseMs = lastScanWallMs != null ? lastScanWallMs : (startTime ? startTime.getTime() : null);
-    if (baseMs == null) {
-      updateDisplay();
-      return;
-    }
-    const wallSec = Math.floor((nowMs - baseMs) / 1000);
-    const breakSec = scheduledBreakOverlapSec(baseMs, nowMs);
-    const diff = Math.max(0, wallSec - breakSec);
-    countdownValue = Math.max(cycleTimeSec - diff, 0);
+    countdownValue = computeRunningCountdownSec(cycleTimeSec);
 
     if (countdownValue === 0) {
       isDowntime = true;
@@ -4982,11 +5001,7 @@ function maybeReconcileLocalActualFromSheet() {
   const statusText = document.getElementById("status")?.innerText?.trim();
   const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
   if (statusText === "RUNNING" || statusText === "DOWN TIME" || statusText === "BREAK TIME") {
-    const nowMs = Date.now();
-    const wallSec = Math.max(Math.floor((nowMs - lastScanWallMs) / 1000), 0);
-    const breakSec = scheduledBreakOverlapSec(lastScanWallMs, nowMs);
-    const productiveSec = Math.max(0, wallSec - breakSec);
-    countdownValue = Math.max(cycleTimeSec - productiveSec, 0);
+    countdownValue = computeRunningCountdownSec(cycleTimeSec);
     isDowntime = countdownValue === 0;
   }
 
