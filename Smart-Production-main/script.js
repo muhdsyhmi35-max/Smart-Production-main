@@ -108,6 +108,7 @@ let firebaseLiveStateRef = null;
 let firebaseShiftScheduleRef = null;
 /** Firebase server clock minus local clock — keeps countdown aligned across PCs. */
 let serverTimeOffsetMs = 0;
+let monitorCountdownRender = null;
 let isApplyingRemoteCommand = false;
 let hasLocalSession = false;
 /** Operator: avoid calendar-day reset until first Firebase live-state read completes (prevents stale overwrite). */
@@ -2024,6 +2025,9 @@ function initFirebaseSync() {
   firebaseDb.ref(".info/serverTimeOffset").on("value", snap => {
     const offset = snap.val();
     serverTimeOffsetMs = typeof offset === "number" && Number.isFinite(offset) ? offset : 0;
+    if (isMonitor && typeof monitorCountdownRender === "function") {
+      monitorCountdownRender();
+    }
   });
 
   firebaseShiftScheduleRef.on("value", snapshot => {
@@ -2109,6 +2113,7 @@ function stopLiveCountdownTicker() {
     clearInterval(liveCountdownInterval);
     liveCountdownInterval = null;
   }
+  monitorCountdownRender = null;
 }
 
 function startLiveCountdownTicker(baseCountdown, status, updatedAt, anchorScanMs) {
@@ -2136,17 +2141,21 @@ function startLiveCountdownTicker(baseCountdown, status, updatedAt, anchorScanMs
 
   const render = () => {
     const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
-    const adjusted = computeRunningCountdownSec(
-      cycleTimeSec,
-      syncedNowMs(),
-      baseCountdown,
-      snapshotUpdatedAt,
-      scanAnchorMs
-    );
+    // Monitors with lastScanAtMs: derive only from Firebase anchor + shared server time.
+    const adjusted =
+      scanAnchorMs != null
+        ? computeRunningCountdownSec(cycleTimeSec, syncedNowMs(), null, null, scanAnchorMs)
+        : computeRunningCountdownSec(
+            cycleTimeSec,
+            syncedNowMs(),
+            baseCountdown,
+            snapshotUpdatedAt
+          );
     countdownValue = adjusted;
     countdownEl.innerText = format(adjusted);
   };
 
+  monitorCountdownRender = render;
   render();
   liveCountdownInterval = setInterval(render, 1000);
 }
