@@ -106,6 +106,8 @@ let firebaseDb = null;
 let firebaseCommandRef = null;
 let firebaseLiveStateRef = null;
 let firebaseShiftScheduleRef = null;
+/** Firebase server clock minus local clock — keeps countdown aligned across PCs. */
+let serverTimeOffsetMs = 0;
 let isApplyingRemoteCommand = false;
 let hasLocalSession = false;
 /** Operator: avoid calendar-day reset until first Firebase live-state read completes (prevents stale overwrite). */
@@ -1871,9 +1873,20 @@ function scheduledBreakOverlapSec(startMs, endMs) {
   return Math.floor(totalMs / 1000);
 }
 
+function syncedNowMs() {
+  return Date.now() + serverTimeOffsetMs;
+}
+
 /** RUNNING countdown from last scan (or session start), excluding scheduled breaks — shared by main + monitors. */
-function computeRunningCountdownSec(cycleTimeSec, nowMs = Date.now(), snapshotCountdown, snapshotUpdatedAtMs) {
-  const baseMs = lastScanWallMs != null ? lastScanWallMs : (startTime ? startTime.getTime() : null);
+function computeRunningCountdownSec(cycleTimeSec, nowMs = syncedNowMs(), snapshotCountdown, snapshotUpdatedAtMs, anchorScanMs) {
+  const baseMs =
+    anchorScanMs != null && Number.isFinite(Number(anchorScanMs))
+      ? Number(anchorScanMs)
+      : lastScanWallMs != null
+        ? lastScanWallMs
+        : startTime
+          ? startTime.getTime()
+          : null;
   if (baseMs != null) {
     const wallSec = Math.floor((nowMs - baseMs) / 1000);
     const breakSec = scheduledBreakOverlapSec(baseMs, nowMs);
@@ -2008,6 +2021,11 @@ function initFirebaseSync() {
   firebaseLiveStateRef = firebaseDb.ref(FIREBASE_LIVE_STATE_PATH);
   firebaseShiftScheduleRef = firebaseDb.ref(FIREBASE_SHIFT_SCHEDULE_PATH);
 
+  firebaseDb.ref(".info/serverTimeOffset").on("value", snap => {
+    const offset = snap.val();
+    serverTimeOffsetMs = typeof offset === "number" && Number.isFinite(offset) ? offset : 0;
+  });
+
   firebaseShiftScheduleRef.on("value", snapshot => {
     const v = snapshot.val();
     if (v) applyShiftScheduleFromRemote(v);
@@ -2093,7 +2111,7 @@ function stopLiveCountdownTicker() {
   }
 }
 
-function startLiveCountdownTicker(baseCountdown, status, updatedAt) {
+function startLiveCountdownTicker(baseCountdown, status, updatedAt, anchorScanMs) {
   stopLiveCountdownTicker();
 
   const countdownEl = document.getElementById("countdown");
@@ -2112,16 +2130,18 @@ function startLiveCountdownTicker(baseCountdown, status, updatedAt) {
     return;
   }
 
-  const snapshotUpdatedAt = Number(updatedAt) || Date.now();
+  const snapshotUpdatedAt = Number(updatedAt) || syncedNowMs();
+  const scanAnchorMs =
+    anchorScanMs != null && Number.isFinite(Number(anchorScanMs)) ? Number(anchorScanMs) : null;
 
   const render = () => {
     const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
-    const nowMs = Date.now();
     const adjusted = computeRunningCountdownSec(
       cycleTimeSec,
-      nowMs,
+      syncedNowMs(),
       baseCountdown,
-      snapshotUpdatedAt
+      snapshotUpdatedAt,
+      scanAnchorMs
     );
     countdownValue = adjusted;
     countdownEl.innerText = format(adjusted);
@@ -2137,16 +2157,18 @@ function restoreProductionTimerFromLiveState(status, countdown, expected, synced
   if (timer) return;
 
   const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
-  const nowMs = Date.now();
+  const nowMs = syncedNowMs();
   let adjustedCountdown = parseInt(countdown, 10) || 0;
   let elapsedInCycle = Math.max(cycleTimeSec - adjustedCountdown, 0);
 
   if (syncedLastScanAtMs) {
-    const lastMs = Number(syncedLastScanAtMs);
-    const wallSec = Math.max(Math.floor((nowMs - lastMs) / 1000), 0);
-    const breakSec = scheduledBreakOverlapSec(lastMs, nowMs);
-    const elapsedSinceLastScanSec = Math.max(0, wallSec - breakSec);
-    adjustedCountdown = Math.max(cycleTimeSec - elapsedSinceLastScanSec, 0);
+    adjustedCountdown = computeRunningCountdownSec(
+      cycleTimeSec,
+      nowMs,
+      null,
+      null,
+      Number(syncedLastScanAtMs)
+    );
     elapsedInCycle = Math.max(cycleTimeSec - adjustedCountdown, 0);
   } else {
     const syncedAtMs = Number(syncedUpdatedAt) || nowMs;
@@ -2272,7 +2294,19 @@ function applyLiveState(state) {
   document.getElementById("actual").innerText = actual;
   document.getElementById("expected").innerText = expected;
   syncEfficiencyCardDom();
-  startLiveCountdownTicker(countdown, status, state.updatedAt);
+
+  // Set last-scan anchor before countdown ticker (every monitor must use Firebase lastScanAtMs).
+  let anchorScanMs = null;
+  if (actual > 0 && state.lastScanAtMs) {
+    anchorScanMs = Number(state.lastScanAtMs);
+    lastScanTime = new Date(anchorScanMs);
+    lastScanWallMs = anchorScanMs;
+  } else if (actual === 0) {
+    lastScanTime = null;
+    lastScanWallMs = null;
+  }
+
+  startLiveCountdownTicker(countdown, status, state.updatedAt, anchorScanMs);
   const downtimeSecToDisplay =
     isMonitor && hasFirebaseTotalDowntime
       ? firebaseTotalDowntime
@@ -2280,16 +2314,6 @@ function applyLiveState(state) {
   downtimeSeconds = downtimeSecToDisplay;
   document.getElementById("downtime").innerText = format(downtimeSecToDisplay);
   syncDowntimeAccumulatedHighlight();
-  // Never carry last-scan time when actual is still 0 — stale Firebase lastScanAtMs makes the
-  // first real scan look like a short gap (< one cycle) so downtime does not book.
-  if (actual > 0 && state.lastScanAtMs) {
-    const ls = Number(state.lastScanAtMs);
-    lastScanTime = new Date(ls);
-    lastScanWallMs = ls;
-  } else if (actual === 0) {
-    lastScanTime = null;
-    lastScanWallMs = null;
-  }
   restoreProductionTimerFromLiveState(status, countdown, expected, state.firstScanAtMs, state.updatedAt, state.lastScanAtMs);
 
   const balanceEl = document.getElementById("balance");
