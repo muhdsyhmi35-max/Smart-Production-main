@@ -101,6 +101,13 @@ exports.tickProductionClock = onSchedule("every 1 minutes", async () => {
   const firstScanAtMs = toInt(state.firstScanAtMs, 0);
   const lastScanAtMs = toInt(state.lastScanAtMs, 0);
 
+  // Operator PC publishes live state every second while running — do not overwrite it.
+  const sender = String(state.sender || "");
+  const operatorFreshMs = nowMs - previousUpdatedAt;
+  if (sender.startsWith("SYNC-") && operatorFreshMs < 180000) {
+    return;
+  }
+
   const elapsedSec = Math.max(Math.floor((nowMs - previousUpdatedAt) / 1000), 0);
   if (elapsedSec <= 0) {
     return;

@@ -1904,6 +1904,15 @@ function computeRunningCountdownSec(cycleTimeSec, nowMs = syncedNowMs(), snapsho
   return Math.max(parseInt(snapshotCountdown, 10) || 0, 0);
 }
 
+/** Monitor RUNNING: tick down from the main PC's last published countdown + updatedAt. */
+function computeMonitorCountdownFromMainPublish(publishedCountdown, publishedUpdatedAtMs, nowMs = syncedNowMs()) {
+  const syncedAt = Number(publishedUpdatedAtMs) || nowMs;
+  const wallSec = Math.floor((nowMs - syncedAt) / 1000);
+  const breakSec = scheduledBreakOverlapSec(syncedAt, nowMs);
+  const productiveSec = Math.max(0, wallSec - breakSec);
+  return Math.max((parseInt(publishedCountdown, 10) || 0) - productiveSec, 0);
+}
+
 function isBreakTime() {
   const now = new Date();
   const current = now.getHours() * 60 + now.getMinutes();
@@ -2136,21 +2145,13 @@ function startLiveCountdownTicker(baseCountdown, status, updatedAt, anchorScanMs
   }
 
   const snapshotUpdatedAt = Number(updatedAt) || syncedNowMs();
-  const scanAnchorMs =
-    anchorScanMs != null && Number.isFinite(Number(anchorScanMs)) ? Number(anchorScanMs) : null;
 
   const render = () => {
-    const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
-    // Monitors with lastScanAtMs: derive only from Firebase anchor + shared server time.
-    const adjusted =
-      scanAnchorMs != null
-        ? computeRunningCountdownSec(cycleTimeSec, syncedNowMs(), null, null, scanAnchorMs)
-        : computeRunningCountdownSec(
-            cycleTimeSec,
-            syncedNowMs(),
-            baseCountdown,
-            snapshotUpdatedAt
-          );
+    // Main PC is source of truth — mirror its published countdown snapshot only.
+    const adjusted = computeMonitorCountdownFromMainPublish(
+      baseCountdown,
+      snapshotUpdatedAt
+    );
     countdownValue = adjusted;
     countdownEl.innerText = format(adjusted);
   };
@@ -4769,6 +4770,12 @@ function updateLiveStateOnly() {
   const lotNo = document.getElementById("lotInput").value || "";
   const bookedDowntime = getBookedDowntimeSec();
 
+  // Publish the same countdown the operator screen is showing (main drives all monitors).
+  if (timer && (status === "RUNNING" || status === "DOWN TIME")) {
+    const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
+    countdownValue = computeRunningCountdownSec(cycleTimeSec);
+  }
+
   fetch(API_URL, {
     method: "POST",
     mode: "no-cors",
@@ -5277,7 +5284,7 @@ window.onload = async function() {
     if (liveDataPollInterval) clearInterval(liveDataPollInterval);
     liveDataPollInterval = setInterval(loadLiveData, 3000);
     if (liveStatePollInterval) clearInterval(liveStatePollInterval);
-    liveStatePollInterval = setInterval(updateLiveStateOnly, 2000);
+    liveStatePollInterval = setInterval(updateLiveStateOnly, 1000);
     applyShiftScheduleTick();
     if (shiftScheduleInterval) clearInterval(shiftScheduleInterval);
     shiftScheduleInterval = setInterval(applyShiftScheduleTick, 30000);
