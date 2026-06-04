@@ -317,6 +317,48 @@ function saveNonProductionDaysSet(daySet) {
   } catch (_) {}
 }
 
+function getNonProductionDaysArray() {
+  return [...loadNonProductionDaysSet()];
+}
+
+/** Main PC publishes graph filters; monitors mirror so Production Trend matches everywhere. */
+function publishGraphSettingsToFirebase() {
+  if (isMonitor || !firebaseLiveStateRef) return;
+  firebaseLiveStateRef.update({
+    graphWtPreset: graphWtPreset,
+    nonProductionDays: getNonProductionDaysArray(),
+    sender: syncClientId,
+    updatedAt: firebase.database.ServerValue.TIMESTAMP
+  }).catch(err => {
+    console.log("Firebase graph settings publish error:", err);
+  });
+}
+
+function applyGraphSettingsFromRemote(state) {
+  if (!state || !isMonitor) return;
+  let changed = false;
+  if (state.graphWtPreset) {
+    const next = normalizeGraphWtPreset(state.graphWtPreset);
+    if (graphWtPreset !== next) {
+      graphWtPreset = next;
+      changed = true;
+    }
+  }
+  if (Array.isArray(state.nonProductionDays)) {
+    const valid = state.nonProductionDays.filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k));
+    const current = [...loadNonProductionDaysSet()].sort().join(",");
+    const incoming = [...valid].sort().join(",");
+    if (current !== incoming) {
+      saveNonProductionDaysSet(new Set(valid));
+      changed = true;
+    }
+  }
+  applyGraphWtControlUi();
+  if (changed && document.body.classList.contains("graph-mode")) {
+    renderGraphCharts();
+  }
+}
+
 function markNonProductionDay(dayKey, active) {
   if (!dayKey) return;
   const set = loadNonProductionDaysSet();
@@ -351,12 +393,15 @@ function getGraphWtPresetLabel(preset) {
 }
 
 function loadGraphWtPresetFromStorage() {
-  try {
-    const stored = localStorage.getItem(GRAPH_WT_PRESET_STORAGE_KEY);
-    if (stored) graphWtPreset = normalizeGraphWtPreset(stored);
-  } catch (_) {}
+  // Monitors follow main PC graph settings via Firebase — not this browser's localStorage.
+  if (!isMonitor) {
+    try {
+      const stored = localStorage.getItem(GRAPH_WT_PRESET_STORAGE_KEY);
+      if (stored) graphWtPreset = normalizeGraphWtPreset(stored);
+    } catch (_) {}
+  }
   if (graphWtPreset === "friday") graphWtPreset = "normal";
-  syncNonProductionDayMarkForToday();
+  if (!isMonitor) syncNonProductionDayMarkForToday();
 }
 
 function saveGraphWtPresetToStorage() {
@@ -462,6 +507,7 @@ function onGraphWtOptionClick(event, preset) {
   syncNonProductionDayMarkForToday();
   applyGraphWtControlUi();
   applyGraphWtPresetEffects(prev);
+  publishGraphSettingsToFirebase();
   renderGraphCharts();
 }
 
@@ -2269,6 +2315,7 @@ function applyLiveState(state) {
     planInput.value = daily != null && daily > 0 ? String(daily) : "";
     cycleInput.value = cycle != null && cycle > 0 ? String(cycle) : "";
     document.getElementById("plan").innerText = daily != null && daily > 0 ? String(daily) : "-";
+    if (effectivePlan > 0) syncTodayScanPlanOnRows(effectivePlan);
   } else {
     effectivePlan = resolvePositiveNumber(state.dailyPlan, plan, currentDailyPlan);
     cycleTimeMin = resolvePositiveNumber(state.cycleTimeMin, state.cycleTarget, currentCycleTime);
@@ -2381,6 +2428,7 @@ function applyLiveState(state) {
   if (isMonitor) {
     monitorLiveStateReceived = true;
     monitorLiveStateError = null;
+    applyGraphSettingsFromRemote(state);
     updateMonitorDataNotice();
   }
 }
@@ -4817,7 +4865,9 @@ function updateLiveStateOnly() {
     delay: delay,
     efficiency: efficiency,
     firstScanAtMs: firstScanAtMs,
-    lastScanAtMs: lastScanWallMs != null ? lastScanWallMs : null
+    lastScanAtMs: lastScanWallMs != null ? lastScanWallMs : null,
+    graphWtPreset: graphWtPreset,
+    nonProductionDays: getNonProductionDaysArray()
   });
 }
 
@@ -5176,6 +5226,9 @@ function loadLiveData() {
         syncDowntimeSecondsFromTable();
         refreshDowntimeCardFromTable();
         maybeReconcileLocalActualFromSheet();
+        if (document.body.classList.contains("graph-mode")) {
+          renderGraphCharts();
+        }
       }
       // Always keep accumulated downtime card synced to rendered rows,
       // even when table data payload is unchanged (e.g. timer stopped/target achieved).
@@ -5248,6 +5301,7 @@ window.onload = async function() {
 
   initFirebaseSync();
   loadInitialLiveState();
+  if (!isMonitor) publishGraphSettingsToFirebase();
 
   if (isMonitor) {
     const chassisInput = document.getElementById("chassisInput");
