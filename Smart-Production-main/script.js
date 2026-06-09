@@ -379,6 +379,63 @@ function isNonProductionDay(dayKey) {
   return loadNonProductionDaysSet().has(dayKey);
 }
 
+/** Count scan rows in the dashboard table for one calendar day. */
+function countScanRowsForDay(dayKey) {
+  if (!dayKey) return 0;
+  let count = 0;
+  document.querySelectorAll("#scanTable tr").forEach(row => {
+    const cells = row.querySelectorAll("td");
+    if (!cells.length) return;
+    const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
+    if (rowDay === dayKey) count += 1;
+  });
+  return count;
+}
+
+/** Build day → scan count from the table (optional day-key filter). */
+function buildDailyActualMapFromScanTable(dayKeys) {
+  const keySet = dayKeys?.length ? new Set(dayKeys) : null;
+  const map = {};
+  document.querySelectorAll("#scanTable tr").forEach(row => {
+    const cells = row.querySelectorAll("td");
+    if (!cells.length) return;
+    const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
+    if (!rowDay || (keySet && !keySet.has(rowDay))) return;
+    map[rowDay] = (map[rowDay] || 0) + 1;
+  });
+  return map;
+}
+
+/**
+ * Reports / graphs: Google Sheet rows override non-production marks.
+ * A day only counts as non-production when marked AND it has no scan data.
+ */
+function isReportNonProductionDay(dayKey, dailyActualMap) {
+  if (!dayKey) return isNonProductionMode() && countScanRowsForDay(toIsoDateLocal(new Date())) === 0;
+  const produced = dailyActualMap
+    ? (dailyActualMap[dayKey] || 0)
+    : countScanRowsForDay(dayKey);
+  if (produced > 0) return false;
+  return isNonProductionDay(dayKey);
+}
+
+/** Remove stale non-production marks when the sheet already has rows for that day. */
+function reconcileNonProductionMarksFromSheet() {
+  const npSet = loadNonProductionDaysSet();
+  let changed = false;
+  npSet.forEach(dayKey => {
+    if (countScanRowsForDay(dayKey) > 0) {
+      npSet.delete(dayKey);
+      changed = true;
+    }
+  });
+  if (changed) {
+    saveNonProductionDaysSet(npSet);
+    if (!isMonitor) publishGraphSettingsToFirebase();
+  }
+  return changed;
+}
+
 function normalizeGraphWtPreset(v) {
   const x = String(v || "").trim().toLowerCase();
   if (x === "halfday" || x === "half-day") return "halfday";
@@ -2024,7 +2081,7 @@ function applyActualEffColorClass(el, pct) {
 
 function getTodayActualEffPct() {
   const dayKey = toIsoDateLocal(new Date());
-  if (isNonProductionDay(dayKey)) return 0;
+  if (isReportNonProductionDay(dayKey)) return 0;
   const planUnits = parseInt(document.getElementById("dailyPlanTarget")?.value || "0", 10) || 0;
   const planWtMins = getPlanWtMinsForDay(dayKey);
   const actualWtMins = calcActualWtMinsForDay(dayKey, planUnits);
@@ -3773,11 +3830,11 @@ function buildTrendLinePathDropToZeroOnSkips(points, dayKeys, skipDayFn, yBase) 
   return buildTrendLinePath(withZero, yBase);
 }
 
-function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valueSuffix = "%", yAxisLabel = "%", dayKeys = null) {
+function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valueSuffix = "%", yAxisLabel = "%", dayKeys = null, reportActualByDay = null) {
   if (!labels.length || !actualValues.length) {
     return `<div class="summary-graph-empty">No data</div>`;
   }
-  const skipNpIdx = i => dayKeys && isNonProductionDay(dayKeys[i]);
+  const skipNpIdx = i => dayKeys && isReportNonProductionDay(dayKeys[i], reportActualByDay);
   const width = 500;
   const height = 170;
   const leftPad = 36;
@@ -3813,7 +3870,7 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
   }).join("");
 
   const points = layoutTrendSeriesPoints(actualValues, leftPad, chartW, toY);
-  const skipNpKey = k => dayKeys ? isNonProductionDay(k) : false;
+  const skipNpKey = k => dayKeys ? isReportNonProductionDay(k, reportActualByDay) : false;
   const path = dayKeys
     ? buildTrendLinePathDropToZeroOnSkips(points, dayKeys, skipNpKey, yBase)
     : buildTrendLinePath(points, yBase);
@@ -3994,7 +4051,7 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
     fallbackDayPlan = parseInt(document.getElementById("dailyPlanTarget")?.value || "0", 10) || 0;
   }
   const dayTarget = computeDayTargetsForReport(dayKeys, dailyActualMap, fallbackDayPlan);
-  const skipNpDay = k => isNonProductionDay(k);
+  const skipNpDay = k => isReportNonProductionDay(k, dailyActualMap);
   const totalPlan = dayKeys.reduce((sum, key) => sum + (skipNpDay(key) ? 0 : (dayTarget[key] || 0)), 0);
 
   // Use per-day values (not cumulative) for both Actual and Target.
@@ -4171,7 +4228,12 @@ function resolveReportPlanForDay(dayKey, fallbackDayPlan) {
   if (dayKey === today && Number.isFinite(fallbackDayPlan) && fallbackDayPlan > 0) {
     return fallbackDayPlan;
   }
-  return getHistoricalPlanForDay(dayKey);
+  const historical = getHistoricalPlanForDay(dayKey);
+  if (Number.isFinite(historical) && historical > 0) return historical;
+  if (countScanRowsForDay(dayKey) > 0 && Number.isFinite(fallbackDayPlan) && fallbackDayPlan > 0) {
+    return fallbackDayPlan;
+  }
+  return historical;
 }
 
 /** Keep today's history rows aligned when operator revises Daily Plan mid-shift. */
@@ -4358,7 +4420,7 @@ function calcActualEffPct(planUnits, actualUnits, planWtMins, actualWtMins) {
 function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, rangeLabel) {
   const planEffPct = PLAN_EFF_PCT;
   const planWtMins = getPlanWtMinsForDay(dayKey);
-  const nonProdDay = dayKey && isNonProductionDay(dayKey);
+  const nonProdDay = dayKey && isReportNonProductionDay(dayKey, dayProduced);
 
   const planUnits = dayTarget?.[dayKey] || 0;
   const actualUnits = dayProduced?.[dayKey] || 0;
@@ -4499,7 +4561,7 @@ function renderGraphCharts() {
     return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
   });
   const oeeValues = effTrendKeys.map(k => {
-    if (isNonProductionDay(k)) return 0;
+    if (isReportNonProductionDay(k, dayProduced)) return 0;
     const target = dayTarget[k] || 0;
     const produced = dayProduced[k] || 0;
     const planWtMins = getPlanWtMinsForDay(k);
@@ -4507,7 +4569,7 @@ function renderGraphCharts() {
     return calcActualEffPct(target, produced, planWtMins, actualWtMins) ?? 0;
   });
   const planEffValues = effTrendKeys.map(k => {
-    if (isNonProductionDay(k)) return 0;
+    if (isReportNonProductionDay(k, dayProduced)) return 0;
     return (dayTarget[k] || 0) > 0 ? PLAN_EFF_PCT : 0;
   });
   const oeeChart = buildEfficiencyTrendChart(
@@ -4517,7 +4579,8 @@ function renderGraphCharts() {
     planEffValues,
     "%",
     "%",
-    effTrendKeys
+    effTrendKeys,
+    dayProduced
   );
   graphBody.innerHTML = `
     <div class="report-kpi-grid">
@@ -5226,8 +5289,12 @@ function loadLiveData() {
         syncDowntimeSecondsFromTable();
         refreshDowntimeCardFromTable();
         maybeReconcileLocalActualFromSheet();
+        reconcileNonProductionMarksFromSheet();
         if (document.body.classList.contains("graph-mode")) {
           renderGraphCharts();
+        }
+        if (document.body.classList.contains("summary-mode")) {
+          showSummaryPage();
         }
       }
       // Always keep accumulated downtime card synced to rendered rows,
