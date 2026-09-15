@@ -488,8 +488,13 @@ body.non-production-mode .scan-box.scan-disabled{
   filter:grayscale(.25);
 }
 
-body.role-operator .menu-btn,
-body.role-management .menu-btn{
+body.role-operator .menu-btn{
+  display:none !important;
+}
+
+body.role-management #appearanceMenuItem,
+body.role-management #overtimeMenuItem,
+body.role-management #ramadanToggle{
   display:none !important;
 }
 

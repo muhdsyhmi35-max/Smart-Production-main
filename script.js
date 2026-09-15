@@ -178,6 +178,11 @@ function isAdminRole() {
   return isMasterRole();
 }
 
+function canViewReports() {
+  const role = getAppRole();
+  return role === "management" || role === "master";
+}
+
 function canOperateLine() {
   return getAppRole() === "operator" || isMasterRole();
 }
@@ -296,7 +301,7 @@ function applyAppRoleUi() {
     btn.setAttribute("aria-selected", sel ? "true" : "false");
     btn.classList.toggle("selected", sel);
   });
-  if (!master) {
+  if (role === "operator") {
     toggleMenuDropdown(false);
     toggleRoleDropdown(false);
     if (
@@ -307,9 +312,11 @@ function applyAppRoleUi() {
     ) {
       showMainPage();
     }
+  } else if (role === "management" && document.body.classList.contains("appearance-mode")) {
+    showMainPage();
   }
   if (isMonitor && document.body.classList.contains("monitor-mode")) {
-    const wantedLayout = master ? MONITOR_LAYOUT_OPERATOR_MIRROR_KEY : MONITOR_LAYOUT_LEGACY_KEY;
+    const wantedLayout = canViewReports() ? MONITOR_LAYOUT_OPERATOR_MIRROR_KEY : MONITOR_LAYOUT_LEGACY_KEY;
     const currentLayout = document.body.dataset.monitorLayout || "";
     if (currentLayout && currentLayout !== wantedLayout) {
       window.location.reload();
@@ -4132,7 +4139,7 @@ function toggleHistoryPanel(forceOpen) {
   }
 
   if (open) {
-    if (!isAdminRole()) return;
+    if (!canViewReports()) return;
     document.body.classList.remove("summary-mode");
     const summaryPage = document.getElementById("summaryPage");
     if (summaryPage) summaryPage.classList.remove("open");
@@ -4156,7 +4163,7 @@ function toggleHistoryPanel(forceOpen) {
 function toggleMenuDropdown(forceOpen) {
   const menu = document.getElementById("menuDropdown");
   if (!menu) return;
-  if (!isAdminRole()) {
+  if (!canViewReports()) {
     if (typeof forceOpen === "boolean" && !forceOpen) {
       menu.classList.remove("open");
       document.body.classList.remove("menu-open");
@@ -5455,7 +5462,7 @@ function showGraphPageFromMenu() {
 }
 
 function showGraphPage() {
-  if (!isAdminRole()) {
+  if (!canViewReports()) {
     showMainPage();
     return;
   }
@@ -5522,7 +5529,7 @@ function showGraphPage() {
 }
 
 function showSummaryPage() {
-  if (!isAdminRole()) {
+  if (!canViewReports()) {
     showMainPage();
     return;
   }
@@ -6256,7 +6263,7 @@ window.onload = async function() {
 
   if (isMonitor) {
     document.body.classList.add("monitor-mode");
-    if (isAdminRole()) applyOperatorStyleMonitorDashboard();
+    if (canViewReports()) applyOperatorStyleMonitorDashboard();
     else applyLegacyMonitorDashboardLayout();
   }
 
