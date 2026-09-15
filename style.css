@@ -1120,27 +1120,15 @@ body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-mini-c
   z-index:0;
 }
 
-body:not(.role-operator) .op-kpi-head{
-  display:contents;
-}
-
-body:not(.role-operator) .card-title-operator,
-body:not(.role-operator) .op-countdown-ring,
-body:not(.role-operator) .op-countdown-icon,
-body:not(.role-operator) .op-cycle-meta,
-body:not(.role-operator) .op-kpi-icon{
-  display:none !important;
-}
-
-body.role-operator .card-title-default{
-  display:none !important;
-}
-
 body.role-operator .card-delay,
 body.role-operator .card-plan,
 body.role-operator .card-downtime,
 body.role-operator .card-efficiency{
   display:none !important;
+}
+
+body.role-operator .bottom-row{
+  grid-template-columns:minmax(0, 1fr);
 }
 
 body.role-operator .bottom-row > .card.wide:last-child{
@@ -1151,14 +1139,13 @@ body.role-operator.monitor-mode .bottom-row{
   display:none !important;
 }
 
-body.role-operator.monitor-mode .controls-fields{
-  display:none;
-}
-
 body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .dashboard{
-  grid-template-columns:minmax(0, 1.22fr) minmax(0, 1fr);
+  --op-card-gap:clamp(10px, 1.35vw, 16px);
+  grid-template-columns:minmax(0, 1.15fr) minmax(0, 1fr);
   grid-template-rows:repeat(3, minmax(0, 1fr));
-  min-height:clamp(420px, 62vh, 780px);
+  column-gap:var(--op-card-gap);
+  row-gap:var(--op-card-gap);
+  min-height:clamp(380px, 58vh, 720px);
 }
 
 body.role-operator.monitor-mode:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .dashboard{
@@ -1169,16 +1156,6 @@ body.role-operator .card-countdown{
   grid-column:1;
   grid-row:1 / span 3;
   justify-content:center;
-  padding:clamp(18px, 2.4vh, 28px);
-  border-color:rgba(37,99,235,.55);
-  box-shadow:inset 0 0 0 1px rgba(37,99,235,.18), 0 8px 18px rgba(2,6,23,.45);
-}
-
-body.role-operator .card-countdown .card-title-operator{
-  color:#93c5fd;
-  letter-spacing:.12em;
-  font-size:clamp(16px, 2.1vh, 22px);
-  margin-bottom:clamp(8px, 1.4vh, 16px);
 }
 
 body.role-operator .card-expected{
@@ -1196,184 +1173,8 @@ body.role-operator .card-balance{
   grid-row:3;
 }
 
-body.role-operator .card-expected,
-body.role-operator .card-actual{
-  border-color:rgba(34,197,94,.5);
-  box-shadow:inset 0 0 0 1px rgba(34,197,94,.16), 0 8px 18px rgba(2,6,23,.45);
-  align-items:stretch;
-  text-align:left;
-  padding:clamp(14px, 1.8vh, 20px) clamp(16px, 2vw, 24px);
-}
-
-body.role-operator .card-balance{
-  align-items:stretch;
-  text-align:left;
-  padding:clamp(14px, 1.8vh, 20px) clamp(16px, 2vw, 24px);
-}
-
-body.role-operator .card-balance.is-behind{
-  border-color:rgba(239,68,68,.65);
-  background:linear-gradient(180deg,rgba(80,16,16,.55),rgba(18,8,12,.96));
-  box-shadow:inset 0 0 0 1px rgba(239,68,68,.22), 0 8px 18px rgba(2,6,23,.45);
-}
-
-body.role-operator .card-balance.is-ahead{
-  border-color:rgba(34,197,94,.5);
-  box-shadow:inset 0 0 0 1px rgba(34,197,94,.16), 0 8px 18px rgba(2,6,23,.45);
-}
-
-body.role-operator .card-balance.is-even{
-  border-color:rgba(59,130,246,.45);
-}
-
-body.role-operator .op-kpi-head{
-  display:flex;
-  align-items:center;
-  gap:clamp(10px, 1.4vw, 16px);
-  width:100%;
-  margin-bottom:clamp(4px, .8vh, 10px);
-}
-
-body.role-operator .op-kpi-head h3{
-  margin:0;
-  text-align:left;
-  color:#86efac;
-  letter-spacing:.08em;
-  font-size:clamp(14px, 1.8vh, 18px);
-}
-
-body.role-operator .card-balance .op-kpi-head h3{
-  color:#fca5a5;
-}
-
-body.role-operator .card-balance.is-ahead .op-kpi-head h3{
-  color:#86efac;
-}
-
-body.role-operator .card-expected .big-number,
-body.role-operator .card-actual .big-number{
-  color:#4ade80;
-  text-align:right;
-  width:100%;
-  font-size:clamp(42px, 7.2vh, 72px);
-}
-
-body.role-operator .card-balance .big-number{
-  text-align:right;
-  width:100%;
-  font-size:clamp(42px, 7.2vh, 72px);
-}
-
-body.role-operator .op-kpi-icon{
-  flex:0 0 auto;
-  width:clamp(36px, 5.2vh, 52px);
-  height:clamp(36px, 5.2vh, 52px);
-  color:#4ade80;
-}
-
-body.role-operator .op-kpi-icon svg{
-  width:100%;
-  height:100%;
-  display:block;
-}
-
-body.role-operator .op-kpi-icon-balance{
-  color:#f87171;
-}
-
-body.role-operator .card-balance.is-ahead .op-kpi-icon-balance{
-  color:#4ade80;
-}
-
-body.role-operator .op-countdown-visual{
-  position:relative;
-  width:min(78%, 420px);
-  aspect-ratio:1;
-  margin:0 auto;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-
-body.role-operator .op-countdown-ring{
-  position:absolute;
-  inset:0;
-  width:100%;
-  height:100%;
-}
-
-body.role-operator .op-countdown-ticks,
-body.role-operator .op-countdown-progress{
-  fill:none;
-  stroke-width:13;
-  stroke-linecap:butt;
-  transform:rotate(-90deg);
-  transform-origin:100px 100px;
-}
-
-body.role-operator .op-countdown-ticks{
-  stroke:rgba(37,99,235,.22);
-  stroke-dasharray:7 9;
-}
-
-body.role-operator .op-countdown-progress{
-  stroke:#3b82f6;
-  stroke-linecap:round;
-  stroke-dasharray:none;
-  filter:drop-shadow(0 0 8px rgba(59,130,246,.45));
-}
-
-body.role-operator .op-countdown-inner{
-  position:relative;
-  z-index:1;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  gap:4px;
-}
-
-body.role-operator .op-countdown-icon{
-  width:clamp(28px, 4.2vh, 40px);
-  height:clamp(28px, 4.2vh, 40px);
-  color:#60a5fa;
-}
-
-body.role-operator .op-countdown-icon svg{
-  width:100%;
-  height:100%;
-  display:block;
-}
-
-body.role-operator .card-countdown #countdown{
-  font-size:clamp(40px, 7.4vh, 76px);
-  letter-spacing:.08em;
-  color:#f8fafc;
-}
-
-body.role-operator .op-cycle-meta{
-  margin-top:4px;
-  text-align:center;
-}
-
-body.role-operator .op-cycle-label{
-  color:#64748b;
-  font-size:clamp(11px, 1.5vh, 14px);
-  font-weight:700;
-}
-
-body.role-operator .op-cycle-value{
-  color:#60a5fa;
-  font-size:clamp(22px, 3.6vh, 34px);
-  font-weight:800;
-  font-family:Consolas, "Courier New", monospace;
-}
-
-body.role-operator .card-countdown:hover,
-body.role-operator .card-expected:hover,
-body.role-operator .card-actual:hover,
-body.role-operator .card-balance:hover{
-  transform:none;
+body.role-operator .card-countdown .big-number{
+  font-size:clamp(64px, 9.5vh, 108px);
 }
 
 .card h3{
@@ -2945,11 +2746,11 @@ path.trend-area-fill{
 }
 
 :fullscreen body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .dashboard,
-:-webkit-full-screen body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .dashboard,
-body.is-fullscreen.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .dashboard{
-  grid-template-columns:minmax(0, 1.22fr) minmax(0, 1fr);
+:-webkit-full-screen body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .dashboard{
+  grid-template-columns:minmax(0, 1.15fr) minmax(0, 1fr);
   grid-template-rows:repeat(3, minmax(0, 1fr));
-  min-height:calc(100vh - 150px);
+  column-gap:clamp(10px, 1.35vw, 16px);
+  row-gap:clamp(10px, 1.35vw, 16px);
 }
 
 :fullscreen body.monitor-layout-active .dashboard.monitor-dashboard-relayout,

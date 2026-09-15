@@ -333,7 +333,6 @@ function applyAppRoleUi() {
   syncGraphWtControl();
   applyMainPcEditLock();
   restoreFullscreenIfNeeded(wasFullscreen);
-  syncOperatorDashboardChrome();
 }
 
 function isAppFullscreen() {
@@ -3151,21 +3150,18 @@ function startLiveCountdownTicker(baseCountdown, status, updatedAt, anchorScanMs
   if (!isMonitor) {
     countdownValue = baseCountdown;
     countdownEl.innerText = format(baseCountdown);
-    syncOperatorDashboardChrome();
     return;
   }
 
   if (status === "NON PRODUCTION") {
     countdownValue = 0;
     countdownEl.innerText = format(0);
-    syncOperatorDashboardChrome();
     return;
   }
 
   if (status !== "RUNNING") {
     countdownValue = baseCountdown;
     countdownEl.innerText = format(baseCountdown);
-    syncOperatorDashboardChrome();
     return;
   }
 
@@ -3179,7 +3175,6 @@ function startLiveCountdownTicker(baseCountdown, status, updatedAt, anchorScanMs
     );
     countdownValue = adjusted;
     countdownEl.innerText = format(adjusted);
-    syncOperatorDashboardChrome();
   };
 
   monitorCountdownRender = render;
@@ -3439,7 +3434,6 @@ function applyLiveState(state) {
   }
 
   syncEfficiencyCardDom();
-  syncOperatorDashboardChrome();
 
   if (isMonitor) {
     monitorLiveStateReceived = true;
@@ -3878,34 +3872,6 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
 
 /* ===== UPDATE DISPLAY ===== */
 
-const OP_COUNTDOWN_RING_C = 2 * Math.PI * 82;
-
-function syncOperatorDashboardChrome() {
-  const cycleMin = parseFloat(document.getElementById("cycleTarget")?.value) || SETTINGS.defaultCycle;
-  const cycleEl = document.getElementById("opCycleTimeDisplay");
-  if (cycleEl) {
-    const shown = Number.isFinite(cycleMin) ? String(Math.round(cycleMin * 10) / 10).replace(/\.0$/, "") : "—";
-    cycleEl.textContent = shown;
-  }
-  const circle = document.getElementById("countdownRingProgress");
-  if (circle) {
-    const cycleSec = Math.max((Number(cycleMin) || 1) * 60, 1);
-    const remain = Math.max(0, Math.min(Number(countdownValue) || 0, cycleSec));
-    const ratio = remain / cycleSec;
-    circle.style.strokeDasharray = String(OP_COUNTDOWN_RING_C);
-    circle.style.strokeDashoffset = String(OP_COUNTDOWN_RING_C * (1 - ratio));
-  }
-  const balCard = document.querySelector(".card-balance");
-  const balEl = document.getElementById("balance");
-  if (balCard && balEl) {
-    const n = parseInt(String(balEl.innerText).replace(/[^\-0-9]/g, ""), 10);
-    const val = Number.isFinite(n) ? n : 0;
-    balCard.classList.toggle("is-behind", val < 0);
-    balCard.classList.toggle("is-ahead", val > 0);
-    balCard.classList.toggle("is-even", val === 0);
-  }
-}
-
 function updateDisplay() {
   if (isMonitor) return;
   // Keep accumulated card aligned with sum of visible table downtime rows.
@@ -3936,7 +3902,6 @@ function updateDisplay() {
     downtimeCard.classList.remove("downtime-alert", "blink");
     downtimeText.classList.remove("status-red", "blink");
     syncDowntimeAccumulatedHighlight();
-    syncOperatorDashboardChrome();
     return;
   }
 
@@ -4034,7 +3999,6 @@ function updateDisplay() {
     downtimeText.classList.remove("status-red", "blink");
   }
   syncDowntimeAccumulatedHighlight();
-  syncOperatorDashboardChrome();
 }
 
 /* ===== DAILY SUMMARY ===== */
