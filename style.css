@@ -1120,63 +1120,6 @@ body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-mini-c
   z-index:0;
 }
 
-body.role-operator .card-delay,
-body.role-operator .card-plan,
-body.role-operator .card-downtime,
-body.role-operator .card-efficiency{
-  display:none !important;
-}
-
-body.role-operator .bottom-row{
-  grid-template-columns:minmax(0, 1fr);
-}
-
-body.role-operator .bottom-row > .card.wide:last-child{
-  display:none !important;
-}
-
-body.role-operator.monitor-mode .bottom-row{
-  display:none !important;
-}
-
-body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .dashboard{
-  --op-card-gap:clamp(10px, 1.35vw, 16px);
-  grid-template-columns:minmax(0, 1.15fr) minmax(0, 1fr);
-  grid-template-rows:repeat(3, minmax(0, 1fr));
-  column-gap:var(--op-card-gap);
-  row-gap:var(--op-card-gap);
-  min-height:clamp(380px, 58vh, 720px);
-}
-
-body.role-operator.monitor-mode:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .dashboard{
-  min-height:calc(100vh - 168px);
-}
-
-body.role-operator .card-countdown{
-  grid-column:1;
-  grid-row:1 / span 3;
-  justify-content:center;
-}
-
-body.role-operator .card-expected{
-  grid-column:2;
-  grid-row:1;
-}
-
-body.role-operator .card-actual{
-  grid-column:2;
-  grid-row:2;
-}
-
-body.role-operator .card-balance{
-  grid-column:2;
-  grid-row:3;
-}
-
-body.role-operator .card-countdown .big-number{
-  font-size:clamp(64px, 9.5vh, 108px);
-}
-
 .card h3{
   color:var(--text-muted);
   margin:0;
@@ -2743,14 +2686,6 @@ path.trend-area-fill{
   grid-template-columns:repeat(4, minmax(0, 1fr));
   column-gap:clamp(12px, 1.5vw, 22px);
   row-gap:clamp(12px, 1.5vw, 22px);
-}
-
-:fullscreen body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .dashboard,
-:-webkit-full-screen body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .dashboard{
-  grid-template-columns:minmax(0, 1.15fr) minmax(0, 1fr);
-  grid-template-rows:repeat(3, minmax(0, 1fr));
-  column-gap:clamp(10px, 1.35vw, 16px);
-  row-gap:clamp(10px, 1.35vw, 16px);
 }
 
 :fullscreen body.monitor-layout-active .dashboard.monitor-dashboard-relayout,
