@@ -1001,6 +1001,10 @@ body.monitor-mode .main-pc-actions{
   display:none !important;
 }
 
+body.monitor-mode.role-master .main-pc-actions{
+  display:flex !important;
+}
+
 .monitor-connection-dock{
   display:none;
 }
@@ -2430,9 +2434,8 @@ span.flatpickr-weekday{
 
 path.trend-line,
 path.trend-line-actual{
-  stroke-dasharray:var(--trend-len, 1200);
-  stroke-dashoffset:var(--trend-len, 1200);
-  will-change:stroke-dashoffset;
+  stroke-dasharray:none;
+  stroke-dashoffset:0;
 }
 
 .trend-line-target{
@@ -2440,15 +2443,13 @@ path.trend-line-actual{
 }
 
 path.trend-area-fill{
-  opacity:0;
-  will-change:opacity;
+  opacity:1;
 }
 
 .trend-dot{
-  opacity:0;
+  opacity:1;
   transform-origin:center;
   transform-box:fill-box;
-  will-change:transform, opacity;
 }
 
 @keyframes trendLineDraw{
@@ -2481,9 +2482,12 @@ path.trend-area-fill{
 .summary-chart-svg .summary-bar{
   transform-box:fill-box;
   transform-origin:center bottom;
-  transform:scaleY(0);
-  will-change:transform;
-  animation:summaryBarGrow .95s var(--ease-smooth) forwards;
+}
+
+.summary-chart-svg .summary-bar-value{
+  opacity:1;
+  transform-box:fill-box;
+  transform-origin:center bottom;
 }
 
 @keyframes summaryBarGrow{
@@ -2491,21 +2495,8 @@ path.trend-area-fill{
   to{transform:scaleY(1);}
 }
 
-.summary-chart-svg .summary-bar-value{
-  opacity:0;
-  transform-box:fill-box;
-  transform-origin:center bottom;
-  transform:translateY(6px);
-  will-change:opacity, transform;
-  animation:summaryBarValueIn .5s var(--ease-smooth) forwards;
-}
-
 .summary-chart-downtime .summary-bar{
   animation-duration:.45s;
-}
-
-.summary-chart-downtime .summary-bar-value{
-  animation-duration:.26s;
 }
 
 @keyframes summaryBarValueIn{

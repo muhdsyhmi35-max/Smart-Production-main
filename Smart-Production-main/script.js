@@ -56,6 +56,8 @@ let graphWtPreset = "normal";
 let graphRangeStartDate = null;
 let graphRangeEndDate = null;
 let graphRangePickerSyncing = false;
+let masterSettingsPublishTimer = null;
+let graphPageShellReady = false;
 let graphFocusedDayKey = null; // when clicking Production Trend, cards show this day only
 let graphReportCache = null; // cached maps for the currently rendered Production Report range
 let historyFilterDate = null;
@@ -205,7 +207,6 @@ function grantAdminAfterLogin() {
 }
 
 function applyMainPcEditLock() {
-  if (isMonitor) return;
   const master = isMasterRole();
   const canOperate = canOperateLine();
   ["cycleTarget", "dailyPlanTarget", "lotInput"].forEach(id => {
@@ -215,9 +216,9 @@ function applyMainPcEditLock() {
     el.classList.toggle("settings-locked", !master);
   });
   document.querySelectorAll(".main-pc-actions button").forEach(btn => {
-    btn.disabled = !canOperate;
+    btn.disabled = isMonitor ? !master : !canOperate;
   });
-  if (isNonProductionMode()) {
+  if (isMonitor || isNonProductionMode()) {
     setScanInputsEnabled(false);
   } else {
     setScanInputsEnabled(canOperate);
@@ -403,9 +404,39 @@ function getNonProductionDaysArray() {
   return [...loadNonProductionDaysSet()];
 }
 
+/** Cycle / plan / lot / WT from Master Control — main PC and monitor both write these. */
+function publishMasterSettingsFromInputs() {
+  if (!isMasterRole() || !firebaseLiveStateRef) return;
+  clearTimeout(masterSettingsPublishTimer);
+  masterSettingsPublishTimer = setTimeout(() => {
+    const configuredPlan = parseInt(document.getElementById("dailyPlanTarget")?.value || "0", 10) || 0;
+    const cycleTimeMin = parseFloat(document.getElementById("cycleTarget")?.value) || SETTINGS.defaultCycle;
+    const lotNo = document.getElementById("lotInput")?.value || "";
+    const plan = getDashboardPlan();
+    firebaseLiveStateRef.update({
+      plan,
+      dailyPlan: configuredPlan,
+      cycleTimeMin,
+      lotNo,
+      ramadanMode,
+      graphWtPreset,
+      nonProductionDays: getNonProductionDaysArray(),
+      settings: {
+        dailyPlan: configuredPlan,
+        cycleTimeMin
+      },
+      sender: syncClientId,
+      updatedAt: firebase.database.ServerValue.TIMESTAMP
+    }).catch(err => {
+      console.log("Firebase master settings publish error:", err);
+    });
+  }, 250);
+}
+
 /** Main PC publishes graph filters; monitors mirror so Production Trend matches everywhere. */
 function publishGraphSettingsToFirebase() {
-  if (isMonitor || !firebaseLiveStateRef) return;
+  if (!firebaseLiveStateRef) return;
+  if (isMonitor && !isMasterRole()) return;
   firebaseLiveStateRef.update({
     graphWtPreset: graphWtPreset,
     nonProductionDays: getNonProductionDaysArray(),
@@ -418,6 +449,7 @@ function publishGraphSettingsToFirebase() {
 
 function applyGraphSettingsFromRemote(state) {
   if (!state || !isMonitor) return;
+  if (state.sender && state.sender === syncClientId) return;
   let changed = false;
   if (state.graphWtPreset) {
     const next = normalizeGraphWtPreset(state.graphWtPreset);
@@ -459,6 +491,53 @@ function isNonProductionDay(dayKey) {
   const today = toIsoDateLocal(new Date());
   if (dayKey === today && isNonProductionMode()) return true;
   return loadNonProductionDaysSet().has(dayKey);
+}
+
+/** One pass over the scan table for report charts (avoids 30+ full-table scans on Month). */
+function collectScanTableStats(dayKeys) {
+  const keySet = dayKeys?.length ? new Set(dayKeys) : null;
+  const dayProduced = {};
+  const dayDowntimeSec = {};
+  const dayDowntimeSecAny = {};
+  const dayPlan = {};
+  const dayScanTimes = {};
+  (dayKeys || []).forEach(k => {
+    dayProduced[k] = 0;
+    dayDowntimeSec[k] = 0;
+    dayDowntimeSecAny[k] = 0;
+    dayScanTimes[k] = [];
+  });
+  const rows = document.getElementById("scanTable")?.rows;
+  if (!rows) return { dayProduced, dayDowntimeSec, dayDowntimeSecAny, dayPlan, dayScanTimes };
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const cells = row.cells;
+    if (!cells || cells.length === 0) continue;
+    const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
+    if (!rowDay || (keySet && !keySet.has(rowDay))) continue;
+    dayProduced[rowDay] = (dayProduced[rowDay] || 0) + 1;
+    const dtSec = parseMmSsToSeconds(cells[9]?.innerText || "");
+    if (dtSec > 0) {
+      dayDowntimeSecAny[rowDay] = (dayDowntimeSecAny[rowDay] || 0) + dtSec;
+      const statusText = String(cells[8]?.innerText || "").replace(/\s+/g, " ").trim().toUpperCase();
+      if (statusText === "DOWN TIME" || statusText === "DOWNTIME") {
+        dayDowntimeSec[rowDay] = (dayDowntimeSec[rowDay] || 0) + dtSec;
+      }
+    }
+    if (!Number.isFinite(dayPlan[rowDay])) {
+      const planVal = parseInt((row.dataset.scanPlan || "").trim(), 10);
+      if (Number.isFinite(planVal) && planVal > 0) dayPlan[rowDay] = planVal;
+    }
+    let scanMs = parseInt(String(row.dataset.scanMs || "").trim(), 10);
+    if (!Number.isFinite(scanMs) || scanMs <= 0) {
+      scanMs = parseDayTimeTextToMs(rowDay, cells[2]?.innerText || "");
+    }
+    if (Number.isFinite(scanMs) && scanMs > 0) {
+      if (!dayScanTimes[rowDay]) dayScanTimes[rowDay] = [];
+      dayScanTimes[rowDay].push(scanMs);
+    }
+  }
+  return { dayProduced, dayDowntimeSec, dayDowntimeSecAny, dayPlan, dayScanTimes };
 }
 
 /** Count scan rows in the dashboard table for one calendar day. */
@@ -581,6 +660,7 @@ function applyNonProductionMode() {
 function applyGraphWtPresetEffects(prevPreset) {
   if (isMonitor) {
     applyGraphWtControlUi();
+    if (isMasterRole()) publishMasterSettingsFromInputs();
     return;
   }
   if (isNonProductionMode()) {
@@ -651,6 +731,7 @@ function onGraphWtOptionClick(event, preset) {
   applyGraphWtControlUi();
   applyGraphWtPresetEffects(prev);
   publishGraphSettingsToFirebase();
+  if (isMonitor && isMasterRole()) publishMasterSettingsFromInputs();
   renderGraphCharts();
 }
 
@@ -1020,6 +1101,7 @@ function syncGraphRangePickerUi() {
 }
 
 function onGraphRangeFilterChange() {
+  if (graphRangePickerSyncing) return;
   const startEl = document.getElementById("graphRangeStart");
   const endEl = document.getElementById("graphRangeEnd");
   if (!startEl || !endEl) return;
@@ -1734,6 +1816,7 @@ function saveShiftScheduleToStorage() {
 
 function applyShiftScheduleFromRemote(payload) {
   if (!payload || typeof payload !== "object") return;
+  if (payload.sender && payload.sender === syncClientId) return;
   const start = parseInt(payload.startMinute, 10);
   const end = parseInt(payload.endMinute, 10);
   if (!Number.isFinite(start) || start < 0 || start >= 1440) return;
@@ -1747,9 +1830,10 @@ function applyShiftScheduleFromRemote(payload) {
   applyShiftScheduleTick();
 }
 
-/** Main operator only: push current shift to Firebase so monitors stay in sync. */
+/** Main or Master Control on a monitor: push current shift so every PC stays in sync. */
 function publishShiftScheduleToFirebase() {
-  if (!firebaseShiftScheduleRef || isMonitor) return;
+  if (!firebaseShiftScheduleRef) return;
+  if (isMonitor && !isMasterRole()) return;
   firebaseShiftScheduleRef.set({
     startMinute: SETTINGS.shiftSchedule.startMinute,
     endMinute: SETTINGS.shiftSchedule.endMinute,
@@ -2302,7 +2386,8 @@ function scheduleAppearancePersist() {
 }
 
 function publishAppearanceToFirebase() {
-  if (!firebaseAppearanceRef || isMonitor || appearanceApplyingRemote) return;
+  if (!firebaseAppearanceRef || appearanceApplyingRemote) return;
+  if (isMonitor && !isMasterRole()) return;
   const payload = {
     themeId: APPEARANCE.themeId,
     title: APPEARANCE.title,
@@ -2970,6 +3055,12 @@ function initFirebaseSync() {
         updateMonitorDataNotice();
       }
     );
+  } else {
+    firebaseLiveStateRef.on("value", snapshot => {
+      const liveState = snapshot.val();
+      if (!liveState || liveState.sender === syncClientId) return;
+      applyRemoteMasterSettings(liveState);
+    });
   }
 
   return true;
@@ -3205,8 +3296,12 @@ function applyLiveState(state) {
   if (isMonitor) {
     const planInput = document.getElementById("dailyPlanTarget");
     const cycleInput = document.getElementById("cycleTarget");
-    planInput.value = np ? "0" : (effectivePlan > 0 ? String(effectivePlan) : "");
-    cycleInput.value = cycleTimeMin > 0 ? String(cycleTimeMin) : "";
+    if (planInput && document.activeElement !== planInput) {
+      planInput.value = np ? "0" : (effectivePlan > 0 ? String(effectivePlan) : "");
+    }
+    if (cycleInput && document.activeElement !== cycleInput) {
+      cycleInput.value = cycleTimeMin > 0 ? String(cycleTimeMin) : "";
+    }
     document.getElementById("plan").innerText = np ? "0" : (effectivePlan > 0 ? String(effectivePlan) : "-");
     if (effectivePlan > 0) syncTodayScanPlanOnRows(effectivePlan);
   } else {
@@ -3215,7 +3310,7 @@ function applyLiveState(state) {
     document.getElementById("cycleTarget").value = String(cycleTimeMin);
   }
   const lotInput = document.getElementById("lotInput");
-  if (lotInput) {
+  if (lotInput && document.activeElement !== lotInput) {
     lotInput.value = lotNo;
   }
   document.getElementById("actual").innerText = actual;
@@ -3333,6 +3428,54 @@ function loadInitialLiveState() {
     });
 }
 
+function applyRemoteMasterSettings(state) {
+  if (!state || isMonitor) return;
+  if (state.sender && state.sender === syncClientId) return;
+  const cycleEl = document.getElementById("cycleTarget");
+  const planEl = document.getElementById("dailyPlanTarget");
+  const lotEl = document.getElementById("lotInput");
+  const { daily, cycle } = readPlanAndCycleFromFirebase(state);
+  if (cycleEl && document.activeElement !== cycleEl && cycle != null && cycle > 0) {
+    cycleEl.value = String(cycle);
+  }
+  if (planEl && document.activeElement !== planEl && daily != null && daily >= 0) {
+    planEl.value = String(daily);
+    if (daily > 0) syncTodayScanPlanOnRows(daily);
+  }
+  if (lotEl && document.activeElement !== lotEl && typeof state.lotNo === "string") {
+    lotEl.value = state.lotNo;
+  }
+  if (typeof state.ramadanMode === "boolean" && state.ramadanMode !== ramadanMode) {
+    ramadanMode = state.ramadanMode;
+    const btn = document.getElementById("ramadanToggle");
+    if (btn) {
+      btn.innerText = ramadanMode ? "🌙 Ramadhan : ON" : "🌙 Ramadhan : OFF";
+      btn.style.background = "";
+    }
+  }
+  if (state.graphWtPreset) {
+    const next = normalizeGraphWtPreset(state.graphWtPreset);
+    if (graphWtPreset !== next) {
+      const prev = graphWtPreset;
+      graphWtPreset = next;
+      saveGraphWtPresetToStorage();
+      syncNonProductionDayMarkForToday();
+      applyGraphWtControlUi();
+      applyGraphWtPresetEffects(prev);
+    }
+  }
+  if (Array.isArray(state.nonProductionDays)) {
+    const valid = state.nonProductionDays.filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k));
+    const current = [...loadNonProductionDaysSet()].sort().join(",");
+    const incoming = [...valid].sort().join(",");
+    if (current !== incoming) {
+      saveNonProductionDaysSet(new Set(valid));
+      if (document.body.classList.contains("graph-mode")) renderGraphCharts();
+    }
+  }
+  updateDisplay();
+}
+
 function loadMonitorStateFromFirebase() {
   if (!isMonitor) return;
   if (!firebaseLiveStateRef) return;
@@ -3368,7 +3511,12 @@ function applyRemoteCommand(action) {
 /* ===== START ===== */
 
 function startProduction(shouldSync = true) {
-  if (isMonitor) return;
+  if (isMonitor) {
+    if (!isMasterRole() || isApplyingRemoteCommand) return;
+    if (isNonProductionMode()) return;
+    if (shouldSync) publishSyncCommand("start");
+    return;
+  }
   if (!canOperateLine()) return;
   if (isNonProductionMode()) {
     setStatus("NON PRODUCTION", "status-blue");
@@ -3412,7 +3560,11 @@ function startProduction(shouldSync = true) {
 
 /* STOP */
 function stopProduction(shouldSync = true) {
-  if (isMonitor) return;
+  if (isMonitor) {
+    if (!isMasterRole() || isApplyingRemoteCommand) return;
+    if (shouldSync) publishSyncCommand("stop");
+    return;
+  }
   if (!canOperateLine()) return;
 
   hasLocalSession = true;
@@ -3430,7 +3582,12 @@ function stopProduction(shouldSync = true) {
 
 /* RESET */
 function resetProduction(shouldSync = true) {
-  if (isMonitor) return;
+  if (isMonitor) {
+    if (!isMasterRole() || isApplyingRemoteCommand) return;
+    if (isNonProductionMode()) return;
+    if (shouldSync) publishSyncCommand("reset");
+    return;
+  }
   if (!canOperateLine()) return;
   if (isNonProductionMode()) return;
 
@@ -4268,71 +4425,20 @@ function formatBarChartValue(v) {
 /** Green / purple actual trend lines: stroke draw + dots timed along the path. */
 function animateTrendLines(container) {
   if (!container) return;
-  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const run = () => {
-    const lines = container.querySelectorAll("path.trend-line-actual, path.trend-line");
-    lines.forEach((path, lineIdx) => {
-      let len = 0;
-      try {
-        len = path.getTotalLength();
-      } catch (_) {
-        len = 0;
-      }
-      if (!Number.isFinite(len) || len <= 0) {
-        path.style.strokeDasharray = "";
-        path.style.strokeDashoffset = "";
-        path.style.animation = "none";
-        return;
-      }
-
-      const durationSec = Math.min(1.75, Math.max(0.9, len / 320));
-      const baseDelayMs = lineIdx * 90;
-
-      if (reduceMotion) {
-        path.style.strokeDasharray = "";
-        path.style.strokeDashoffset = "";
-        path.style.animation = "none";
-      } else {
-        path.style.strokeDasharray = `${len}`;
-        path.style.strokeDashoffset = `${len}`;
-        path.style.animation = "none";
-        void path.getBoundingClientRect();
-        path.style.animation = `trendLineDraw ${durationSec}s var(--ease-smooth) ${baseDelayMs}ms forwards`;
-      }
-
-      const svg = path.closest("svg");
-      if (!svg) return;
-      const dots = [...svg.querySelectorAll("circle.trend-dot")];
-      const n = dots.length;
-      dots.forEach((dot, i) => {
-        const along = n <= 1 ? 1 : i / (n - 1);
-        const dotDelay = Math.round(baseDelayMs + durationSec * 1000 * along * 0.92);
-        if (reduceMotion) {
-          dot.style.animation = "none";
-          dot.style.opacity = "1";
-          return;
-        }
-        dot.style.opacity = "0";
-        dot.style.animation = "none";
-        void dot.getBoundingClientRect();
-        dot.style.animation = `trendDotPop .4s var(--ease-soft) ${dotDelay}ms forwards`;
-      });
-    });
-
-    container.querySelectorAll("path.trend-area-fill").forEach((area, i) => {
-      if (reduceMotion) {
-        area.style.opacity = "1";
-        area.style.animation = "none";
-        return;
-      }
-      const delay = 180 + i * 100;
-      area.style.opacity = "0";
-      area.style.animation = "none";
-      void area.getBoundingClientRect();
-      area.style.animation = `trendAreaFade 0.85s var(--ease-smooth) ${delay}ms forwards`;
-    });
-  };
-  requestAnimationFrame(() => requestAnimationFrame(run));
+  const lines = container.querySelectorAll("path.trend-line-actual, path.trend-line");
+  lines.forEach(path => {
+    path.style.strokeDasharray = "none";
+    path.style.strokeDashoffset = "0";
+    path.style.animation = "none";
+  });
+  container.querySelectorAll("circle.trend-dot").forEach(dot => {
+    dot.style.opacity = "1";
+    dot.style.animation = "none";
+  });
+  container.querySelectorAll("path.trend-area-fill").forEach(area => {
+    area.style.opacity = "1";
+    area.style.animation = "none";
+  });
 }
 
 /** Smooth HTML tooltip for Production Trend target / actual hover. */
@@ -4852,14 +4958,15 @@ function isWeekendIsoDay(dayKey) {
  * Past days → plan saved on scan rows. Day has scans → compare to Daily Plan (fallback).
  * Otherwise → 0 unless legacy implicit weekday plan is enabled in SETTINGS.
  */
-function computeDayTargetsForReport(dayKeys, dailyActualMap, fallbackDayPlan) {
+function computeDayTargetsForReport(dayKeys, dailyActualMap, fallbackDayPlan, dayPlanMap) {
   const legacyImplicitWeekday =
     SETTINGS.productionTrend?.implicitDailyPlanOnInactiveWeekdays === true;
   const zWeekend = SETTINGS.productionTrend?.zeroTargetOnInactiveWeekends !== false;
   const dayTarget = {};
   dayKeys.forEach(k => {
-    const resolved = resolveReportPlanForDay(k, fallbackDayPlan);
+    const historical = dayPlanMap ? dayPlanMap[k] : undefined;
     const dayActual = dailyActualMap[k] || 0;
+    const resolved = resolveReportPlanForDay(k, fallbackDayPlan, historical, dayActual, !!dayPlanMap);
     if (Number.isFinite(resolved) && resolved > 0) {
       dayTarget[k] = resolved;
     } else if (dayActual > 0) {
@@ -4877,28 +4984,33 @@ function computeDayTargetsForReport(dayKeys, dailyActualMap, fallbackDayPlan) {
   return dayTarget;
 }
 
-function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphPeriod) {
+function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphPeriod, precomputed) {
   const range = getActiveGraphRange();
   const rangeLabel = formatIsoRangeAsDdMmYy(range.start, range.end);
-  const dayKeys = getDayKeysBetween(range.start, range.end);
-  const daySet = new Set(dayKeys);
+  const dayKeys = precomputed?.dayKeys || getDayKeysBetween(range.start, range.end);
   const periodLabel = getTrendChartPeriodLabel(range.start, range.end, period);
 
-  const dailyActualMap = {};
-  const rows = document.querySelectorAll("#scanTable tr");
-  rows.forEach(row => {
-    const cells = row.querySelectorAll("td");
-    if (!cells.length) return;
-    const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
-    if (!rowDay || !daySet.has(rowDay)) return;
-    dailyActualMap[rowDay] = (dailyActualMap[rowDay] || 0) + 1;
-  });
+  const dailyActualMap = precomputed?.dayProduced || (() => {
+    const daySet = new Set(dayKeys);
+    const map = {};
+    const rows = document.getElementById("scanTable")?.rows;
+    if (!rows) return map;
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const cells = row.cells;
+      if (!cells || !cells.length) continue;
+      const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
+      if (!rowDay || !daySet.has(rowDay)) continue;
+      map[rowDay] = (map[rowDay] || 0) + 1;
+    }
+    return map;
+  })();
 
   let fallbackDayPlan = parseInt(String(document.getElementById("plan")?.innerText || "").trim(), 10);
   if (!Number.isFinite(fallbackDayPlan) || fallbackDayPlan <= 0) {
     fallbackDayPlan = parseInt(document.getElementById("dailyPlanTarget")?.value || "0", 10) || 0;
   }
-  const dayTarget = computeDayTargetsForReport(dayKeys, dailyActualMap, fallbackDayPlan);
+  const dayTarget = precomputed?.dayTarget || computeDayTargetsForReport(dayKeys, dailyActualMap, fallbackDayPlan);
   const skipNpDay = k => isReportNonProductionDay(k, dailyActualMap);
   const totalPlan = dayKeys.reduce((sum, key) => sum + (skipNpDay(key) ? 0 : (dayTarget[key] || 0)), 0);
 
@@ -5065,14 +5177,19 @@ function getHistoricalPlanForDay(dayKey) {
 }
 
 /** Today uses live Daily Plan; past days use plan frozen on scan rows. */
-function resolveReportPlanForDay(dayKey, fallbackDayPlan) {
+function resolveReportPlanForDay(dayKey, fallbackDayPlan, historicalPlan, dayActualCount, fromScanCache) {
   const today = toIsoDateLocal(new Date());
   if (dayKey === today && Number.isFinite(fallbackDayPlan) && fallbackDayPlan > 0) {
     return fallbackDayPlan;
   }
-  const historical = getHistoricalPlanForDay(dayKey);
+  const historical = fromScanCache
+    ? (Number.isFinite(historicalPlan) ? historicalPlan : null)
+    : (Number.isFinite(historicalPlan) ? historicalPlan : getHistoricalPlanForDay(dayKey));
   if (Number.isFinite(historical) && historical > 0) return historical;
-  if (countScanRowsForDay(dayKey) > 0 && Number.isFinite(fallbackDayPlan) && fallbackDayPlan > 0) {
+  const count = fromScanCache
+    ? (Number.isFinite(dayActualCount) ? dayActualCount : 0)
+    : (Number.isFinite(dayActualCount) ? dayActualCount : countScanRowsForDay(dayKey));
+  if (count > 0 && Number.isFinite(fallbackDayPlan) && fallbackDayPlan > 0) {
     return fallbackDayPlan;
   }
   return historical;
@@ -5175,29 +5292,35 @@ function parseDayTimeTextToMs(dayKey, timeText) {
   return new Date(yy, mm - 1, dd, h, min, sec, 0).getTime();
 }
 
+function getTargetAchievedMsFromTimes(times, targetUnits) {
+  if (!Number.isFinite(targetUnits) || targetUnits <= 0 || !times || times.length < targetUnits) return null;
+  const sorted = times.length > 1 ? times.slice().sort((a, b) => a - b) : times;
+  return sorted[targetUnits - 1] || null;
+}
+
 function getTargetAchievedMsForDay(dayKey, targetUnits) {
   if (!Number.isFinite(targetUnits) || targetUnits <= 0) return null;
-  const rows = document.querySelectorAll("#scanTable tr");
   const times = [];
-  rows.forEach(row => {
-    const cells = row.querySelectorAll("td");
-    if (!cells.length) return;
+  const rows = document.getElementById("scanTable")?.rows;
+  if (!rows) return null;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const cells = row.cells;
+    if (!cells || !cells.length) continue;
     const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
-    if (rowDay !== dayKey) return;
+    if (rowDay !== dayKey) continue;
     const scanMsRaw = parseInt(String(row.dataset.scanMs || "").trim(), 10);
     if (Number.isFinite(scanMsRaw) && scanMsRaw > 0) {
       times.push(scanMsRaw);
-      return;
+      continue;
     }
     const parsedMs = parseDayTimeTextToMs(rowDay, cells[2]?.innerText || "");
     if (Number.isFinite(parsedMs)) times.push(parsedMs);
-  });
-  if (times.length < targetUnits) return null;
-  times.sort((a, b) => a - b); // earliest -> latest
-  return times[targetUnits - 1] || null;
+  }
+  return getTargetAchievedMsFromTimes(times, targetUnits);
 }
 
-function calcActualWtMinsForDay(dayKey, targetUnits = 0) {
+function calcActualWtMinsForDay(dayKey, targetUnits = 0, achievedMsOpt) {
   const shiftStartMin = Number(SETTINGS.shiftSchedule.startMinute);
   const shiftEndMin = Number(SETTINGS.shiftSchedule.endMinute);
   if (!Number.isFinite(shiftStartMin) || !Number.isFinite(shiftEndMin) || shiftEndMin <= shiftStartMin) return null;
@@ -5209,7 +5332,9 @@ function calcActualWtMinsForDay(dayKey, targetUnits = 0) {
   const shiftStartMs = dayStartMs + (shiftStartMin * 60 * 1000);
   const shiftEndMs = dayStartMs + (shiftEndMin * 60 * 1000);
   const todayKey = toIsoDateLocal(new Date());
-  const achievedMs = getTargetAchievedMsForDay(dayKey, targetUnits);
+  const achievedMs = achievedMsOpt !== undefined
+    ? achievedMsOpt
+    : getTargetAchievedMsForDay(dayKey, targetUnits);
 
   if (dayKey < todayKey) {
     // Past day: full configured shift window minus scheduled breaks
@@ -5259,14 +5384,14 @@ function calcActualEffPct(planUnits, actualUnits, planWtMins, actualWtMins) {
   return Number(Math.max(0, unitsRatio * PLAN_EFF_PCT).toFixed(1));
 }
 
-function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, rangeLabel) {
+function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, rangeLabel, achievedMs) {
   const planEffPct = PLAN_EFF_PCT;
   const planWtMins = getPlanWtMinsForDay(dayKey);
   const nonProdDay = dayKey && isReportNonProductionDay(dayKey, dayProduced);
 
   const planUnits = dayTarget?.[dayKey] || 0;
   const actualUnits = dayProduced?.[dayKey] || 0;
-  const actualWtMins = nonProdDay ? 0 : calcActualWtMinsForDay(dayKey, planUnits);
+  const actualWtMins = nonProdDay ? 0 : calcActualWtMinsForDay(dayKey, planUnits, achievedMs);
 
   const actualEffPct = nonProdDay ? 0 : calcActualEffPct(planUnits, actualUnits, planWtMins, actualWtMins);
   const actualEffClass = nonProdDay
@@ -5326,61 +5451,55 @@ function renderGraphCharts() {
   const activeDay = getActiveGraphDayKey();
   const range = getActiveGraphRange();
   const rangeLabel = formatIsoRangeAsDdMmYy(range.start, range.end);
-  const { labels, downtimeMins } = collectHourlyGraphData(activeDay, graphPeriod);
   const periodLabel = getTrendChartPeriodLabel(range.start, range.end, graphPeriod);
   const periodKeys = getDayKeysBetween(range.start, range.end);
   if (graphFocusedDayKey && !periodKeys.includes(graphFocusedDayKey)) {
     graphFocusedDayKey = null;
   }
-  const keySet = new Set(periodKeys);
-  const rows = document.querySelectorAll("#scanTable tr");
-  const dayProduced = {};
-  const dayDowntimeSec = {};
-  periodKeys.forEach(k => { dayProduced[k] = 0; dayDowntimeSec[k] = 0; });
-  rows.forEach(row => {
-    const cells = row.querySelectorAll("td");
-    if (!cells.length) return;
-    const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
-    if (!rowDay || !keySet.has(rowDay)) return;
-    dayProduced[rowDay] = (dayProduced[rowDay] || 0) + 1;
-    const statusText = (cells[8]?.innerText || "").trim().toUpperCase();
-    if (statusText === "DOWN TIME") {
-      dayDowntimeSec[rowDay] = (dayDowntimeSec[rowDay] || 0) + parseMmSsToSeconds(cells[9]?.innerText || "");
-    }
-  });
+  const stats = collectScanTableStats(periodKeys);
+  const dayProduced = stats.dayProduced;
+  const dayDowntimeSec = stats.dayDowntimeSec;
+  let labels;
+  let downtimeMins;
+  if (graphPeriod === "day" && periodKeys.length === 1) {
+    ({ labels, downtimeMins } = collectHourlyGraphData(activeDay, graphPeriod));
+  } else {
+    labels = periodKeys.map(k => {
+      const dt = new Date(`${k}T00:00:00`);
+      if (graphPeriod === "week") {
+        const dName = dt.toLocaleDateString(undefined, { weekday: "short" });
+        return `${dName} ${k.slice(8, 10)}`;
+      }
+      return dt.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    });
+    downtimeMins = periodKeys.map(k => {
+      const sec = stats.dayDowntimeSecAny[k] || 0;
+      if (sec <= 0) return 0;
+      return Math.max(1, Math.round(sec / 60));
+    });
+  }
   let fallbackDayPlan = parseInt(String(document.getElementById("plan")?.innerText || "").trim(), 10);
   if (!Number.isFinite(fallbackDayPlan) || fallbackDayPlan <= 0) {
     fallbackDayPlan = parseInt(document.getElementById("dailyPlanTarget")?.value || "0", 10) || 0;
   }
-  const dayTarget = computeDayTargetsForReport(periodKeys, dayProduced, fallbackDayPlan);
+  const dayTarget = computeDayTargetsForReport(periodKeys, dayProduced, fallbackDayPlan, stats.dayPlan);
   graphReportCache = {
     anchorDay: activeDay,
     periodKeys,
     dayProduced,
     dayTarget,
-    periodLabel: getTrendChartPeriodLabel(range.start, range.end, graphPeriod),
-    rangeLabel: formatIsoRangeAsDdMmYy(range.start, range.end)
+    periodLabel,
+    rangeLabel
   };
   const totalProduced = periodKeys.reduce((s, k) => s + (dayProduced[k] || 0), 0);
   const totalTarget = periodKeys.reduce((s, k) => s + (dayTarget[k] || 0), 0);
   const totalDowntimeMin = Math.max(0, Math.round(periodKeys.reduce((s, k) => s + (dayDowntimeSec[k] || 0), 0) / 60));
   const avgRate = totalProduced > 0 ? (totalProduced / Math.max(periodKeys.length * 8, 1)) : 0;
-  const dailyRows = periodKeys.map(k => {
-    const produced = dayProduced[k] || 0;
-    const target = dayTarget[k] || 0;
-    const balance = produced - target;
-    const ach = target > 0 ? ((produced / target) * 100) : 0;
-    const dtMin = Math.max(0, Math.round((dayDowntimeSec[k] || 0) / 60));
-    return `<tr>
-      <td>${formatIsoDateAsDdMmYy(k)}</td>
-      <td>${target}</td>
-      <td>${produced}</td>
-      <td class="${balance < 0 ? "summary-downtime-red" : "summary-status-scanned"}">${balance > 0 ? "+" : ""}${balance}</td>
-      <td>${ach.toFixed(1)}%</td>
-      <td>${dtMin}</td>
-    </tr>`;
-  }).join("");
-  const planActualChart = buildPlanVsActualChart(activeDay, graphPeriod);
+  const planActualChart = buildPlanVsActualChart(activeDay, graphPeriod, {
+    dayKeys: periodKeys,
+    dayProduced,
+    dayTarget
+  });
   const downtimeChart = buildSummaryBarChart(
     `DOWNTIME TREND (${periodLabel}: ${rangeLabel})`,
     labels,
@@ -5396,21 +5515,24 @@ function renderGraphCharts() {
     }
   );
   const scopeDayKey = graphFocusedDayKey || activeDay;
-  const wtCards = buildEffWtCardsHtmlForDay(scopeDayKey, dayProduced, dayTarget, periodLabel, rangeLabel);
-  const effTrendKeys = periodKeys;
-  const oeeLabels = effTrendKeys.map(k => {
+  const scopeTarget = dayTarget[scopeDayKey] || 0;
+  const scopeAchievedMs = getTargetAchievedMsFromTimes(stats.dayScanTimes[scopeDayKey] || [], scopeTarget);
+  const wtCards = buildEffWtCardsHtmlForDay(scopeDayKey, dayProduced, dayTarget, periodLabel, rangeLabel, scopeAchievedMs);
+  const oeeLabels = periodKeys.map(k => {
     const d = new Date(`${k}T00:00:00`);
     return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
   });
-  const oeeValues = effTrendKeys.map(k => {
+  const oeeValues = periodKeys.map(k => {
     if (isReportNonProductionDay(k, dayProduced)) return 0;
     const target = dayTarget[k] || 0;
     const produced = dayProduced[k] || 0;
     const planWtMins = getPlanWtMinsForDay(k);
-    const actualWtMins = calcActualWtMinsForDay(k, target);
+    const times = stats.dayScanTimes[k] || [];
+    const achievedMs = getTargetAchievedMsFromTimes(times, target);
+    const actualWtMins = calcActualWtMinsForDay(k, target, achievedMs);
     return calcActualEffPct(target, produced, planWtMins, actualWtMins) ?? 0;
   });
-  const planEffValues = effTrendKeys.map(k => {
+  const planEffValues = periodKeys.map(k => {
     if (isReportNonProductionDay(k, dayProduced)) return 0;
     return (dayTarget[k] || 0) > 0 ? PLAN_EFF_PCT : 0;
   });
@@ -5421,7 +5543,7 @@ function renderGraphCharts() {
     planEffValues,
     "%",
     "%",
-    effTrendKeys,
+    periodKeys,
     dayProduced
   );
   graphBody.innerHTML = `
@@ -5472,42 +5594,47 @@ function showGraphPage() {
     graphPage.id = "graphPage";
     graphPage.className = "graph-page";
     document.body.appendChild(graphPage);
+    graphPageShellReady = false;
   }
 
-  graphPage.innerHTML = `
-    <div class="summary-head">Production Report</div>
-    <div class="graph-filter-row">
-      <div class="graph-period-toggle" role="group" aria-label="Graph period">
-        <button type="button" id="graphPeriodWeekBtn" class="graph-period-btn">Week</button>
-        <button type="button" id="graphPeriodMonthBtn" class="graph-period-btn">Month</button>
-      </div>
-      <div class="graph-range-box">
-        <span class="graph-range-label">DATE RANGE</span>
-        <div class="graph-range-inputs">
-          <input type="text" class="app-date-input" id="graphRangeStart" title="Graph range start date" placeholder="dd/mm/yyyy" readonly>
-          <span class="graph-range-sep">-</span>
-          <input type="text" class="app-date-input" id="graphRangeEnd" title="Graph range end date" placeholder="dd/mm/yyyy" readonly>
-          <button type="button" id="graphRangeTodayBtn" class="graph-today-btn">Today</button>
+  if (!graphPageShellReady || !document.getElementById("graphChartsBody")) {
+    graphPage.innerHTML = `
+      <div class="summary-head">Production Report</div>
+      <div class="graph-filter-row">
+        <div class="graph-period-toggle" role="group" aria-label="Graph period">
+          <button type="button" id="graphPeriodWeekBtn" class="graph-period-btn">Week</button>
+          <button type="button" id="graphPeriodMonthBtn" class="graph-period-btn">Month</button>
+        </div>
+        <div class="graph-range-box">
+          <span class="graph-range-label">DATE RANGE</span>
+          <div class="graph-range-inputs">
+            <input type="text" class="app-date-input" id="graphRangeStart" title="Graph range start date" placeholder="dd/mm/yyyy" readonly>
+            <span class="graph-range-sep">-</span>
+            <input type="text" class="app-date-input" id="graphRangeEnd" title="Graph range end date" placeholder="dd/mm/yyyy" readonly>
+            <button type="button" id="graphRangeTodayBtn" class="graph-today-btn">Today</button>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="report-body" id="graphChartsBody">
-    </div>
-  `;
+      <div class="report-body" id="graphChartsBody"></div>
+    `;
+    const graphRangeTodayBtn = document.getElementById("graphRangeTodayBtn");
+    const graphPeriodWeekBtn = document.getElementById("graphPeriodWeekBtn");
+    const graphPeriodMonthBtn = document.getElementById("graphPeriodMonthBtn");
+    if (graphRangeTodayBtn) graphRangeTodayBtn.addEventListener("click", onGraphRangeTodayClick);
+    if (graphPeriodWeekBtn) graphPeriodWeekBtn.addEventListener("click", () => onGraphPeriodChange("week"));
+    if (graphPeriodMonthBtn) graphPeriodMonthBtn.addEventListener("click", () => onGraphPeriodChange("month"));
+    graphPageShellReady = true;
+  }
   if (!graphRangeStartDate || !graphRangeEndDate) {
     applyGraphPeriodRange(toIsoDateLocal(new Date()), graphPeriod, false);
   }
-  syncGraphRangePickerUi();
+  const graphRangeStartEl = document.getElementById("graphRangeStart");
+  if (!graphRangeStartEl || !datePickerRegistry.get(graphRangeStartEl)) {
+    initGraphRangeDatePickers();
+  } else {
+    syncGraphRangePickerUi();
+  }
   syncGraphPeriodButtonsUi();
-  initGraphRangeDatePickers();
-  const graphRangeStart = document.getElementById("graphRangeStart");
-  const graphRangeEnd = document.getElementById("graphRangeEnd");
-  const graphRangeTodayBtn = document.getElementById("graphRangeTodayBtn");
-  const graphPeriodWeekBtn = document.getElementById("graphPeriodWeekBtn");
-  const graphPeriodMonthBtn = document.getElementById("graphPeriodMonthBtn");
-  if (graphRangeTodayBtn) graphRangeTodayBtn.addEventListener("click", onGraphRangeTodayClick);
-  if (graphPeriodWeekBtn) graphPeriodWeekBtn.addEventListener("click", () => onGraphPeriodChange("week"));
-  if (graphPeriodMonthBtn) graphPeriodMonthBtn.addEventListener("click", () => onGraphPeriodChange("month"));
   try {
     renderGraphCharts();
   } catch (err) {
@@ -5683,6 +5810,7 @@ document.addEventListener("keydown", (event) => {
 /* ===== RAMADHAN TOGGLE ===== */
 
 function toggleRamadan() {
+  if (!isMasterRole()) return;
   ramadanMode = !ramadanMode;
 
   const btn = document.getElementById("ramadanToggle");
@@ -5697,6 +5825,10 @@ function toggleRamadan() {
   btn.style.background = "";
 
   updateDisplay();
+  if (isMonitor) {
+    publishMasterSettingsFromInputs();
+    return;
+  }
   // Persist Ramadhan mode so the backend clock matches the operator's break windows.
   if (hasLocalSession) updateLiveStateOnly();
 }
@@ -6208,7 +6340,8 @@ document.getElementById("cycleTarget").addEventListener("input", () => {
   }
   hasLocalSession = true;
   updateDisplay();
-  updateLiveStateOnly();
+  if (isMonitor) publishMasterSettingsFromInputs();
+  else updateLiveStateOnly();
 });
 
 document.getElementById("dailyPlanTarget").addEventListener("input", () => {
@@ -6217,14 +6350,16 @@ document.getElementById("dailyPlanTarget").addEventListener("input", () => {
   syncTodayScanPlanOnRows(plan);
   hasLocalSession = true;
   updateDisplay();
-  updateLiveStateOnly();
+  if (isMonitor) publishMasterSettingsFromInputs();
+  else updateLiveStateOnly();
   if (document.getElementById("graphChartsBody")) renderGraphCharts();
 });
 
 document.getElementById("lotInput").addEventListener("input", () => {
   if (!isMasterRole()) return;
   hasLocalSession = true;
-  updateLiveStateOnly();
+  if (isMonitor) publishMasterSettingsFromInputs();
+  else updateLiveStateOnly();
 });
 
 const historyDayFilterEl = document.getElementById("historyDayFilter");
@@ -6281,9 +6416,7 @@ window.onload = async function() {
     if (engineInput) engineInput.style.display = "none";
     if (keyInput) keyInput.style.display = "none";
 
-    document.getElementById("cycleTarget").readOnly = true;
-    document.getElementById("dailyPlanTarget").readOnly = true;
-    document.getElementById("lotInput").readOnly = true;
+    applyMainPcEditLock();
 
     // Dashboard cards/status: Firebase realtime listener source of truth
     // (attached in initFirebaseSync). Avoid duplicate polling reads.
