@@ -106,6 +106,7 @@ let firebaseDb = null;
 let firebaseCommandRef = null;
 let firebaseLiveStateRef = null;
 let firebaseShiftScheduleRef = null;
+let firebaseAppearanceRef = null;
 /** Firebase server clock minus local clock — keeps countdown aligned across PCs. */
 let serverTimeOffsetMs = 0;
 let monitorCountdownRender = null;
@@ -249,7 +250,8 @@ function applyAppRoleUi() {
     if (
       document.body.classList.contains("summary-mode") ||
       document.body.classList.contains("graph-mode") ||
-      document.body.classList.contains("history-mode")
+      document.body.classList.contains("history-mode") ||
+      document.body.classList.contains("appearance-mode")
     ) {
       showMainPage();
     }
@@ -299,6 +301,22 @@ function onRoleOptionClick(event, role) {
 
 function isNonProductionMode() {
   return graphWtPreset === "nonproduction";
+}
+
+function isNonProductionLiveState(state, status) {
+  const st = String(status || (state && state.status) || "").trim().toUpperCase();
+  if (st === "NON PRODUCTION") return true;
+  if (state && normalizeGraphWtPreset(state.graphWtPreset) === "nonproduction") return true;
+  return isNonProductionMode();
+}
+
+function getConfiguredDailyPlan() {
+  return parseInt(document.getElementById("dailyPlanTarget")?.value || "0", 10) || 0;
+}
+
+/** Dashboard / live-card target. Non-production days have no output target. */
+function getDashboardPlan() {
+  return isNonProductionMode() ? 0 : getConfiguredDailyPlan();
 }
 
 function loadNonProductionDaysSet() {
@@ -583,6 +601,8 @@ const FIREBASE_COMMAND_PATH = "production/commands/latest";
 const FIREBASE_LIVE_STATE_PATH = "production/liveState";
 /** Operator (main) writes; ?monitor PCs read and mirror local shift / auto-window. */
 const FIREBASE_SHIFT_SCHEDULE_PATH = "production/shiftSchedule";
+const FIREBASE_APPEARANCE_PATH = "production/appearance";
+const APPEARANCE_STORAGE_KEY = "TF2_APPEARANCE";
 const FIREBASE_CONFIG = window.FIREBASE_CONFIG || {
   apiKey: "AIzaSyBFKY6pmz_1UPAmozY65aMnWr0n7Mdka8I",
   authDomain: "monitoring-system-61d36.firebaseapp.com",
@@ -1891,6 +1911,638 @@ function toggleOvertimeFromMenu() {
   openOvertimeModal();
 }
 
+/* ================= THEME & BRAND ================= */
+
+const DEFAULT_APPEARANCE = {
+  themeId: "midnight",
+  title: "TF 2 PRODUCTION MONITORING SYSTEM",
+  subtitle: "Real-time overview of production",
+  menuLine1: "PRODUCTION",
+  menuLine2: "MONITORING SYSTEM",
+  footer: "© 2026 Production System",
+  logoEmoji: "🏭",
+  logoData: "",
+  accent: ""
+};
+
+const APPEARANCE_EMOJIS = ["🏭", "🚗", "🔧", "⚙️", "🏢", "🛠️", "📦", "🚜", "⚡", "🛢️"];
+
+const THEME_PRESETS = {
+  midnight: {
+    label: "Midnight Factory",
+    light: false,
+    swatch: ["#000000", "#0b1220", "#38bdf8", "#22c55e"],
+    vars: {
+      "--bg": "#000000",
+      "--panel": "#000000",
+      "--text": "#e2e8f0",
+      "--text-muted": "#94a3b8",
+      "--text-soft": "#cbd5e1",
+      "--border": "rgba(148,163,184,0.18)",
+      "--border-strong": "rgba(71,85,105,.45)",
+      "--blue": "#38bdf8",
+      "--accent": "#38bdf8",
+      "--accent-soft": "#93c5fd",
+      "--green": "#22c55e",
+      "--red": "#ef4444",
+      "--orange": "#f97316",
+      "--card-bg": "linear-gradient(180deg, rgba(8,13,25,0.96), rgba(6,10,20,0.98))",
+      "--card-glow": "rgba(56,189,248,0.08)",
+      "--input-bg": "rgba(2,6,23,0.72)",
+      "--header-fg": "#dbeafe",
+      "--table-bg": "#020617",
+      "--table-th": "#0f172a"
+    }
+  },
+  navy: {
+    label: "Steel Navy",
+    light: false,
+    swatch: ["#020617", "#0f172a", "#60a5fa", "#38bdf8"],
+    vars: {
+      "--bg": "#020617",
+      "--panel": "#07111f",
+      "--text": "#e2e8f0",
+      "--text-muted": "#94a3b8",
+      "--text-soft": "#cbd5e1",
+      "--border": "rgba(96,165,250,0.22)",
+      "--border-strong": "rgba(59,130,246,.4)",
+      "--blue": "#60a5fa",
+      "--accent": "#60a5fa",
+      "--accent-soft": "#93c5fd",
+      "--green": "#22c55e",
+      "--red": "#ef4444",
+      "--orange": "#f59e0b",
+      "--card-bg": "linear-gradient(180deg, rgba(15,23,42,0.96), rgba(8,15,30,0.98))",
+      "--card-glow": "rgba(96,165,250,0.14)",
+      "--input-bg": "rgba(15,23,42,0.85)",
+      "--header-fg": "#dbeafe",
+      "--table-bg": "#020617",
+      "--table-th": "#0f172a"
+    }
+  },
+  forest: {
+    label: "Forest Line",
+    light: false,
+    swatch: ["#04110c", "#0b1f16", "#34d399", "#86efac"],
+    vars: {
+      "--bg": "#04110c",
+      "--panel": "#071a12",
+      "--text": "#ecfdf5",
+      "--text-muted": "#86efac",
+      "--text-soft": "#d1fae5",
+      "--border": "rgba(52,211,153,0.22)",
+      "--border-strong": "rgba(16,185,129,.4)",
+      "--blue": "#34d399",
+      "--accent": "#34d399",
+      "--accent-soft": "#6ee7b7",
+      "--green": "#22c55e",
+      "--red": "#f87171",
+      "--orange": "#fbbf24",
+      "--card-bg": "linear-gradient(180deg, rgba(6,32,22,0.96), rgba(4,18,12,0.98))",
+      "--card-glow": "rgba(52,211,153,0.14)",
+      "--input-bg": "rgba(6,24,16,0.85)",
+      "--header-fg": "#d1fae5",
+      "--table-bg": "#03140d",
+      "--table-th": "#0b2418"
+    }
+  },
+  amber: {
+    label: "Amber Plant",
+    light: false,
+    swatch: ["#120a03", "#2a1706", "#fbbf24", "#fb923c"],
+    vars: {
+      "--bg": "#120a03",
+      "--panel": "#1a0f05",
+      "--text": "#fff7ed",
+      "--text-muted": "#fdba74",
+      "--text-soft": "#fed7aa",
+      "--border": "rgba(251,191,36,0.22)",
+      "--border-strong": "rgba(245,158,11,.42)",
+      "--blue": "#fbbf24",
+      "--accent": "#fbbf24",
+      "--accent-soft": "#fde68a",
+      "--green": "#4ade80",
+      "--red": "#f87171",
+      "--orange": "#fb923c",
+      "--card-bg": "linear-gradient(180deg, rgba(42,23,6,0.96), rgba(18,10,3,0.98))",
+      "--card-glow": "rgba(251,191,36,0.16)",
+      "--input-bg": "rgba(30,16,4,0.85)",
+      "--header-fg": "#ffedd5",
+      "--table-bg": "#120a03",
+      "--table-th": "#271504"
+    }
+  },
+  crimson: {
+    label: "Crimson Shift",
+    light: false,
+    swatch: ["#140406", "#2a0b10", "#fb7185", "#f43f5e"],
+    vars: {
+      "--bg": "#140406",
+      "--panel": "#1c070b",
+      "--text": "#ffe4e6",
+      "--text-muted": "#fda4af",
+      "--text-soft": "#fecdd3",
+      "--border": "rgba(251,113,133,0.24)",
+      "--border-strong": "rgba(244,63,94,.42)",
+      "--blue": "#fb7185",
+      "--accent": "#fb7185",
+      "--accent-soft": "#fda4af",
+      "--green": "#4ade80",
+      "--red": "#ef4444",
+      "--orange": "#fb923c",
+      "--card-bg": "linear-gradient(180deg, rgba(42,11,16,0.96), rgba(20,4,6,0.98))",
+      "--card-glow": "rgba(251,113,133,0.16)",
+      "--input-bg": "rgba(30,8,12,0.85)",
+      "--header-fg": "#ffe4e6",
+      "--table-bg": "#140406",
+      "--table-th": "#2a0b10"
+    }
+  },
+  violet: {
+    label: "Violet Night",
+    light: false,
+    swatch: ["#0b0614", "#1e1033", "#a78bfa", "#c084fc"],
+    vars: {
+      "--bg": "#0b0614",
+      "--panel": "#12091f",
+      "--text": "#f5f3ff",
+      "--text-muted": "#c4b5fd",
+      "--text-soft": "#ddd6fe",
+      "--border": "rgba(167,139,250,0.24)",
+      "--border-strong": "rgba(139,92,246,.42)",
+      "--blue": "#a78bfa",
+      "--accent": "#a78bfa",
+      "--accent-soft": "#c4b5fd",
+      "--green": "#34d399",
+      "--red": "#f87171",
+      "--orange": "#fb923c",
+      "--card-bg": "linear-gradient(180deg, rgba(30,16,51,0.96), rgba(11,6,20,0.98))",
+      "--card-glow": "rgba(167,139,250,0.16)",
+      "--input-bg": "rgba(22,12,38,0.85)",
+      "--header-fg": "#ede9fe",
+      "--table-bg": "#0b0614",
+      "--table-th": "#1e1033"
+    }
+  },
+  daylight: {
+    label: "Day Shift",
+    light: true,
+    swatch: ["#e8eef5", "#ffffff", "#2563eb", "#0f172a"],
+    vars: {
+      "--bg": "#e8eef5",
+      "--panel": "#ffffff",
+      "--text": "#0f172a",
+      "--text-muted": "#64748b",
+      "--text-soft": "#334155",
+      "--border": "rgba(15,23,42,0.12)",
+      "--border-strong": "rgba(15,23,42,0.18)",
+      "--blue": "#2563eb",
+      "--accent": "#2563eb",
+      "--accent-soft": "#1d4ed8",
+      "--green": "#16a34a",
+      "--red": "#dc2626",
+      "--orange": "#ea580c",
+      "--card-bg": "linear-gradient(180deg, #ffffff, #f8fafc)",
+      "--card-glow": "rgba(37,99,235,0.12)",
+      "--input-bg": "#f8fafc",
+      "--header-fg": "#0f172a",
+      "--table-bg": "#ffffff",
+      "--table-th": "#e2e8f0"
+    }
+  }
+};
+
+let APPEARANCE = { ...DEFAULT_APPEARANCE };
+let appearanceSaveTimer = null;
+let appearancePublishTimer = null;
+let appearanceApplyingRemote = false;
+
+function clipAppearanceText(value, max) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
+}
+
+function isHexColor(value) {
+  return /^#[0-9a-fA-F]{6}$/.test(String(value || ""));
+}
+
+function isSafeLogoData(value) {
+  return typeof value === "string" &&
+    value.length > 32 &&
+    value.length < 180000 &&
+    /^data:image\/(png|jpe?g|gif|webp|svg\+xml);base64,/i.test(value);
+}
+
+function normalizeAppearance(raw) {
+  const src = raw && typeof raw === "object" ? raw : {};
+  const themeId = THEME_PRESETS[src.themeId] ? src.themeId : DEFAULT_APPEARANCE.themeId;
+  const logoEmoji = clipAppearanceText(src.logoEmoji, 8) || DEFAULT_APPEARANCE.logoEmoji;
+  return {
+    themeId,
+    title: clipAppearanceText(src.title, 80) || DEFAULT_APPEARANCE.title,
+    subtitle: clipAppearanceText(src.subtitle, 120) || DEFAULT_APPEARANCE.subtitle,
+    menuLine1: clipAppearanceText(src.menuLine1, 28) || DEFAULT_APPEARANCE.menuLine1,
+    menuLine2: clipAppearanceText(src.menuLine2, 32) || DEFAULT_APPEARANCE.menuLine2,
+    footer: clipAppearanceText(src.footer, 60) || DEFAULT_APPEARANCE.footer,
+    logoEmoji,
+    logoData: isSafeLogoData(src.logoData) ? src.logoData : "",
+    accent: isHexColor(src.accent) ? src.accent.toLowerCase() : ""
+  };
+}
+
+function loadAppearanceFromStorage() {
+  try {
+    const raw = localStorage.getItem(APPEARANCE_STORAGE_KEY);
+    if (!raw) {
+      APPEARANCE = { ...DEFAULT_APPEARANCE };
+      return;
+    }
+    APPEARANCE = normalizeAppearance(JSON.parse(raw));
+  } catch (_) {
+    APPEARANCE = { ...DEFAULT_APPEARANCE };
+  }
+}
+
+function saveAppearanceToStorage() {
+  try {
+    localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify(APPEARANCE));
+  } catch (_) {}
+}
+
+function scheduleAppearancePersist() {
+  if (appearanceApplyingRemote) return;
+  clearTimeout(appearanceSaveTimer);
+  appearanceSaveTimer = setTimeout(() => {
+    saveAppearanceToStorage();
+  }, 250);
+  clearTimeout(appearancePublishTimer);
+  appearancePublishTimer = setTimeout(() => {
+    publishAppearanceToFirebase();
+  }, 700);
+}
+
+function publishAppearanceToFirebase() {
+  if (!firebaseAppearanceRef || isMonitor || appearanceApplyingRemote) return;
+  const payload = {
+    themeId: APPEARANCE.themeId,
+    title: APPEARANCE.title,
+    subtitle: APPEARANCE.subtitle,
+    menuLine1: APPEARANCE.menuLine1,
+    menuLine2: APPEARANCE.menuLine2,
+    footer: APPEARANCE.footer,
+    logoEmoji: APPEARANCE.logoEmoji,
+    accent: APPEARANCE.accent,
+    sender: syncClientId,
+    updatedAt: firebase.database.ServerValue.TIMESTAMP
+  };
+  if (APPEARANCE.logoData && APPEARANCE.logoData.length < 90000) {
+    payload.logoData = APPEARANCE.logoData;
+  }
+  firebaseAppearanceRef.set(payload).catch(err => {
+    console.log("Firebase appearance publish error:", err);
+  });
+}
+
+function applyAppearanceFromRemote(payload) {
+  if (!payload || typeof payload !== "object") return;
+  if (payload.sender && payload.sender === syncClientId) return;
+  const next = normalizeAppearance(payload);
+  if (!payload.logoData && APPEARANCE.logoData) next.logoData = APPEARANCE.logoData;
+  appearanceApplyingRemote = true;
+  APPEARANCE = next;
+  saveAppearanceToStorage();
+  applyAppearance();
+  const page = document.getElementById("appearancePage");
+  if (page && page.dataset.bound === "1") syncAppearanceForm(page);
+  appearanceApplyingRemote = false;
+}
+
+function applyAppearance() {
+  const cfg = normalizeAppearance(APPEARANCE);
+  APPEARANCE = cfg;
+  const theme = THEME_PRESETS[cfg.themeId] || THEME_PRESETS.midnight;
+  const root = document.documentElement;
+  root.setAttribute("data-theme", cfg.themeId);
+  root.classList.toggle("theme-light", !!theme.light);
+  Object.entries(theme.vars).forEach(([key, value]) => {
+    root.style.setProperty(key, value);
+  });
+  if (cfg.accent) {
+    root.style.setProperty("--blue", cfg.accent);
+    root.style.setProperty("--accent", cfg.accent);
+    root.style.setProperty("--accent-soft", cfg.accent);
+    root.style.setProperty("--card-glow", cfg.accent + "29");
+  }
+  document.title = cfg.title;
+  const titleEl = document.getElementById("headerTitle");
+  const subEl = document.getElementById("headerSubtitle");
+  const line1 = document.getElementById("menuBrandLine1");
+  const line2 = document.getElementById("menuBrandLine2");
+  const footer = document.getElementById("menuFooterBrand");
+  if (titleEl) titleEl.textContent = cfg.title;
+  if (subEl) subEl.textContent = cfg.subtitle;
+  if (line1) line1.textContent = cfg.menuLine1;
+  if (line2) line2.textContent = cfg.menuLine2;
+  if (footer) footer.textContent = cfg.footer;
+  const icon = document.getElementById("menuBrandIcon");
+  if (icon) {
+    if (cfg.logoData) {
+      icon.classList.add("has-logo");
+      icon.innerHTML = "";
+      const img = document.createElement("img");
+      img.alt = "";
+      img.src = cfg.logoData;
+      icon.appendChild(img);
+    } else {
+      icon.classList.remove("has-logo");
+      icon.textContent = cfg.logoEmoji;
+    }
+  }
+  const headerLogo = document.getElementById("headerBrandLogo");
+  if (headerLogo) {
+    if (cfg.logoData) {
+      headerLogo.src = cfg.logoData;
+      headerLogo.hidden = false;
+    } else {
+      headerLogo.removeAttribute("src");
+      headerLogo.hidden = true;
+    }
+  }
+}
+
+function closeAppearancePage() {
+  document.body.classList.remove("appearance-mode");
+  const page = document.getElementById("appearancePage");
+  if (page) page.classList.remove("open");
+}
+
+function showAppearancePageFromMenu() {
+  toggleMenuDropdown(false);
+  showAppearancePage();
+}
+
+function appearancePageMarkup() {
+  const themeButtons = Object.entries(THEME_PRESETS).map(([id, theme]) => {
+    const swatches = theme.swatch.map(c => `<span style="background:${c}"></span>`).join("");
+    return `
+      <button type="button" class="theme-preset-btn" data-theme-id="${id}">
+        <span class="theme-swatch">${swatches}</span>
+        <span class="theme-preset-name">${theme.label}</span>
+      </button>`;
+  }).join("");
+  const emojis = APPEARANCE_EMOJIS.map(e =>
+    `<button type="button" class="appearance-emoji-btn" data-emoji="${e}" title="Use ${e}">${e}</button>`
+  ).join("");
+  return `
+    <div class="summary-head">Theme & Brand</div>
+    <p class="appearance-lead">Edit the plant name, logo, and color theme. Changes apply immediately and save on this PC.</p>
+    <div class="appearance-grid">
+      <section class="appearance-card">
+        <h3>Brand</h3>
+        <div class="appearance-fields">
+          <label class="span-2">Site title
+            <input type="text" id="appearanceTitle" maxlength="80" autocomplete="off">
+          </label>
+          <label class="span-2">Subtitle
+            <input type="text" id="appearanceSubtitle" maxlength="120" autocomplete="off">
+          </label>
+          <label>Menu line 1
+            <input type="text" id="appearanceMenu1" maxlength="28" autocomplete="off">
+          </label>
+          <label>Menu line 2
+            <input type="text" id="appearanceMenu2" maxlength="32" autocomplete="off">
+          </label>
+          <label class="span-2">Footer
+            <input type="text" id="appearanceFooter" maxlength="60" autocomplete="off">
+          </label>
+        </div>
+        <div class="appearance-logo-row">
+          <span>Logo icon</span>
+          <div class="appearance-emoji-row" id="appearanceEmojiRow">${emojis}</div>
+          <div class="appearance-logo-actions">
+            <label class="appearance-file-btn">Upload logo
+              <input type="file" id="appearanceLogoFile" accept="image/*" hidden>
+            </label>
+            <button type="button" class="appearance-clear-logo" id="appearanceClearLogo">Clear logo image</button>
+          </div>
+          <p class="appearance-note" id="appearanceLogoNote">Upload a square PNG or JPG. It is resized automatically.</p>
+          <p class="appearance-error" id="appearanceLogoError" hidden></p>
+        </div>
+      </section>
+      <section class="appearance-card">
+        <h3>Theme</h3>
+        <div class="theme-preset-grid" id="appearanceThemeGrid">${themeButtons}</div>
+        <div class="appearance-accent-row">
+          <label>Custom accent
+            <input type="color" id="appearanceAccentColor" value="#38bdf8">
+          </label>
+          <label>Hex
+            <input type="text" class="appearance-accent-hex" id="appearanceAccentHex" maxlength="7" placeholder="#38bdf8" autocomplete="off">
+          </label>
+          <button type="button" class="appearance-clear-logo" id="appearanceAccentReset">Use theme default</button>
+        </div>
+        <p class="appearance-note">Choose a preset, or override the accent color for buttons and highlights.</p>
+      </section>
+    </div>
+    <button type="button" class="appearance-reset" id="appearanceResetBtn">Reset to TF 2 defaults</button>
+  `;
+}
+
+function syncAppearanceForm(page) {
+  if (!page) return;
+  const setVal = (id, value) => {
+    const el = page.querySelector("#" + id);
+    if (el && document.activeElement !== el) el.value = value;
+  };
+  setVal("appearanceTitle", APPEARANCE.title);
+  setVal("appearanceSubtitle", APPEARANCE.subtitle);
+  setVal("appearanceMenu1", APPEARANCE.menuLine1);
+  setVal("appearanceMenu2", APPEARANCE.menuLine2);
+  setVal("appearanceFooter", APPEARANCE.footer);
+  const accent = APPEARANCE.accent || (THEME_PRESETS[APPEARANCE.themeId] || THEME_PRESETS.midnight).vars["--accent"];
+  setVal("appearanceAccentHex", accent);
+  const color = page.querySelector("#appearanceAccentColor");
+  if (color && document.activeElement !== color) color.value = accent;
+  page.querySelectorAll(".theme-preset-btn").forEach(btn => {
+    btn.classList.toggle("selected", btn.getAttribute("data-theme-id") === APPEARANCE.themeId);
+  });
+  page.querySelectorAll(".appearance-emoji-btn").forEach(btn => {
+    btn.classList.toggle("selected", !APPEARANCE.logoData && btn.getAttribute("data-emoji") === APPEARANCE.logoEmoji);
+  });
+}
+
+function readAppearanceForm(page) {
+  if (!page) return;
+  APPEARANCE = normalizeAppearance({
+    ...APPEARANCE,
+    title: page.querySelector("#appearanceTitle")?.value,
+    subtitle: page.querySelector("#appearanceSubtitle")?.value,
+    menuLine1: page.querySelector("#appearanceMenu1")?.value,
+    menuLine2: page.querySelector("#appearanceMenu2")?.value,
+    footer: page.querySelector("#appearanceFooter")?.value
+  });
+}
+
+function commitAppearanceFromForm(page) {
+  readAppearanceForm(page);
+  applyAppearance();
+  scheduleAppearancePersist();
+  syncAppearanceForm(page);
+}
+
+function resizeLogoFile(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !String(file.type || "").startsWith("image/")) {
+      reject(new Error("Please choose an image file."));
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      reject(new Error("Image must be under 2 MB."));
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const max = 128;
+      const scale = Math.min(1, max / Math.max(img.width || 1, img.height || 1));
+      const w = Math.max(1, Math.round((img.width || 1) * scale));
+      const h = Math.max(1, Math.round((img.height || 1) * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not read that image."));
+    };
+    img.src = url;
+  });
+}
+
+function bindAppearancePage(page) {
+  const onField = () => commitAppearanceFromForm(page);
+  ["appearanceTitle", "appearanceSubtitle", "appearanceMenu1", "appearanceMenu2", "appearanceFooter"].forEach(id => {
+    page.querySelector("#" + id)?.addEventListener("input", onField);
+  });
+  page.querySelectorAll(".theme-preset-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      APPEARANCE.themeId = btn.getAttribute("data-theme-id") || "midnight";
+      applyAppearance();
+      scheduleAppearancePersist();
+      syncAppearanceForm(page);
+    });
+  });
+  page.querySelectorAll(".appearance-emoji-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      APPEARANCE.logoEmoji = btn.getAttribute("data-emoji") || "🏭";
+      APPEARANCE.logoData = "";
+      applyAppearance();
+      scheduleAppearancePersist();
+      syncAppearanceForm(page);
+    });
+  });
+  const fileInput = page.querySelector("#appearanceLogoFile");
+  const errEl = page.querySelector("#appearanceLogoError");
+  fileInput?.addEventListener("change", async () => {
+    const file = fileInput.files && fileInput.files[0];
+    fileInput.value = "";
+    if (!file) return;
+    if (errEl) {
+      errEl.hidden = true;
+      errEl.textContent = "";
+    }
+    try {
+      APPEARANCE.logoData = await resizeLogoFile(file);
+      applyAppearance();
+      scheduleAppearancePersist();
+      syncAppearanceForm(page);
+    } catch (err) {
+      if (errEl) {
+        errEl.textContent = err.message || "Could not use that image.";
+        errEl.hidden = false;
+      }
+    }
+  });
+  page.querySelector("#appearanceClearLogo")?.addEventListener("click", () => {
+    APPEARANCE.logoData = "";
+    applyAppearance();
+    scheduleAppearancePersist();
+    syncAppearanceForm(page);
+  });
+  const applyAccent = (hex) => {
+    APPEARANCE.accent = isHexColor(hex) ? hex.toLowerCase() : APPEARANCE.accent;
+    applyAppearance();
+    scheduleAppearancePersist();
+    syncAppearanceForm(page);
+  };
+  page.querySelector("#appearanceAccentColor")?.addEventListener("input", ev => {
+    applyAccent(ev.target.value);
+  });
+  page.querySelector("#appearanceAccentHex")?.addEventListener("input", ev => {
+    const hex = String(ev.target.value || "").trim();
+    if (isHexColor(hex)) applyAccent(hex);
+  });
+  page.querySelector("#appearanceAccentReset")?.addEventListener("click", () => {
+    APPEARANCE.accent = "";
+    applyAppearance();
+    scheduleAppearancePersist();
+    syncAppearanceForm(page);
+  });
+  page.querySelector("#appearanceResetBtn")?.addEventListener("click", () => {
+    APPEARANCE = { ...DEFAULT_APPEARANCE };
+    applyAppearance();
+    scheduleAppearancePersist();
+    syncAppearanceForm(page);
+  });
+}
+
+function showAppearancePage() {
+  if (!isAdminRole()) {
+    showMainPage();
+    return;
+  }
+  let page = document.getElementById("appearancePage");
+  if (!page) {
+    page = document.createElement("div");
+    page.id = "appearancePage";
+    page.className = "graph-page appearance-page";
+    document.body.appendChild(page);
+  }
+  if (page.dataset.bound !== "1") {
+    page.innerHTML = appearancePageMarkup();
+    bindAppearancePage(page);
+    page.dataset.bound = "1";
+  }
+  syncAppearanceForm(page);
+
+  document.body.classList.remove("summary-mode");
+  document.body.classList.remove("graph-mode");
+  document.body.classList.remove("history-mode");
+  const summaryPage = document.getElementById("summaryPage");
+  if (summaryPage) summaryPage.classList.remove("open");
+  const graphPage = document.getElementById("graphPage");
+  if (graphPage) graphPage.classList.remove("open");
+  const historyPanel = document.getElementById("historyPanel");
+  if (historyPanel) historyPanel.classList.remove("open");
+  document.body.classList.add("appearance-mode");
+  page.classList.add("open");
+  triggerEnterAnimation(page);
+  updateViewToggleMenuItem();
+}
+
+function ensureAppearanceMenuItem() {
+  const menu = document.getElementById("menuDropdown");
+  const btn = document.getElementById("appearanceMenuItem");
+  const footer = menu?.querySelector(".menu-dropdown-footer");
+  if (!menu || !btn || !footer) return;
+  if (btn.nextElementSibling !== footer) {
+    menu.insertBefore(btn, footer);
+  }
+}
+
 /* ================= STRICT GLOBAL LOCK ================= */
 
 async function checkAccess() {
@@ -2027,8 +2679,9 @@ function isBreakTime() {
 
 function calculateExpectedOutput() {
   if (isMonitor) return 0;
+  if (isNonProductionMode()) return 0;
 
-  const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+  const plan = getDashboardPlan();
   if (actualCount >= plan && plan > 0) {
     return plan;
   }
@@ -2081,8 +2734,10 @@ function applyActualEffColorClass(el, pct) {
 
 function getTodayActualEffPct() {
   const dayKey = toIsoDateLocal(new Date());
-  if (isReportNonProductionDay(dayKey)) return 0;
-  const planUnits = parseInt(document.getElementById("dailyPlanTarget")?.value || "0", 10) || 0;
+  const statusText = document.getElementById("status")?.innerText?.trim().toUpperCase();
+  if (isNonProductionMode() || statusText === "NON PRODUCTION") return null;
+  if (isReportNonProductionDay(dayKey)) return null;
+  const planUnits = getDashboardPlan();
   const planWtMins = getPlanWtMinsForDay(dayKey);
   const actualWtMins = calcActualWtMinsForDay(dayKey, planUnits);
   return calcActualEffPct(planUnits, actualCount, planWtMins, actualWtMins);
@@ -2133,6 +2788,7 @@ function initFirebaseSync() {
   firebaseCommandRef = firebaseDb.ref(FIREBASE_COMMAND_PATH);
   firebaseLiveStateRef = firebaseDb.ref(FIREBASE_LIVE_STATE_PATH);
   firebaseShiftScheduleRef = firebaseDb.ref(FIREBASE_SHIFT_SCHEDULE_PATH);
+  firebaseAppearanceRef = firebaseDb.ref(FIREBASE_APPEARANCE_PATH);
 
   firebaseDb.ref(".info/serverTimeOffset").on("value", snap => {
     const offset = snap.val();
@@ -2147,9 +2803,17 @@ function initFirebaseSync() {
     if (v) applyShiftScheduleFromRemote(v);
   });
 
+  firebaseAppearanceRef.on("value", snapshot => {
+    const v = snapshot.val();
+    if (v) applyAppearanceFromRemote(v);
+  });
+
   if (!isMonitor) {
     firebaseShiftScheduleRef.once("value").then(snap => {
       if (!snap.val()) publishShiftScheduleToFirebase();
+    }).catch(() => {});
+    firebaseAppearanceRef.once("value").then(snap => {
+      if (!snap.val()) publishAppearanceToFirebase();
     }).catch(() => {});
   }
 
@@ -2355,9 +3019,15 @@ function applyLiveState(state) {
     ramadanMode = state.ramadanMode;
   }
 
+  if (isMonitor) {
+    applyGraphSettingsFromRemote(state);
+  }
+
   const plan = parseInt(state.plan, 10) || 0;
   const currentDailyPlan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || SETTINGS.defaultPlan;
   const currentCycleTime = parseFloat(document.getElementById("cycleTarget").value) || SETTINGS.defaultCycle;
+  let status = state.status || "READY";
+  const np = isNonProductionLiveState(state, status);
   let effectivePlan;
   let cycleTimeMin;
 
@@ -2366,29 +3036,37 @@ function applyLiveState(state) {
     const { daily, cycle } = readPlanAndCycleFromFirebase(state);
     effectivePlan = daily != null && daily > 0 ? daily : 0;
     cycleTimeMin = cycle != null && cycle > 0 ? cycle : SETTINGS.defaultCycle;
-
-    const planInput = document.getElementById("dailyPlanTarget");
-    const cycleInput = document.getElementById("cycleTarget");
-    planInput.value = daily != null && daily > 0 ? String(daily) : "";
-    cycleInput.value = cycle != null && cycle > 0 ? String(cycle) : "";
-    document.getElementById("plan").innerText = daily != null && daily > 0 ? String(daily) : "-";
-    if (effectivePlan > 0) syncTodayScanPlanOnRows(effectivePlan);
   } else {
     effectivePlan = resolvePositiveNumber(state.dailyPlan, plan, currentDailyPlan);
     cycleTimeMin = resolvePositiveNumber(state.cycleTimeMin, state.cycleTarget, currentCycleTime);
   }
-  const actual = parseInt(state.actual, 10) || 0;
-  const balance = parseInt(state.balance, 10) || 0;
-  const status = state.status || "READY";
+  const displayPlan = np ? 0 : effectivePlan;
+  let actual = parseInt(state.actual, 10) || 0;
+  let balance = parseInt(state.balance, 10) || 0;
   const countdown = parseInt(state.countdown, 10) || 0;
-  const expected = parseInt(state.expected, 10) || 0;
-  const delay = parseInt(state.delay, 10) || 0;
+  let expected = parseInt(state.expected, 10) || 0;
+  let delay = parseInt(state.delay, 10) || 0;
+  if (np) {
+    expected = 0;
+    delay = 0;
+  }
   const lotNo = state.lotNo || "";
   const firebaseTotalDowntime = parseInt(state.totalDowntime, 10);
   const hasFirebaseTotalDowntime = Number.isFinite(firebaseTotalDowntime) && firebaseTotalDowntime >= 0;
 
   // Keep local variables aligned so refresh doesn't revert values.
   actualCount = actual;
+  if (isMonitor) {
+    const today = toIsoDateLocal(new Date());
+    if (reconcileActualCountFromSheet(today)) {
+      actual = actualCount;
+    }
+  }
+  if (np) {
+    balance = actual - displayPlan;
+  } else if (isMonitor) {
+    balance = actual - effectivePlan;
+  }
   if (isMonitor && hasFirebaseTotalDowntime) {
     downtimeSeconds = firebaseTotalDowntime;
   } else {
@@ -2396,8 +3074,15 @@ function applyLiveState(state) {
   }
   firstScanAtMs = state.firstScanAtMs ? Number(state.firstScanAtMs) : firstScanAtMs;
 
-  if (!isMonitor) {
-    document.getElementById("plan").innerText = effectivePlan;
+  if (isMonitor) {
+    const planInput = document.getElementById("dailyPlanTarget");
+    const cycleInput = document.getElementById("cycleTarget");
+    planInput.value = np ? "0" : (effectivePlan > 0 ? String(effectivePlan) : "");
+    cycleInput.value = cycleTimeMin > 0 ? String(cycleTimeMin) : "";
+    document.getElementById("plan").innerText = np ? "0" : (effectivePlan > 0 ? String(effectivePlan) : "-");
+    if (effectivePlan > 0) syncTodayScanPlanOnRows(effectivePlan);
+  } else {
+    document.getElementById("plan").innerText = displayPlan;
     document.getElementById("dailyPlanTarget").value = String(effectivePlan);
     document.getElementById("cycleTarget").value = String(cycleTimeMin);
   }
@@ -2407,7 +3092,10 @@ function applyLiveState(state) {
   }
   document.getElementById("actual").innerText = actual;
   document.getElementById("expected").innerText = expected;
-  syncEfficiencyCardDom();
+
+  if (isMonitor && !np && effectivePlan > 0 && actual < effectivePlan && status === "TARGET ACHIEVED") {
+    status = actual > 0 ? "PAUSED" : "READY";
+  }
 
   // Set last-scan anchor before countdown ticker (every monitor must use Firebase lastScanAtMs).
   let anchorScanMs = null;
@@ -2476,11 +3164,17 @@ function applyLiveState(state) {
     setStatus("BREAK TIME", "status-orange");
   } else if (status === "PAUSED") {
     setStatus("PAUSED", "status-orange");
+  } else if (status === "NON PRODUCTION" || np) {
+    setStatus("NON PRODUCTION", "status-orange");
+    downtimeCard.classList.remove("downtime-alert", "blink");
+    downtimeText.classList.remove("status-red", "blink");
   } else {
     setStatus(status, "status-blue");
     downtimeCard.classList.remove("downtime-alert", "blink");
     downtimeText.classList.remove("status-red", "blink");
   }
+
+  syncEfficiencyCardDom();
 
   if (isMonitor) {
     monitorLiveStateReceived = true;
@@ -2858,7 +3552,7 @@ function updateDisplay() {
   if (isMonitor) return;
   // Keep accumulated card aligned with sum of visible table downtime rows.
   syncDowntimeSecondsFromTable();
-  const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+  const plan = getDashboardPlan();
   const balance = actualCount - plan;
   const displayBalance = balance > 0 ? ("+" + balance) : balance;
 
@@ -3320,6 +4014,7 @@ function toggleHistoryPanel(forceOpen) {
     document.body.classList.remove("graph-mode");
     const graphPage = document.getElementById("graphPage");
     if (graphPage) graphPage.classList.remove("open");
+    closeAppearancePage();
     document.body.classList.add("history-mode");
     panel.classList.add("open");
     syncHistoryDayPickerUi();
@@ -3378,7 +4073,8 @@ function updateViewToggleMenuItem() {
   const summary = document.getElementById("dailySummaryMenuItem");
   const graph = document.getElementById("graphMenuItem");
   const history = document.getElementById("historyMenuItem");
-  [main, summary, graph, history].forEach(el => {
+  const appearance = document.getElementById("appearanceMenuItem");
+  [main, summary, graph, history, appearance].forEach(el => {
     if (el) el.classList.remove("active");
   });
 
@@ -3388,6 +4084,8 @@ function updateViewToggleMenuItem() {
     if (graph) graph.classList.add("active");
   } else if (document.body.classList.contains("history-mode")) {
     if (history) history.classList.add("active");
+  } else if (document.body.classList.contains("appearance-mode")) {
+    if (appearance) appearance.classList.add("active");
   } else {
     if (main) main.classList.add("active");
   }
@@ -3403,6 +4101,7 @@ function showMainPage() {
   document.body.classList.remove("summary-mode");
   document.body.classList.remove("graph-mode");
   document.body.classList.remove("history-mode");
+  closeAppearancePage();
   const summaryPage = document.getElementById("summaryPage");
   if (summaryPage) summaryPage.classList.remove("open");
   const graphPage = document.getElementById("graphPage");
@@ -4671,6 +5370,7 @@ function showGraphPage() {
 
   document.body.classList.remove("summary-mode");
   document.body.classList.remove("history-mode");
+  closeAppearancePage();
   const summaryPage = document.getElementById("summaryPage");
   if (summaryPage) summaryPage.classList.remove("open");
   const historyPanel = document.getElementById("historyPanel");
@@ -4778,6 +5478,7 @@ function showSummaryPage() {
   document.body.classList.add("summary-mode");
   document.body.classList.remove("graph-mode");
   document.body.classList.remove("history-mode");
+  closeAppearancePage();
   const graphPage = document.getElementById("graphPage");
   if (graphPage) graphPage.classList.remove("open");
   const historyPanel = document.getElementById("historyPanel");
@@ -4858,7 +5559,8 @@ function updateLiveStateOnly() {
   if (isMonitor) return;
   if (!hasLocalSession) return;
 
-  const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+  const configuredPlan = getConfiguredDailyPlan();
+  const plan = getDashboardPlan();
   const cycleTimeMin = parseFloat(document.getElementById("cycleTarget").value) || SETTINGS.defaultCycle;
   const actual = actualCount;
 
@@ -4896,7 +5598,7 @@ function updateLiveStateOnly() {
     body: JSON.stringify({
       liveOnly: true,
       plan: plan,
-      dailyPlan: plan,
+      dailyPlan: configuredPlan,
       cycleTimeMin: cycleTimeMin,
       actual: actual,
       balance: balance,
@@ -4913,7 +5615,7 @@ function updateLiveStateOnly() {
 
   publishLiveStateToFirebase({
     plan: plan,
-    dailyPlan: plan,
+    dailyPlan: configuredPlan,
     cycleTimeMin: cycleTimeMin,
     actual: actual,
     balance: balance,
@@ -5128,39 +5830,79 @@ function getCompletedUnitStatsFromScanTableForDay(dayKey) {
   return { count, firstScanMs, lastScanMs };
 }
 
-function maybeReconcileLocalActualFromSheet() {
-  if (isMonitor) return;
-  if (!initialLiveStateHydrated) return;
-  // Avoid disrupting the live countdown when the operator timer is running.
-  if (timer) return;
-
-  const dayKey = getActiveDowntimeDayKey();
+/**
+ * Google Sheet row count is the source of truth for logged units.
+ * Live actualCount can be higher when a scan succeeded locally but never reached the sheet.
+ */
+function reconcileActualCountFromSheet(dayKey) {
   const stats = getCompletedUnitStatsFromScanTableForDay(dayKey);
-  if (stats.count <= 0) return;
-  if (stats.count === actualCount) return;
-  if (!Number.isFinite(stats.lastScanMs)) return;
+  if (stats.count <= 0) return false;
+  if (stats.count === actualCount) return false;
 
-  // Only correct when Firebase is clearly behind the sheet's latest completed scan.
-  const skewMs = 30000;
-  if (lastScanWallMs != null && stats.lastScanMs <= lastScanWallMs + skewMs) return;
+  if (stats.count > actualCount) {
+    // Sheet ahead of live counter — only apply when clearly newer (avoid mid-scan flicker).
+    if (!Number.isFinite(stats.lastScanMs)) return false;
+    const skewMs = 30000;
+    if (lastScanWallMs != null && stats.lastScanMs <= lastScanWallMs + skewMs) return false;
+    if (!isMonitor && timer) return false;
+  }
 
   actualCount = stats.count;
   if (Number.isFinite(stats.firstScanMs)) firstScanAtMs = stats.firstScanMs;
-  lastScanWallMs = stats.lastScanMs;
-  lastScanTime = new Date(lastScanWallMs);
+  if (Number.isFinite(stats.lastScanMs)) {
+    lastScanWallMs = stats.lastScanMs;
+    lastScanTime = new Date(lastScanWallMs);
+  }
+  return true;
+}
 
-  // If we're currently in an active production state, adjust the countdown display
-  // based on elapsed productive time since the last scan.
-  const statusText = document.getElementById("status")?.innerText?.trim();
-  const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
-  if (statusText === "RUNNING" || statusText === "DOWN TIME" || statusText === "BREAK TIME") {
-    countdownValue = computeRunningCountdownSec(cycleTimeSec);
-    isDowntime = countdownValue === 0;
+function applyReconciledActualToDashboard() {
+  const planCard = parseInt(document.getElementById("plan")?.innerText || "0", 10) || 0;
+  const planInput = parseInt(document.getElementById("dailyPlanTarget")?.value || "0", 10) || 0;
+  const plan = planCard > 0 ? planCard : planInput;
+  const balance = actualCount - plan;
+  const displayBalance = balance > 0 ? ("+" + balance) : balance;
+
+  document.getElementById("actual").innerText = actualCount;
+
+  const balanceEl = document.getElementById("balance");
+  if (balanceEl) {
+    if (balance < 0) balanceEl.className = "big-number status-red";
+    else if (balance > 0) balanceEl.className = "big-number status-green";
+    else balanceEl.className = "big-number status-blue";
+    balanceEl.innerText = displayBalance;
+  }
+
+  if (isMonitor) {
+    const statusText = document.getElementById("status")?.innerText?.trim() || "";
+    if (plan > 0 && actualCount >= plan) {
+      setStatus("TARGET ACHIEVED", "status-green");
+    } else if (statusText === "TARGET ACHIEVED" && actualCount < plan) {
+      setStatus(actualCount > 0 ? "PAUSED" : "READY", actualCount > 0 ? "status-orange" : "status-blue");
+    }
+    syncEfficiencyCardDom();
+    return;
   }
 
   hasLocalSession = true;
   updateDisplay();
   updateLiveStateOnly();
+}
+
+function maybeReconcileLocalActualFromSheet() {
+  if (!isMonitor && !initialLiveStateHydrated) return;
+
+  const dayKey = toIsoDateLocal(new Date());
+  if (!reconcileActualCountFromSheet(dayKey)) return;
+
+  const statusText = document.getElementById("status")?.innerText?.trim();
+  const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
+  if (!isMonitor && (statusText === "RUNNING" || statusText === "DOWN TIME" || statusText === "BREAK TIME")) {
+    countdownValue = computeRunningCountdownSec(cycleTimeSec);
+    isDowntime = countdownValue === 0;
+  }
+
+  applyReconciledActualToDashboard();
 }
 
 // Ambil data untuk MONITOR PC
@@ -5300,6 +6042,7 @@ function loadLiveData() {
       // Always keep accumulated downtime card synced to rendered rows,
       // even when table data payload is unchanged (e.g. timer stopped/target achieved).
       refreshDowntimeCardFromTable();
+      maybeReconcileLocalActualFromSheet();
     })
     .catch(err => console.log("Monitor load error:", err));
 }
@@ -5339,12 +6082,17 @@ if (historyDayTodayBtn) {
   historyDayTodayBtn.addEventListener("click", onHistoryDayTodayClick);
 }
 
+loadAppearanceFromStorage();
+applyAppearance();
+
 window.onload = async function() {
   // 🔐 MUST WAIT ACCESS CHECK
   const allowed = await checkAccess();
   if (!allowed) return;
 
   loadGraphWtPresetFromStorage();
+  loadAppearanceFromStorage();
+  applyAppearance();
   applyAppRoleUi();
   loadShiftScheduleFromStorage();
   ensureShiftScheduleModal();
@@ -5353,6 +6101,7 @@ window.onload = async function() {
   ensureOvertimeMenuItem();
   ensureOvertimeModal();
   updateOvertimeMenuLabel();
+  ensureAppearanceMenuItem();
 
   syncDowntimeDayPickerUi();
 

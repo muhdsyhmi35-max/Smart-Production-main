@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <title>TF 2 Production Monitoring</title>
 <link rel="icon" href="./favicon.svg" type="image/svg+xml" sizes="any">
-<link rel="stylesheet" href="./style.css?v=20260529">
+<link rel="stylesheet" href="./style.css?v=20260826">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
@@ -19,10 +19,10 @@
     <button class="menu-btn" onclick="toggleMenuDropdown()" aria-label="Toggle menu">☰</button>
     <div id="menuDropdown" class="menu-dropdown">
       <div class="menu-brand">
-        <div class="menu-brand-icon">🏭</div>
+        <div class="menu-brand-icon" id="menuBrandIcon">🏭</div>
         <div class="menu-brand-text">
-          <div>PRODUCTION</div>
-          <div>MONITORING SYSTEM</div>
+          <div id="menuBrandLine1">PRODUCTION</div>
+          <div id="menuBrandLine2">MONITORING SYSTEM</div>
         </div>
       </div>
       <button class="menu-item" id="mainPageMenuItem" onclick="showMainPage()"><span class="menu-icon">🏠</span><span>Main Page</span></button>
@@ -30,15 +30,19 @@
       <button class="menu-item" id="dailySummaryMenuItem" onclick="showSummaryPage()"><span class="menu-icon">🖥</span><span>Daily Summary</span></button>
       <button class="menu-item" id="historyMenuItem" onclick="openHistoryPanelFromMenu()"><span class="menu-icon">🗂</span><span>History</span></button>
       <button class="menu-item menu-ramadan-hidden" id="ramadanToggle" onclick="toggleRamadanFromMenu()"><span class="menu-icon">🌙</span><span>Ramadhan : OFF</span></button>
+      <button class="menu-item" id="appearanceMenuItem" onclick="showAppearancePageFromMenu()"><span class="menu-icon">🎨</span><span>Theme & Brand</span></button>
       <div class="menu-dropdown-footer">
-        <div class="menu-footer-line">© 2026 Production System</div>
+        <div class="menu-footer-line" id="menuFooterBrand">© 2026 Production System</div>
         <div class="menu-footer-line">Developed by m01400</div>
       </div>
     </div>
     <div class="header-main">
       <div class="header-title-wrap">
-        <div class="header-title">TF 2 PRODUCTION MONITORING SYSTEM</div>
-        <div class="header-subtitle">Real-time overview of production</div>
+        <img id="headerBrandLogo" class="header-brand-logo" alt="" hidden>
+        <div class="header-title-text">
+          <div class="header-title" id="headerTitle">TF 2 PRODUCTION MONITORING SYSTEM</div>
+          <div class="header-subtitle" id="headerSubtitle">Real-time overview of production</div>
+        </div>
       </div>
       <div class="header-meta">
         <span class="header-pill"><span class="header-pill-icon">📅</span><span id="dateDisplay"></span></span>
@@ -178,6 +182,6 @@ Lot:
   </div>
 </div>
 
-<script src="./script.js?v=20260602"></script>
+<script src="./script.js?v=20260826"></script>
 </body>
 </html>
