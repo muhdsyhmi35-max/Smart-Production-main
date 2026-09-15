@@ -984,8 +984,7 @@ function onGraphRangeTodayClick() {
 
 function onGraphPeriodChange(period) {
   graphPeriod = (period === "week" || period === "month") ? period : "week";
-  const preferred = graphRangeEndDate || graphRangeStartDate || getActiveGraphDayKey();
-  applyGraphPeriodRange(preferred, graphPeriod, true);
+  applyGraphPeriodRange(toIsoDateLocal(new Date()), graphPeriod, false);
   syncGraphPeriodButtonsUi();
   syncGraphRangePickerUi();
   renderGraphCharts();
@@ -5409,7 +5408,7 @@ function showGraphPage() {
     </div>
   `;
   if (!graphRangeStartDate || !graphRangeEndDate) {
-    applyGraphPeriodRange(getActiveGraphDayKey(), graphPeriod, true);
+    applyGraphPeriodRange(toIsoDateLocal(new Date()), graphPeriod, false);
   }
   syncGraphRangePickerUi();
   syncGraphPeriodButtonsUi();
@@ -6096,11 +6095,6 @@ function loadLiveData() {
         maybeReconcileLocalActualFromSheet();
         reconcileNonProductionMarksFromSheet();
         if (document.body.classList.contains("graph-mode")) {
-          const rangeKeys = getDayKeysBetween(graphRangeStartDate, graphRangeEndDate);
-          if (!rangeKeys.length || countScansInDayKeys(rangeKeys) === 0) {
-            applyGraphPeriodRange(getActiveGraphDayKey(), graphPeriod, true);
-            syncGraphRangePickerUi();
-          }
           renderGraphCharts();
         }
         if (document.body.classList.contains("summary-mode")) {
