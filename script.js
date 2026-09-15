@@ -2,7 +2,7 @@
 
 const SETTINGS = {
   defaultCycle: 16,
-  defaultPlan: 1,
+  defaultPlan: 0,
 
   breakTime: {
     normal: {
@@ -2925,7 +2925,8 @@ function calculateExpectedOutput() {
   if (isNonProductionMode()) return 0;
 
   const plan = getDashboardPlan();
-  if (actualCount >= plan && plan > 0) {
+  if (!(plan > 0)) return 0;
+  if (actualCount >= plan) {
     return plan;
   }
 
@@ -3309,6 +3310,9 @@ function applyLiveState(state) {
     expected = 0;
     delay = 0;
     countdown = 0;
+  } else if (isMonitor && effectivePlan <= 0) {
+    expected = 0;
+    delay = actual;
   }
   const lotNo = state.lotNo || "";
   const firebaseTotalDowntime = parseInt(state.totalDowntime, 10);
@@ -6485,7 +6489,7 @@ function loadLiveData() {
 /* ===== INITIALIZE SYSTEM ===== */
 
 document.getElementById("cycleTarget").value = SETTINGS.defaultCycle;
-document.getElementById("dailyPlanTarget").value = SETTINGS.defaultPlan;
+document.getElementById("dailyPlanTarget").value = SETTINGS.defaultPlan > 0 ? String(SETTINGS.defaultPlan) : "";
 
 document.getElementById("cycleTarget").addEventListener("input", () => {
   if (!isMasterRole()) return;
