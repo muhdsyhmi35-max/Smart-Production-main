@@ -1120,6 +1120,85 @@ body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-mini-c
   z-index:0;
 }
 
+/* Operator: only Countdown, Expected, Actual, Balance — one screen */
+body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode){
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+  overflow:hidden;
+}
+
+body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .header,
+body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .controls{
+  flex:0 0 auto;
+}
+
+body.role-operator .card-delay,
+body.role-operator .card-plan,
+body.role-operator .card-downtime,
+body.role-operator .card-efficiency,
+body.role-operator .dashboard > .card:nth-child(4),
+body.role-operator .dashboard > .card:nth-child(5),
+body.role-operator .dashboard > .card:nth-child(7),
+body.role-operator .dashboard > .card:nth-child(8){
+  display:none !important;
+}
+
+body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .bottom-row{
+  display:none !important;
+}
+
+body.role-operator.monitor-mode .controls-fields,
+body.role-operator.monitor-mode .main-pc-actions,
+body.role-operator #monitorDataNotice{
+  display:none !important;
+}
+
+body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .dashboard{
+  --op-card-gap:clamp(10px, 1.2vw, 14px);
+  flex:1 1 auto;
+  min-height:0;
+  grid-template-columns:minmax(0, 1.15fr) minmax(0, 1fr);
+  grid-template-rows:repeat(3, minmax(0, 1fr));
+  column-gap:var(--op-card-gap);
+  row-gap:var(--op-card-gap);
+  margin-bottom:clamp(12px, 1.8vh, 18px);
+}
+
+body.role-operator .card-countdown,
+body.role-operator .dashboard > .card:nth-child(1){
+  grid-column:1;
+  grid-row:1 / span 3;
+  justify-content:center;
+  min-height:0;
+}
+
+body.role-operator .card-expected,
+body.role-operator .dashboard > .card:nth-child(3){
+  grid-column:2;
+  grid-row:1;
+  min-height:0;
+}
+
+body.role-operator .card-actual,
+body.role-operator .dashboard > .card:nth-child(2){
+  grid-column:2;
+  grid-row:2;
+  min-height:0;
+}
+
+body.role-operator .card-balance,
+body.role-operator .dashboard > .card:nth-child(6){
+  grid-column:2;
+  grid-row:3;
+  min-height:0;
+}
+
+body.role-operator .card-countdown .big-number,
+body.role-operator .dashboard > .card:nth-child(1) .big-number{
+  font-size:clamp(56px, 8.5vh, 96px);
+}
+
 .card h3{
   color:var(--text-muted);
   margin:0;
@@ -2686,6 +2765,14 @@ path.trend-area-fill{
   grid-template-columns:repeat(4, minmax(0, 1fr));
   column-gap:clamp(12px, 1.5vw, 22px);
   row-gap:clamp(12px, 1.5vw, 22px);
+}
+
+:fullscreen body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .dashboard,
+:-webkit-full-screen body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .dashboard{
+  grid-template-columns:minmax(0, 1.15fr) minmax(0, 1fr);
+  grid-template-rows:repeat(3, minmax(0, 1fr));
+  column-gap:clamp(10px, 1.2vw, 14px);
+  row-gap:clamp(10px, 1.2vw, 14px);
 }
 
 :fullscreen body.monitor-layout-active .dashboard.monitor-dashboard-relayout,

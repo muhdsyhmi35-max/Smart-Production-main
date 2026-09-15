@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <title>TF 2 Production Monitoring</title>
 <link rel="icon" href="./favicon.svg" type="image/svg+xml" sizes="any">
-<link rel="stylesheet" href="./style.css?v=20260915mc7">
+<link rel="stylesheet" href="./style.css?v=20260915op2">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
@@ -88,22 +88,17 @@ Lot:
 
 <div class="dashboard">
 
-<!-- 🔹 ROW 1 -->
-<div class="card"><h3>COUNTDOWN</h3><div class="big-number" id="countdown">00:00</div></div>
-<div class="card"><h3>ACTUAL OUTPUT</h3><div class="big-number status-green" id="actual">0</div></div>
-<div class="card"><h3>EXPECTED OUTPUT</h3><div class="big-number status-blue" id="expected">0</div></div>
-<div class="card"><h3>DELAY / AHEAD</h3><div class="big-number" id="delay">0</div></div>
-
-<!-- 🔹 ROW 2 -->
-<div class="card"><h3>DAILY PLAN</h3><div class="big-number" id="plan">0</div></div>
-<div class="card"><h3>BALANCE</h3><div class="big-number" id="balance">0</div></div>
-
-<div class="card" id="downtimeCard">
+<div class="card card-countdown"><h3>COUNTDOWN</h3><div class="big-number" id="countdown">00:00</div></div>
+<div class="card card-actual"><h3>ACTUAL OUTPUT</h3><div class="big-number status-green" id="actual">0</div></div>
+<div class="card card-expected"><h3>EXPECTED OUTPUT</h3><div class="big-number status-blue" id="expected">0</div></div>
+<div class="card card-delay"><h3>DELAY / AHEAD</h3><div class="big-number" id="delay">0</div></div>
+<div class="card card-plan"><h3>DAILY PLAN</h3><div class="big-number" id="plan">0</div></div>
+<div class="card card-balance"><h3>BALANCE</h3><div class="big-number" id="balance">0</div></div>
+<div class="card card-downtime" id="downtimeCard">
 <h3>TOTAL DOWNTIME</h3>
 <div class="big-number" id="downtime">00:00</div>
 </div>
-
-<div class="card">
+<div class="card card-efficiency">
 <h3>EFFICIENCY</h3>
 <div class="big-number" id="efficiency">—</div>
 </div>
@@ -183,6 +178,6 @@ Lot:
   </div>
 </div>
 
-<script src="./script.js?v=20260915mc7"></script>
+<script src="./script.js?v=20260915op2"></script>
 </body>
 </html>
