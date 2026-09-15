@@ -189,9 +189,9 @@ function canOperateLine() {
   return getAppRole() === "operator" || isMasterRole();
 }
 
-/** Monitor screens for Operator/Management only mirror live data. */
+/** Monitor screens for Operator/Management only mirror live data — unless this PC is already running the line. */
 function isLiveDisplayOnly() {
-  return isMonitor && !isMasterRole();
+  return isMonitor && !isMasterRole() && !timer;
 }
 
 /** Master can drive Start/Stop/Reset on main or ?monitor; Operator only on the main PC. */
@@ -343,7 +343,8 @@ function applyAppRoleUi() {
   syncGraphWtControl();
   applyMainPcEditLock();
   restoreFullscreenIfNeeded(wasFullscreen);
-  syncOperatorDashboardChrome();
+  if (isMonitor && timer) updateDisplay();
+  else syncOperatorDashboardChrome();
 }
 
 function isAppFullscreen() {
@@ -3095,7 +3096,7 @@ function initFirebaseSync() {
           return;
         }
         monitorLiveStateReceived = true;
-        if (liveState.sender === syncClientId && isMasterRole() && hasLocalSession) {
+        if (liveState.sender === syncClientId && hasLocalSession && timer) {
           updateMonitorDataNotice();
           return;
         }
@@ -3162,6 +3163,14 @@ function startLiveCountdownTicker(baseCountdown, status, updatedAt, anchorScanMs
 
   const countdownEl = document.getElementById("countdown");
   if (!countdownEl) return;
+
+  // This PC is already driving the line (Master started on monitor).
+  if (timer) {
+    countdownValue = Number.isFinite(Number(countdownValue)) ? countdownValue : baseCountdown;
+    countdownEl.innerText = format(countdownValue);
+    syncOperatorDashboardChrome();
+    return;
+  }
 
   // Main operator screen uses its own production timer logic.
   if (!isMonitor) {
@@ -3587,6 +3596,10 @@ function startProduction(shouldSync = true) {
   hasLocalSession = true;
   stopLiveCountdownTicker();
 
+  if (shouldSync) {
+    publishSyncCommand("start");
+  }
+
   // Set start time if first run
   if (!startTime) {
     startTime = new Date();
@@ -3608,7 +3621,7 @@ function startProduction(shouldSync = true) {
     }
 
     updateDisplay();
-    if (isMasterRole() && isMonitor) updateLiveStateOnly();
+    updateLiveStateOnly();
   }, 1000);
   updateDisplay();
   updateLiveStateOnly();
