@@ -498,7 +498,12 @@ body.role-management #ramadanToggle{
   display:none !important;
 }
 
-input.settings-locked,
+input.settings-locked{
+  pointer-events:none;
+  opacity:.88;
+  cursor:not-allowed;
+}
+
 .wt-locked,
 .wt-locked .header-wt-trigger{
   pointer-events:none;
@@ -1148,7 +1153,6 @@ body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.a
   display:none !important;
 }
 
-body.role-operator.monitor-mode .controls-fields,
 body.role-operator.monitor-mode .main-pc-actions,
 body.role-operator #monitorDataNotice{
   display:none !important;
@@ -1197,7 +1201,7 @@ body.role-operator .dashboard > .card:nth-child(6){
 
 body.role-operator .card-countdown .big-number,
 body.role-operator .dashboard > .card:nth-child(1) .big-number{
-  font-size:clamp(58px, 9.2vh, 104px);
+  font-size:clamp(72px, 12vh, 128px);
   font-weight:800;
 }
 
@@ -1242,7 +1246,7 @@ body.role-operator .card-countdown{
 body.role-operator .card-countdown .card-title-operator{
   color:#3b82f6;
   letter-spacing:.18em;
-  font-size:clamp(12px, 1.65vh, 16px);
+  font-size:clamp(14px, 2vh, 20px);
   font-weight:800;
   text-align:center;
   width:100%;
@@ -1313,13 +1317,13 @@ body.role-operator .op-cycle-meta{
 
 body.role-operator .op-cycle-label{
   color:#64748b;
-  font-size:clamp(11px, 1.4vh, 13px);
+  font-size:clamp(13px, 1.7vh, 16px);
   font-weight:600;
 }
 
 body.role-operator .op-cycle-value{
   color:#3b82f6;
-  font-size:clamp(20px, 3.2vh, 32px);
+  font-size:clamp(26px, 4vh, 40px);
   font-weight:800;
   font-family:Consolas, "Courier New", monospace;
 }
@@ -1335,34 +1339,33 @@ body.role-operator .card-actual,
 body.role-operator .card-balance{
   display:grid !important;
   grid-template-columns:auto minmax(0, 1fr);
-  grid-template-rows:minmax(0, 1fr) auto minmax(0, 1fr);
-  column-gap:clamp(14px, 1.8vw, 22px);
+  grid-template-rows:minmax(0, 1fr);
+  column-gap:clamp(10px, 1.4vw, 18px);
   align-items:center;
-  text-align:left;
-  padding:clamp(12px, 1.6vh, 18px) clamp(18px, 2vw, 24px);
+  text-align:center;
+  padding:clamp(10px, 1.4vh, 16px) clamp(16px, 1.8vw, 22px);
 }
 
 body.role-operator .card-expected .op-kpi-icon,
 body.role-operator .card-actual .op-kpi-icon,
 body.role-operator .card-balance .op-kpi-icon{
   grid-column:1;
-  grid-row:1 / -1;
+  grid-row:1;
   align-self:center;
-  flex:0 0 auto;
-  width:clamp(52px, 8vh, 78px);
-  height:clamp(52px, 8vh, 78px);
+  width:clamp(56px, 8.5vh, 84px);
+  height:clamp(56px, 8.5vh, 84px);
 }
 
 body.role-operator .op-kpi-copy{
   grid-column:2;
-  grid-row:2;
+  grid-row:1;
   display:flex;
   flex-direction:column;
-  align-items:flex-end;
+  align-items:center;
   justify-content:center;
-  gap:2px;
+  gap:4px;
   min-width:0;
-  text-align:right;
+  text-align:center;
 }
 
 body.role-operator .card-expected,
@@ -1386,18 +1389,18 @@ body.role-operator .card-actual h3{
   margin:0;
   color:#22c55e;
   letter-spacing:.12em;
-  font-size:clamp(13px, 1.8vh, 18px);
+  font-size:clamp(16px, 2.4vh, 24px);
   font-weight:800;
-  text-align:right;
+  text-align:center;
 }
 
 body.role-operator .card-expected .big-number,
 body.role-operator .card-actual .big-number{
   color:#22c55e !important;
-  text-align:right;
-  font-size:clamp(52px, 8.6vh, 92px);
+  text-align:center;
+  font-size:clamp(72px, 12vh, 140px);
   font-weight:800;
-  line-height:.95;
+  line-height:.92;
 }
 
 body.role-operator .card-balance{
@@ -1433,9 +1436,9 @@ body.role-operator .card-balance h3{
   margin:0;
   color:#ef4444;
   letter-spacing:.12em;
-  font-size:clamp(13px, 1.8vh, 18px);
+  font-size:clamp(16px, 2.4vh, 24px);
   font-weight:800;
-  text-align:right;
+  text-align:center;
 }
 
 body.role-operator .card-balance.is-ahead h3{
@@ -1447,10 +1450,10 @@ body.role-operator .card-balance.is-even h3{
 }
 
 body.role-operator .card-balance .big-number{
-  text-align:right;
-  font-size:clamp(52px, 8.6vh, 92px);
+  text-align:center;
+  font-size:clamp(72px, 12vh, 140px);
   font-weight:800;
-  line-height:.95;
+  line-height:.92;
 }
 
 body.role-operator .card-balance.is-behind .big-number,
