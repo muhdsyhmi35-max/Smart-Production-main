@@ -189,6 +189,16 @@ function canOperateLine() {
   return getAppRole() === "operator" || isMasterRole();
 }
 
+/** Monitor screens for Operator/Management only mirror live data. */
+function isLiveDisplayOnly() {
+  return isMonitor && !isMasterRole();
+}
+
+/** Master can drive Start/Stop/Reset on main or ?monitor; Operator only on the main PC. */
+function canDriveProductionFromThisScreen() {
+  return isMasterRole() || (!isMonitor && canOperateLine());
+}
+
 function canAdjustWorkingHour() {
   return true;
 }
@@ -2921,7 +2931,7 @@ function isBreakTime() {
 }
 
 function calculateExpectedOutput() {
-  if (isMonitor) return 0;
+  if (isLiveDisplayOnly()) return 0;
   if (isNonProductionMode()) return 0;
 
   const plan = getDashboardPlan();
@@ -3084,7 +3094,12 @@ function initFirebaseSync() {
           updateMonitorDataNotice();
           return;
         }
-      applyLiveState(liveState);
+        monitorLiveStateReceived = true;
+        if (liveState.sender === syncClientId && isMasterRole() && hasLocalSession) {
+          updateMonitorDataNotice();
+          return;
+        }
+        applyLiveState(liveState);
       },
       err => {
         monitorLiveStateError = err;
@@ -3557,13 +3572,8 @@ function applyRemoteCommand(action) {
 /* ===== START ===== */
 
 function startProduction(shouldSync = true) {
-  if (isMonitor) {
-    if (!isMasterRole() || isApplyingRemoteCommand) return;
-    if (isNonProductionMode()) return;
-    if (shouldSync) publishSyncCommand("start");
-    return;
-  }
-  if (!canOperateLine()) return;
+  if (!canDriveProductionFromThisScreen()) return;
+  if (isMonitor && isApplyingRemoteCommand) return;
   if (isNonProductionMode()) {
     setStatus("NON PRODUCTION", "status-blue");
     return;
@@ -3575,10 +3585,7 @@ function startProduction(shouldSync = true) {
   }
 
   hasLocalSession = true;
-
-  if (shouldSync) {
-    publishSyncCommand("start");
-  }
+  stopLiveCountdownTicker();
 
   // Set start time if first run
   if (!startTime) {
@@ -3601,17 +3608,16 @@ function startProduction(shouldSync = true) {
     }
 
     updateDisplay();
+    if (isMasterRole() && isMonitor) updateLiveStateOnly();
   }, 1000);
+  updateDisplay();
+  updateLiveStateOnly();
 }
 
 /* STOP */
 function stopProduction(shouldSync = true) {
-  if (isMonitor) {
-    if (!isMasterRole() || isApplyingRemoteCommand) return;
-    if (shouldSync) publishSyncCommand("stop");
-    return;
-  }
-  if (!canOperateLine()) return;
+  if (!canDriveProductionFromThisScreen()) return;
+  if (isMonitor && isApplyingRemoteCommand) return;
 
   hasLocalSession = true;
 
@@ -3628,13 +3634,8 @@ function stopProduction(shouldSync = true) {
 
 /* RESET */
 function resetProduction(shouldSync = true) {
-  if (isMonitor) {
-    if (!isMasterRole() || isApplyingRemoteCommand) return;
-    if (isNonProductionMode()) return;
-    if (shouldSync) publishSyncCommand("reset");
-    return;
-  }
-  if (!canOperateLine()) return;
+  if (!canDriveProductionFromThisScreen()) return;
+  if (isMonitor && isApplyingRemoteCommand) return;
   if (isNonProductionMode()) return;
 
   hasLocalSession = true;
@@ -3943,7 +3944,7 @@ if (document.getElementById("countdownTickGroup")) {
 }
 
 function updateDisplay() {
-  if (isMonitor) return;
+  if (isLiveDisplayOnly()) return;
   // Keep accumulated card aligned with sum of visible table downtime rows.
   syncDowntimeSecondsFromTable();
   const plan = getDashboardPlan();
@@ -5993,7 +5994,7 @@ function toggleRamadan() {
 }
 
 function updateLiveStateOnly() {
-  if (isMonitor) return;
+  if (isLiveDisplayOnly()) return;
   if (!hasLocalSession) return;
 
   const configuredPlan = getConfiguredDailyPlan();
