@@ -53,7 +53,7 @@
           </button>
           <div class="header-role-dropdown" id="roleDropdown" role="listbox" aria-labelledby="roleTrigger" aria-hidden="true">
             <button type="button" class="header-role-option" data-role="operator" role="option" onclick="onRoleOptionClick(event, 'operator')">Operator</button>
-            <button type="button" class="header-role-option" data-role="admin" role="option" onclick="onRoleOptionClick(event, 'admin')">Admin</button>
+            <button type="button" class="header-role-option" data-role="admin" role="option" onclick="onRoleOptionClick(event, 'admin')">Management</button>
           </div>
         </div>
       </div>
@@ -163,7 +163,7 @@ Lot:
 
 <div id="adminLoginOverlay" class="admin-login-overlay" aria-hidden="true" onclick="onAdminLoginBackdropClick(event)">
   <div class="admin-login-dialog" role="dialog" aria-modal="true" aria-labelledby="adminLoginTitle" onclick="event.stopPropagation()">
-    <h2 id="adminLoginTitle" class="admin-login-title">Admin sign in</h2>
+    <h2 id="adminLoginTitle" class="admin-login-title">Management sign in</h2>
     <p id="adminLoginError" class="admin-login-error" hidden></p>
     <form class="admin-login-form" onsubmit="event.preventDefault(); submitAdminLogin();">
       <label class="admin-login-label">
@@ -182,6 +182,6 @@ Lot:
   </div>
 </div>
 
-<script src="./script.js?v=20260826"></script>
+<script src="./script.js?v=20260915"></script>
 </body>
 </html>

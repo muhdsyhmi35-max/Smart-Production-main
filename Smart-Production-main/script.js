@@ -237,7 +237,7 @@ function applyAppRoleUi() {
   document.body.classList.toggle("role-admin", admin);
   document.body.classList.toggle("role-operator", !admin);
   const label = document.getElementById("roleLabel");
-  if (label) label.textContent = admin ? "Admin" : "Operator";
+  if (label) label.textContent = admin ? "Management" : "Operator";
   document.querySelectorAll(".header-role-option").forEach(btn => {
     const role = btn.getAttribute("data-role");
     const sel = (admin && role === "admin") || (!admin && role === "operator");
