@@ -1234,7 +1234,10 @@ tr:nth-child(even){background:#0b1220;}
   text-align:center;
 }
 
-body.non-production-mode #status,
+body.non-production-mode #status{
+  color:var(--blue);
+}
+
 #status.status-orange{
   color:var(--orange);
 }

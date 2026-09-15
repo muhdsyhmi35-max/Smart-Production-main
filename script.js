@@ -502,6 +502,7 @@ function applyNonProductionMode() {
   document.body.classList.add("non-production-mode");
   clearInterval(timer);
   timer = null;
+  countdownValue = 0;
   isDowntime = false;
   duplicateLock = false;
   pendingChassis = "";
@@ -509,7 +510,7 @@ function applyNonProductionMode() {
   pendingEngine = "";
   pendingKey = "";
   setScanInputsEnabled(false);
-  setStatus("NON PRODUCTION", "status-orange");
+  setStatus("NON PRODUCTION", "status-blue");
   updateDisplay();
   updateLiveStateOnly();
 }
@@ -1547,7 +1548,7 @@ function applyShiftScheduleTick() {
   if (isMonitor || !SETTINGS.shiftSchedule.enableAutoWindow) return;
   if (isNonProductionMode()) {
     if (timer) stopProduction(false);
-    setStatus("NON PRODUCTION", "status-orange");
+    setStatus("NON PRODUCTION", "status-blue");
     updateDisplay();
     updateLiveStateOnly();
     return;
@@ -2959,6 +2960,12 @@ function startLiveCountdownTicker(baseCountdown, status, updatedAt, anchorScanMs
     return;
   }
 
+  if (status === "NON PRODUCTION") {
+    countdownValue = 0;
+    countdownEl.innerText = format(0);
+    return;
+  }
+
   if (status !== "RUNNING") {
     countdownValue = baseCountdown;
     countdownEl.innerText = format(baseCountdown);
@@ -3097,12 +3104,13 @@ function applyLiveState(state) {
   const displayPlan = np ? 0 : effectivePlan;
   let actual = parseInt(state.actual, 10) || 0;
   let balance = parseInt(state.balance, 10) || 0;
-  const countdown = parseInt(state.countdown, 10) || 0;
+  let countdown = parseInt(state.countdown, 10) || 0;
   let expected = parseInt(state.expected, 10) || 0;
   let delay = parseInt(state.delay, 10) || 0;
   if (np) {
     expected = 0;
     delay = 0;
+    countdown = 0;
   }
   const lotNo = state.lotNo || "";
   const firebaseTotalDowntime = parseInt(state.totalDowntime, 10);
@@ -3219,7 +3227,7 @@ function applyLiveState(state) {
   } else if (status === "PAUSED") {
     setStatus("PAUSED", "status-orange");
   } else if (status === "NON PRODUCTION" || np) {
-    setStatus("NON PRODUCTION", "status-orange");
+    setStatus("NON PRODUCTION", "status-blue");
     downtimeCard.classList.remove("downtime-alert", "blink");
     downtimeText.classList.remove("status-red", "blink");
   } else {
@@ -3296,7 +3304,7 @@ function applyRemoteCommand(action) {
 function startProduction(shouldSync = true) {
   if (isMonitor) return;
   if (isNonProductionMode()) {
-    setStatus("NON PRODUCTION", "status-orange");
+    setStatus("NON PRODUCTION", "status-blue");
     return;
   }
   if (timer) return;
@@ -3615,7 +3623,8 @@ function updateDisplay() {
     document.getElementById("expected").innerText = "0";
     document.getElementById("actual").innerText = actualCount;
     document.getElementById("plan").innerText = plan;
-    document.getElementById("countdown").innerText = format(countdownValue);
+    countdownValue = 0;
+    document.getElementById("countdown").innerText = format(0);
     refreshDowntimeCardFromTable();
     const balanceEl = document.getElementById("balance");
     if (balance < 0) balanceEl.className = "big-number status-red";
@@ -3624,7 +3633,7 @@ function updateDisplay() {
     balanceEl.innerText = displayBalance;
     delayEl.className = "big-number status-blue";
     delayEl.innerText = "0";
-    setStatus("NON PRODUCTION", "status-orange");
+    setStatus("NON PRODUCTION", "status-blue");
     syncEfficiencyCardDom();
     const downtimeCard = document.getElementById("downtimeCard");
     const downtimeText = document.getElementById("downtime");
@@ -3694,7 +3703,7 @@ function updateDisplay() {
     duplicateLock = false;
   }
   if (isNonProductionMode()) {
-    setStatus("NON PRODUCTION", "status-orange");
+    setStatus("NON PRODUCTION", "status-blue");
   } else if (isBreakTime()) {
     setStatus("BREAK TIME", "status-orange");
   } else if (duplicateLock) {
@@ -5638,6 +5647,9 @@ function updateLiveStateOnly() {
   if (timer && (status === "RUNNING" || status === "DOWN TIME")) {
     const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
     countdownValue = computeRunningCountdownSec(cycleTimeSec);
+  }
+  if (isNonProductionMode() || status === "NON PRODUCTION") {
+    countdownValue = 0;
   }
 
   fetch(API_URL, {
