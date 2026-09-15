@@ -146,26 +146,47 @@ const ADMIN_LOGIN = {
 function getAppRole() {
   try {
     const v = sessionStorage.getItem(APP_ROLE_STORAGE_KEY);
-    if (v !== "admin") return "operator";
-    if (sessionStorage.getItem(APP_ADMIN_SESSION_KEY) !== "1") {
-      sessionStorage.setItem(APP_ROLE_STORAGE_KEY, "operator");
-      return "operator";
+    if (v === "management") return "management";
+    if (v === "master" || v === "admin") {
+      if (sessionStorage.getItem(APP_ADMIN_SESSION_KEY) !== "1") {
+        sessionStorage.setItem(APP_ROLE_STORAGE_KEY, "operator");
+        return "operator";
+      }
+      return "master";
     }
-    return "admin";
+    return "operator";
   } catch {
     return "operator";
   }
 }
 
+function getRoleLabel(role) {
+  if (role === "master") return "Master Control";
+  if (role === "management") return "Management";
+  return "Operator";
+}
+
+function isMasterRole() {
+  return getAppRole() === "master";
+}
+
+function isManagementRole() {
+  return getAppRole() === "management";
+}
+
 function isAdminRole() {
-  return getAppRole() === "admin";
+  return isMasterRole();
+}
+
+function canOperateLine() {
+  return getAppRole() === "operator" || isMasterRole();
 }
 
 function setAppRole(role) {
-  if (role === "admin") return;
+  if (role === "master" || role === "admin") return;
   try {
     sessionStorage.removeItem(APP_ADMIN_SESSION_KEY);
-    sessionStorage.setItem(APP_ROLE_STORAGE_KEY, "operator");
+    sessionStorage.setItem(APP_ROLE_STORAGE_KEY, role === "management" ? "management" : "operator");
   } catch (_) {}
   applyAppRoleUi();
 }
@@ -173,9 +194,36 @@ function setAppRole(role) {
 function grantAdminAfterLogin() {
   try {
     sessionStorage.setItem(APP_ADMIN_SESSION_KEY, "1");
-    sessionStorage.setItem(APP_ROLE_STORAGE_KEY, "admin");
+    sessionStorage.setItem(APP_ROLE_STORAGE_KEY, "master");
   } catch (_) {}
   applyAppRoleUi();
+}
+
+function applyMainPcEditLock() {
+  if (isMonitor) return;
+  const master = isMasterRole();
+  const canOperate = canOperateLine();
+  ["cycleTarget", "dailyPlanTarget", "lotInput"].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.readOnly = !master;
+    el.classList.toggle("settings-locked", !master);
+  });
+  document.querySelectorAll(".main-pc-actions button").forEach(btn => {
+    btn.disabled = !canOperate;
+  });
+  if (isNonProductionMode()) {
+    setScanInputsEnabled(false);
+  } else {
+    setScanInputsEnabled(canOperate);
+  }
+  const wtWrap = document.querySelector(".header-wt-dd-wrap");
+  if (wtWrap) wtWrap.classList.toggle("wt-locked", !master);
+  const wtTrigger = document.getElementById("graphWtTrigger");
+  if (wtTrigger) {
+    wtTrigger.disabled = !master;
+    wtTrigger.setAttribute("aria-disabled", master ? "false" : "true");
+  }
 }
 
 function showAdminLoginModal() {
@@ -234,18 +282,21 @@ function syncRoleDropdownAria() {
 }
 
 function applyAppRoleUi() {
-  const admin = isAdminRole();
-  document.body.classList.toggle("role-admin", admin);
-  document.body.classList.toggle("role-operator", !admin);
+  const role = getAppRole();
+  const master = role === "master";
+  document.body.classList.toggle("role-admin", master);
+  document.body.classList.toggle("role-master", master);
+  document.body.classList.toggle("role-management", role === "management");
+  document.body.classList.toggle("role-operator", role === "operator");
   const label = document.getElementById("roleLabel");
-  if (label) label.textContent = admin ? "Management" : "Operator";
+  if (label) label.textContent = getRoleLabel(role);
   document.querySelectorAll(".header-role-option").forEach(btn => {
-    const role = btn.getAttribute("data-role");
-    const sel = (admin && role === "admin") || (!admin && role === "operator");
+    const btnRole = btn.getAttribute("data-role");
+    const sel = btnRole === role || (master && btnRole === "admin");
     btn.setAttribute("aria-selected", sel ? "true" : "false");
     btn.classList.toggle("selected", sel);
   });
-  if (!admin) {
+  if (!master) {
     toggleMenuDropdown(false);
     toggleRoleDropdown(false);
     if (
@@ -258,7 +309,7 @@ function applyAppRoleUi() {
     }
   }
   if (isMonitor && document.body.classList.contains("monitor-mode")) {
-    const wantedLayout = admin ? MONITOR_LAYOUT_OPERATOR_MIRROR_KEY : MONITOR_LAYOUT_LEGACY_KEY;
+    const wantedLayout = master ? MONITOR_LAYOUT_OPERATOR_MIRROR_KEY : MONITOR_LAYOUT_LEGACY_KEY;
     const currentLayout = document.body.dataset.monitorLayout || "";
     if (currentLayout && currentLayout !== wantedLayout) {
       window.location.reload();
@@ -267,6 +318,7 @@ function applyAppRoleUi() {
   }
   syncRoleDropdownAria();
   syncGraphWtControl();
+  applyMainPcEditLock();
 }
 
 function toggleRoleDropdown(forceOpen) {
@@ -292,9 +344,13 @@ function onRoleTriggerClick(event) {
 function onRoleOptionClick(event, role) {
   event.stopPropagation();
   toggleRoleDropdown(false);
-  if (role === "admin") {
-    if (isAdminRole()) return;
+  if (role === "master" || role === "admin") {
+    if (isMasterRole()) return;
     showAdminLoginModal();
+    return;
+  }
+  if (role === "management") {
+    setAppRole("management");
     return;
   }
   setAppRole("operator");
@@ -556,6 +612,7 @@ function toggleGraphWtDropdown(forceOpen) {
 
 function onGraphWtTriggerClick(event) {
   event.stopPropagation();
+  if (!isMasterRole()) return;
   toggleGraphWtDropdown();
 }
 
@@ -571,11 +628,13 @@ function applyGraphWtControlUi() {
     btn.setAttribute("aria-selected", sel ? "true" : "false");
     btn.classList.toggle("selected", sel);
   });
+  applyMainPcEditLock();
 }
 
 function onGraphWtOptionClick(event, preset) {
   event.stopPropagation();
   toggleGraphWtDropdown(false);
+  if (!isMasterRole()) return;
   const p = normalizeGraphWtPreset(preset);
   if (graphWtPreset === p) return;
   const prev = graphWtPreset;
@@ -1758,6 +1817,7 @@ function ensureShiftScheduleModal() {
 }
 
 function openShiftScheduleModal() {
+  if (!isMasterRole()) return;
   ensureShiftScheduleModal();
   const overlay = document.getElementById("shiftScheduleOverlay");
   const start = document.getElementById("shiftStartTimeInput");
@@ -3302,6 +3362,7 @@ function applyRemoteCommand(action) {
 
 function startProduction(shouldSync = true) {
   if (isMonitor) return;
+  if (!canOperateLine()) return;
   if (isNonProductionMode()) {
     setStatus("NON PRODUCTION", "status-blue");
     return;
@@ -3345,6 +3406,7 @@ function startProduction(shouldSync = true) {
 /* STOP */
 function stopProduction(shouldSync = true) {
   if (isMonitor) return;
+  if (!canOperateLine()) return;
 
   hasLocalSession = true;
 
@@ -3362,6 +3424,7 @@ function stopProduction(shouldSync = true) {
 /* RESET */
 function resetProduction(shouldSync = true) {
   if (isMonitor) return;
+  if (!canOperateLine()) return;
   if (isNonProductionMode()) return;
 
   hasLocalSession = true;
@@ -3398,7 +3461,7 @@ function resetProduction(shouldSync = true) {
 
 document.getElementById("chassisInput").addEventListener("keydown", function(e) {
   if (e.key === "Enter" && this.value.trim() !== "") {
-    if (isNonProductionMode()) {
+    if (!canOperateLine() || isNonProductionMode()) {
       this.value = "";
       return;
     }
@@ -3416,7 +3479,7 @@ document.getElementById("chassisInput").addEventListener("keydown", function(e) 
 
 document.getElementById("modelInput").addEventListener("keydown", function(e) {
   if (e.key === "Enter" && this.value.trim() !== "") {
-    if (isNonProductionMode()) {
+    if (!canOperateLine() || isNonProductionMode()) {
       this.value = "";
       return;
     }
@@ -3436,7 +3499,7 @@ document.getElementById("modelInput").addEventListener("keydown", function(e) {
 
 document.getElementById("engineInput").addEventListener("keydown", function(e) {
   if (e.key === "Enter" && this.value.trim() !== "") {
-    if (isNonProductionMode()) {
+    if (!canOperateLine() || isNonProductionMode()) {
       this.value = "";
       return;
     }
@@ -3456,7 +3519,7 @@ document.getElementById("engineInput").addEventListener("keydown", function(e) {
 
 document.getElementById("keyInput").addEventListener("keydown", function(e) {
   if (e.key === "Enter" && this.value.trim() !== "") {
-    if (isNonProductionMode()) {
+    if (!canOperateLine() || isNonProductionMode()) {
       this.value = "";
       return;
     }
@@ -6132,6 +6195,7 @@ document.getElementById("cycleTarget").value = SETTINGS.defaultCycle;
 document.getElementById("dailyPlanTarget").value = SETTINGS.defaultPlan;
 
 document.getElementById("cycleTarget").addEventListener("input", () => {
+  if (!isMasterRole()) return;
   if (!timer) {
     countdownValue = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
   }
@@ -6141,6 +6205,7 @@ document.getElementById("cycleTarget").addEventListener("input", () => {
 });
 
 document.getElementById("dailyPlanTarget").addEventListener("input", () => {
+  if (!isMasterRole()) return;
   const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
   syncTodayScanPlanOnRows(plan);
   hasLocalSession = true;
@@ -6150,6 +6215,7 @@ document.getElementById("dailyPlanTarget").addEventListener("input", () => {
 });
 
 document.getElementById("lotInput").addEventListener("input", () => {
+  if (!isMasterRole()) return;
   hasLocalSession = true;
   updateLiveStateOnly();
 });

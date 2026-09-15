@@ -488,8 +488,17 @@ body.non-production-mode .scan-box.scan-disabled{
   filter:grayscale(.25);
 }
 
-body.role-operator .menu-btn{
+body.role-operator .menu-btn,
+body.role-management .menu-btn{
   display:none !important;
+}
+
+input.settings-locked,
+.wt-locked,
+.wt-locked .header-wt-trigger{
+  pointer-events:none;
+  opacity:.55;
+  cursor:not-allowed;
 }
 
 .admin-login-overlay{

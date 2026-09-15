@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <title>TF 2 Production Monitoring</title>
 <link rel="icon" href="./favicon.svg" type="image/svg+xml" sizes="any">
-<link rel="stylesheet" href="./style.css?v=20260915np">
+<link rel="stylesheet" href="./style.css?v=20260915mc">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
@@ -53,7 +53,8 @@
           </button>
           <div class="header-role-dropdown" id="roleDropdown" role="listbox" aria-labelledby="roleTrigger" aria-hidden="true">
             <button type="button" class="header-role-option" data-role="operator" role="option" onclick="onRoleOptionClick(event, 'operator')">Operator</button>
-            <button type="button" class="header-role-option" data-role="admin" role="option" onclick="onRoleOptionClick(event, 'admin')">Management</button>
+            <button type="button" class="header-role-option" data-role="management" role="option" onclick="onRoleOptionClick(event, 'management')">Management</button>
+            <button type="button" class="header-role-option" data-role="master" role="option" onclick="onRoleOptionClick(event, 'master')">Master Control</button>
           </div>
         </div>
       </div>
@@ -163,7 +164,7 @@ Lot:
 
 <div id="adminLoginOverlay" class="admin-login-overlay" aria-hidden="true" onclick="onAdminLoginBackdropClick(event)">
   <div class="admin-login-dialog" role="dialog" aria-modal="true" aria-labelledby="adminLoginTitle" onclick="event.stopPropagation()">
-    <h2 id="adminLoginTitle" class="admin-login-title">Management sign in</h2>
+    <h2 id="adminLoginTitle" class="admin-login-title">Master Control sign in</h2>
     <p id="adminLoginError" class="admin-login-error" hidden></p>
     <form class="admin-login-form" onsubmit="event.preventDefault(); submitAdminLogin();">
       <label class="admin-login-label">
@@ -182,6 +183,6 @@ Lot:
   </div>
 </div>
 
-<script src="./script.js?v=20260915gap"></script>
+<script src="./script.js?v=20260915mc"></script>
 </body>
 </html>
