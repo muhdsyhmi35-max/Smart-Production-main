@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <title>TF 2 Production Monitoring</title>
 <link rel="icon" href="./favicon.svg" type="image/svg+xml" sizes="any">
-<link rel="stylesheet" href="./style.css?v=20260915op2">
+<link rel="stylesheet" href="./style.css?v=20260915op7">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
@@ -88,12 +88,61 @@ Lot:
 
 <div class="dashboard">
 
-<div class="card card-countdown"><h3>COUNTDOWN</h3><div class="big-number" id="countdown">00:00</div></div>
-<div class="card card-actual"><h3>ACTUAL OUTPUT</h3><div class="big-number status-green" id="actual">0</div></div>
-<div class="card card-expected"><h3>EXPECTED OUTPUT</h3><div class="big-number status-blue" id="expected">0</div></div>
+<div class="card card-countdown">
+  <h3 class="card-title-default">COUNTDOWN</h3>
+  <h3 class="card-title-operator">CYCLE TIME COUNTDOWN</h3>
+  <div class="op-countdown-visual">
+    <svg class="op-countdown-svg" viewBox="0 0 240 240" aria-hidden="true">
+      <g id="countdownTickGroup"></g>
+    </svg>
+    <div class="op-countdown-inner">
+      <div class="op-timer-icon" aria-hidden="true">
+        <svg viewBox="0 0 64 64" fill="none">
+          <rect x="27" y="5" width="10" height="7" rx="1.8" fill="currentColor"/>
+          <path d="M32 12v5" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/>
+          <path d="M16 16l5 5M48 16l-5 5" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/>
+          <circle cx="32" cy="38" r="18" stroke="currentColor" stroke-width="3.6"/>
+          <path d="M32 38V26M32 38l11 6" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="32" cy="38" r="2.6" fill="currentColor"/>
+        </svg>
+      </div>
+      <div class="big-number" id="countdown">00:00</div>
+      <div class="op-cycle-meta">
+        <div class="op-cycle-label">Cycle Time (min)</div>
+        <div class="op-cycle-value" id="opCycleTimeDisplay">16</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="card card-actual">
+  <span class="op-kpi-icon" aria-hidden="true">
+    <svg viewBox="0 0 64 64"><rect x="6" y="38" width="10" height="18" rx="2.2"/><rect x="20" y="26" width="10" height="30" rx="2.2"/><rect x="34" y="14" width="10" height="42" rx="2.2"/><rect x="48" y="4" width="10" height="52" rx="2.2"/></svg>
+  </span>
+  <div class="op-kpi-copy">
+    <h3>ACTUAL OUTPUT</h3>
+    <div class="big-number status-green" id="actual">0</div>
+  </div>
+</div>
+<div class="card card-expected">
+  <span class="op-kpi-icon" aria-hidden="true">
+    <svg viewBox="0 0 64 64" fill="none"><circle cx="26" cy="38" r="18" stroke="currentColor" stroke-width="3.4"/><circle cx="26" cy="38" r="9.5" stroke="currentColor" stroke-width="3.4"/><circle cx="26" cy="38" r="3.4" fill="currentColor"/><path d="M40 8l18-2-8 18z" fill="currentColor"/></svg>
+  </span>
+  <div class="op-kpi-copy">
+    <h3>EXPECTED OUTPUT</h3>
+    <div class="big-number status-blue" id="expected">0</div>
+  </div>
+</div>
 <div class="card card-delay"><h3>DELAY / AHEAD</h3><div class="big-number" id="delay">0</div></div>
 <div class="card card-plan"><h3>DAILY PLAN</h3><div class="big-number" id="plan">0</div></div>
-<div class="card card-balance"><h3>BALANCE</h3><div class="big-number" id="balance">0</div></div>
+<div class="card card-balance">
+  <span class="op-kpi-icon" aria-hidden="true">
+    <svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="8" r="3.2" fill="currentColor"/><path d="M32 11v15" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/><path d="M8 26h48" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/><path d="M12 26l10 20H2z" fill="currentColor"/><path d="M52 26l10 20H42z" fill="currentColor"/><path d="M32 44v12" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/><path d="M18 56h28" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/></svg>
+  </span>
+  <div class="op-kpi-copy">
+    <h3><span class="card-title-default">BALANCE</span><span class="card-title-operator">BALANCED</span></h3>
+    <div class="big-number" id="balance">0</div>
+  </div>
+</div>
 <div class="card card-downtime" id="downtimeCard">
 <h3>TOTAL DOWNTIME</h3>
 <div class="big-number" id="downtime">00:00</div>
@@ -178,6 +227,6 @@ Lot:
   </div>
 </div>
 
-<script src="./script.js?v=20260915op2"></script>
+<script src="./script.js?v=20260915op7"></script>
 </body>
 </html>

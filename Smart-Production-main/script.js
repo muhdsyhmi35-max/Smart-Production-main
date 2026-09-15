@@ -333,6 +333,7 @@ function applyAppRoleUi() {
   syncGraphWtControl();
   applyMainPcEditLock();
   restoreFullscreenIfNeeded(wasFullscreen);
+  syncOperatorDashboardChrome();
 }
 
 function isAppFullscreen() {
@@ -3150,18 +3151,21 @@ function startLiveCountdownTicker(baseCountdown, status, updatedAt, anchorScanMs
   if (!isMonitor) {
     countdownValue = baseCountdown;
     countdownEl.innerText = format(baseCountdown);
+    syncOperatorDashboardChrome();
     return;
   }
 
   if (status === "NON PRODUCTION") {
     countdownValue = 0;
     countdownEl.innerText = format(0);
+    syncOperatorDashboardChrome();
     return;
   }
 
   if (status !== "RUNNING") {
     countdownValue = baseCountdown;
     countdownEl.innerText = format(baseCountdown);
+    syncOperatorDashboardChrome();
     return;
   }
 
@@ -3175,6 +3179,7 @@ function startLiveCountdownTicker(baseCountdown, status, updatedAt, anchorScanMs
     );
     countdownValue = adjusted;
     countdownEl.innerText = format(adjusted);
+    syncOperatorDashboardChrome();
   };
 
   monitorCountdownRender = render;
@@ -3441,6 +3446,7 @@ function applyLiveState(state) {
     applyGraphSettingsFromRemote(state);
     updateMonitorDataNotice();
   }
+  syncOperatorDashboardChrome();
 }
 
 function loadInitialLiveState() {
@@ -3872,6 +3878,65 @@ document.getElementById("keyInput").addEventListener("keydown", function(e) {
 
 /* ===== UPDATE DISPLAY ===== */
 
+function ensureOperatorCountdownTicks() {
+  const g = document.getElementById("countdownTickGroup");
+  if (!g) return;
+  const n = 48;
+  if (g.dataset.built === "1" && g.childElementCount === n) return;
+  g.replaceChildren();
+  const ns = "http://www.w3.org/2000/svg";
+  const cx = 120;
+  const cy = 120;
+  const r = 104;
+  const tickW = 10.5;
+  const tickH = 15;
+  for (let i = 0; i < n; i++) {
+    const deg = (i / n) * 360;
+    const a = ((deg - 90) * Math.PI) / 180;
+    const x = cx + r * Math.cos(a);
+    const y = cy + r * Math.sin(a);
+    const rect = document.createElementNS(ns, "rect");
+    rect.setAttribute("x", String(-tickW / 2));
+    rect.setAttribute("y", "0");
+    rect.setAttribute("width", String(tickW));
+    rect.setAttribute("height", String(tickH));
+    rect.setAttribute("rx", "3.2");
+    rect.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${deg.toFixed(2)})`);
+    rect.setAttribute("class", "op-tick");
+    g.appendChild(rect);
+  }
+  g.dataset.built = "1";
+}
+
+function syncOperatorDashboardChrome() {
+  ensureOperatorCountdownTicks();
+  const cycleMin = parseFloat(document.getElementById("cycleTarget")?.value) || SETTINGS.defaultCycle;
+  const cycleEl = document.getElementById("opCycleTimeDisplay");
+  if (cycleEl) {
+    const shown = Number.isFinite(cycleMin) ? String(Math.round(cycleMin * 10) / 10).replace(/\.0$/, "") : "—";
+    cycleEl.textContent = shown;
+  }
+  const ticks = document.querySelectorAll("#countdownTickGroup .op-tick");
+  const cycleSec = Math.max((Number(cycleMin) || 1) * 60, 1);
+  const remain = Math.max(0, Math.min(Number(countdownValue) || 0, cycleSec));
+  const lit = ticks.length ? Math.round((remain / cycleSec) * ticks.length) : 0;
+  ticks.forEach((tick, i) => tick.classList.toggle("is-lit", i < lit));
+
+  const balCard = document.querySelector(".card-balance");
+  const balEl = document.getElementById("balance");
+  if (balCard && balEl) {
+    const n = parseInt(String(balEl.innerText).replace(/[^\-0-9]/g, ""), 10);
+    const v = Number.isFinite(n) ? n : 0;
+    balCard.classList.toggle("is-behind", v < 0);
+    balCard.classList.toggle("is-ahead", v > 0);
+    balCard.classList.toggle("is-even", v === 0);
+  }
+}
+
+if (document.getElementById("countdownTickGroup")) {
+  syncOperatorDashboardChrome();
+}
+
 function updateDisplay() {
   if (isMonitor) return;
   // Keep accumulated card aligned with sum of visible table downtime rows.
@@ -3902,6 +3967,7 @@ function updateDisplay() {
     downtimeCard.classList.remove("downtime-alert", "blink");
     downtimeText.classList.remove("status-red", "blink");
     syncDowntimeAccumulatedHighlight();
+    syncOperatorDashboardChrome();
     return;
   }
 
@@ -3999,6 +4065,7 @@ function updateDisplay() {
     downtimeText.classList.remove("status-red", "blink");
   }
   syncDowntimeAccumulatedHighlight();
+  syncOperatorDashboardChrome();
 }
 
 /* ===== DAILY SUMMARY ===== */

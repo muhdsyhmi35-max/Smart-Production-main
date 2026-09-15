@@ -1169,7 +1169,8 @@ body.role-operator .card-countdown,
 body.role-operator .dashboard > .card:nth-child(1){
   grid-column:1;
   grid-row:1 / span 3;
-  justify-content:center;
+  justify-content:flex-start;
+  align-items:stretch;
   min-height:0;
 }
 
@@ -1196,7 +1197,272 @@ body.role-operator .dashboard > .card:nth-child(6){
 
 body.role-operator .card-countdown .big-number,
 body.role-operator .dashboard > .card:nth-child(1) .big-number{
-  font-size:clamp(56px, 8.5vh, 96px);
+  font-size:clamp(58px, 9.2vh, 104px);
+  font-weight:800;
+}
+
+body:not(.role-operator) .card-title-operator,
+body:not(.role-operator) .op-countdown-svg,
+body:not(.role-operator) .op-timer-icon,
+body:not(.role-operator) .op-cycle-meta,
+body:not(.role-operator) .op-kpi-icon{
+  display:none !important;
+}
+
+body:not(.role-operator) .op-kpi-copy{
+  display:contents;
+}
+
+body.role-operator .card-title-default{
+  display:none !important;
+}
+
+body.role-operator .card-countdown,
+body.role-operator .card-expected,
+body.role-operator .card-actual,
+body.role-operator .card-balance{
+  border-radius:10px;
+  overflow:hidden;
+}
+
+body.role-operator .card-countdown::before,
+body.role-operator .card-expected::before,
+body.role-operator .card-actual::before,
+body.role-operator .card-balance::before{
+  display:none;
+}
+
+body.role-operator .card-countdown{
+  background:#050b18;
+  border:1px solid #1e4ed8;
+  box-shadow:inset 0 0 0 1px rgba(37,99,235,.18), 0 10px 28px rgba(2,6,23,.5);
+  padding:clamp(14px, 1.8vh, 22px) clamp(12px, 1.6vw, 20px) clamp(10px, 1.4vh, 16px);
+}
+
+body.role-operator .card-countdown .card-title-operator{
+  color:#3b82f6;
+  letter-spacing:.18em;
+  font-size:clamp(12px, 1.65vh, 16px);
+  font-weight:800;
+  text-align:center;
+  width:100%;
+  margin:0 0 clamp(4px, .8vh, 10px);
+}
+
+body.role-operator .op-countdown-visual{
+  position:relative;
+  width:min(92%, 520px);
+  aspect-ratio:1;
+  margin:0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex:1 1 auto;
+  min-height:0;
+}
+
+body.role-operator .op-countdown-svg{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  overflow:visible;
+}
+
+body.role-operator .op-tick{
+  fill:#1e3a5f;
+}
+
+body.role-operator .op-tick.is-lit{
+  fill:#2f80ed;
+}
+
+body.role-operator .op-countdown-inner{
+  position:relative;
+  z-index:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+}
+
+body.role-operator .op-timer-icon{
+  width:clamp(48px, 7vh, 72px);
+  height:clamp(48px, 7vh, 72px);
+  color:#3b82f6;
+  margin-bottom:6px;
+}
+
+body.role-operator .op-timer-icon svg{
+  width:100%;
+  height:100%;
+  display:block;
+}
+
+body.role-operator .card-countdown #countdown{
+  color:#f8fafc;
+  letter-spacing:.08em;
+  line-height:1;
+}
+
+body.role-operator .op-cycle-meta{
+  margin-top:6px;
+  text-align:center;
+}
+
+body.role-operator .op-cycle-label{
+  color:#64748b;
+  font-size:clamp(11px, 1.4vh, 13px);
+  font-weight:600;
+}
+
+body.role-operator .op-cycle-value{
+  color:#3b82f6;
+  font-size:clamp(20px, 3.2vh, 32px);
+  font-weight:800;
+  font-family:Consolas, "Courier New", monospace;
+}
+
+body.role-operator .op-kpi-icon svg{
+  width:100%;
+  height:100%;
+  display:block;
+}
+
+body.role-operator .card-expected,
+body.role-operator .card-actual,
+body.role-operator .card-balance{
+  display:grid !important;
+  grid-template-columns:auto minmax(0, 1fr);
+  grid-template-rows:minmax(0, 1fr) auto minmax(0, 1fr);
+  column-gap:clamp(14px, 1.8vw, 22px);
+  align-items:center;
+  text-align:left;
+  padding:clamp(12px, 1.6vh, 18px) clamp(18px, 2vw, 24px);
+}
+
+body.role-operator .card-expected .op-kpi-icon,
+body.role-operator .card-actual .op-kpi-icon,
+body.role-operator .card-balance .op-kpi-icon{
+  grid-column:1;
+  grid-row:1 / -1;
+  align-self:center;
+  flex:0 0 auto;
+  width:clamp(52px, 8vh, 78px);
+  height:clamp(52px, 8vh, 78px);
+}
+
+body.role-operator .op-kpi-copy{
+  grid-column:2;
+  grid-row:2;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  justify-content:center;
+  gap:2px;
+  min-width:0;
+  text-align:right;
+}
+
+body.role-operator .card-expected,
+body.role-operator .card-actual{
+  background:#03150c;
+  border:1px solid #16a34a;
+  box-shadow:inset 0 0 0 1px rgba(34,197,94,.18), 0 8px 18px rgba(2,6,23,.45);
+}
+
+body.role-operator .card-expected .op-kpi-icon,
+body.role-operator .card-actual .op-kpi-icon{
+  color:#22c55e;
+}
+
+body.role-operator .card-actual .op-kpi-icon svg{
+  fill:currentColor;
+}
+
+body.role-operator .card-expected h3,
+body.role-operator .card-actual h3{
+  margin:0;
+  color:#22c55e;
+  letter-spacing:.12em;
+  font-size:clamp(13px, 1.8vh, 18px);
+  font-weight:800;
+  text-align:right;
+}
+
+body.role-operator .card-expected .big-number,
+body.role-operator .card-actual .big-number{
+  color:#22c55e !important;
+  text-align:right;
+  font-size:clamp(52px, 8.6vh, 92px);
+  font-weight:800;
+  line-height:.95;
+}
+
+body.role-operator .card-balance{
+  background:#160507;
+  border:1px solid #e11d2e;
+  box-shadow:inset 0 0 0 1px rgba(239,68,68,.22), 0 8px 18px rgba(2,6,23,.45);
+}
+
+body.role-operator .card-balance.is-ahead{
+  background:#04140c;
+  border-color:#16a34a;
+  box-shadow:inset 0 0 0 1px rgba(34,197,94,.16), 0 8px 18px rgba(2,6,23,.45);
+}
+
+body.role-operator .card-balance.is-even{
+  background:#07111f;
+  border-color:#2563eb;
+}
+
+body.role-operator .card-balance .op-kpi-icon{
+  color:#ef4444;
+}
+
+body.role-operator .card-balance.is-ahead .op-kpi-icon{
+  color:#22c55e;
+}
+
+body.role-operator .card-balance.is-even .op-kpi-icon{
+  color:#3b82f6;
+}
+
+body.role-operator .card-balance h3{
+  margin:0;
+  color:#ef4444;
+  letter-spacing:.12em;
+  font-size:clamp(13px, 1.8vh, 18px);
+  font-weight:800;
+  text-align:right;
+}
+
+body.role-operator .card-balance.is-ahead h3{
+  color:#22c55e;
+}
+
+body.role-operator .card-balance.is-even h3{
+  color:#60a5fa;
+}
+
+body.role-operator .card-balance .big-number{
+  text-align:right;
+  font-size:clamp(52px, 8.6vh, 92px);
+  font-weight:800;
+  line-height:.95;
+}
+
+body.role-operator .card-balance.is-behind .big-number,
+body.role-operator .card-balance .big-number.status-red{
+  color:#ef4444 !important;
+}
+
+body.role-operator .card-countdown:hover,
+body.role-operator .card-expected:hover,
+body.role-operator .card-actual:hover,
+body.role-operator .card-balance:hover{
+  transform:none;
 }
 
 .card h3{
