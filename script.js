@@ -295,6 +295,11 @@ function syncRoleDropdownAria() {
 function applyAppRoleUi() {
   const role = getAppRole();
   const master = role === "master";
+  const wasFullscreen = !!(
+    document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    document.msFullscreenElement
+  );
   document.body.classList.toggle("role-admin", master);
   document.body.classList.toggle("role-master", master);
   document.body.classList.toggle("role-management", role === "management");
@@ -322,16 +327,31 @@ function applyAppRoleUi() {
     showMainPage();
   }
   if (isMonitor && document.body.classList.contains("monitor-mode")) {
-    const wantedLayout = canViewReports() ? MONITOR_LAYOUT_OPERATOR_MIRROR_KEY : MONITOR_LAYOUT_LEGACY_KEY;
-    const currentLayout = document.body.dataset.monitorLayout || "";
-    if (currentLayout && currentLayout !== wantedLayout) {
-      window.location.reload();
-      return;
-    }
+    applyMonitorLayoutForCurrentRole();
   }
   syncRoleDropdownAria();
   syncGraphWtControl();
   applyMainPcEditLock();
+  restoreFullscreenIfNeeded(wasFullscreen);
+}
+
+function isAppFullscreen() {
+  return !!(
+    document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    document.msFullscreenElement
+  );
+}
+
+function restoreFullscreenIfNeeded(wasFullscreen) {
+  if (!wasFullscreen || isAppFullscreen()) return;
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+  if (!req) return;
+  try {
+    const result = req.call(el);
+    if (result && typeof result.catch === "function") result.catch(() => {});
+  } catch (_) {}
 }
 
 function toggleRoleDropdown(forceOpen) {
@@ -859,9 +879,28 @@ function applyMonitorDashboardLayout() {
   dashboard.appendChild(lineCard);
 }
 
-/** Admin monitor: operator-style 4+4 dashboard cards + CONNECTION STATUS / LINE STATUS bottom row (inputs hidden by monitor-mode). */
+function applyMonitorLayoutForCurrentRole() {
+  if (!isMonitor) return;
+  if (canViewReports()) applyOperatorStyleMonitorDashboard();
+  else applyLegacyMonitorDashboardLayout();
+  setMonitorConnectionStatus(monitorFirebaseNetConnected);
+}
+
+function ensureMonitorConnectionWrap() {
+  let wrap = document.getElementById("monitorConnectionWrap");
+  if (wrap) return wrap;
+  wrap = document.createElement("div");
+  wrap.id = "monitorConnectionWrap";
+  wrap.innerHTML = `
+      <div class="monitor-only-text">MONITOR ONLY</div>
+      <div id="monitorConnectionStatus" class="monitor-connection-badge">LIVE</div>
+    `;
+  return wrap;
+}
+
+/** Admin / management monitor: operator-style 4+4 dashboard cards + CONNECTION STATUS / LINE STATUS bottom row (inputs hidden by monitor-mode). */
 function applyOperatorStyleMonitorDashboard() {
-  if (!isMonitor || document.body.dataset.monitorLayout === MONITOR_LAYOUT_OPERATOR_MIRROR_KEY) return;
+  if (!isMonitor) return;
 
   document.body.dataset.monitorLayout = MONITOR_LAYOUT_OPERATOR_MIRROR_KEY;
   document.body.classList.remove("monitor-layout-active");
@@ -879,14 +918,9 @@ function applyOperatorStyleMonitorDashboard() {
   const title = scanCard.querySelector("h3");
   if (title) title.textContent = "CONNECTION STATUS";
 
-  if (scanCard.querySelector(".monitor-inline-connection")) return;
-
-  const wrap = document.createElement("div");
+  const wrap = ensureMonitorConnectionWrap();
   wrap.className = "monitor-status-wrap monitor-inline-connection";
-  wrap.innerHTML = `
-      <div class="monitor-only-text">MONITOR ONLY</div>
-      <div id="monitorConnectionStatus" class="monitor-connection-badge">LIVE</div>
-    `;
+  wrap.hidden = false;
   scanCard.appendChild(wrap);
 }
 
@@ -903,15 +937,13 @@ function applyLegacyMonitorDashboardLayout() {
   if (!monitorCard) return;
   const monitorTitle = monitorCard.querySelector("h3");
   if (monitorTitle) monitorTitle.textContent = "CONNECTION STATUS";
+
+  const wrap = ensureMonitorConnectionWrap();
+  wrap.className = "monitor-status-wrap monitor-legacy-connection";
+  wrap.hidden = false;
   const scanGrid = monitorCard.querySelector(".scan-grid");
-  if (scanGrid) {
-    scanGrid.innerHTML = `
-      <div class="monitor-status-wrap">
-        <div class="monitor-only-text">MONITOR ONLY</div>
-        <div id="monitorConnectionStatus" class="monitor-connection-badge">LIVE</div>
-      </div>
-    `;
-  }
+  if (scanGrid) scanGrid.appendChild(wrap);
+  else monitorCard.appendChild(wrap);
 }
 
 /* ===== FORMAT ===== */
