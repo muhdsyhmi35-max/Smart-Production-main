@@ -4743,9 +4743,9 @@ function buildSummaryBarChart(title, labels, values, color, valueSuffix = "", yA
   } = animOpts;
   const width = 500;
   const height = 190;
-  const leftPad = 36;
+  const leftPad = 48;
   const rightPad = 12;
-  const topPad = 14;
+  const topPad = 22;
   const bottomPad = 30;
   const chartW = width - leftPad - rightPad;
   const chartH = height - topPad - bottomPad;
@@ -4762,7 +4762,7 @@ function buildSummaryBarChart(title, labels, values, color, valueSuffix = "", yA
     const y = topPad + (chartH - h);
     const showLabel = xLabelSet.has(i);
     const cx = (x + (barW / 2)).toFixed(2);
-    const valueY = (Math.max(y - 5, 12)).toFixed(2);
+    const valueY = (Math.max(y - 6, 14)).toFixed(2);
     const barDelayMs = i * barStaggerMs;
     const valueDelayMs = barDelayMs + valueDelayAfterBarMs;
     return `
@@ -4813,9 +4813,9 @@ function buildSummaryLineChart(title, labels, values, color, valueSuffix = "", y
   }
   const width = 500;
   const height = 170;
-  const leftPad = 36;
+  const leftPad = 48;
   const rightPad = 12;
-  const topPad = 14;
+  const topPad = 22;
   const bottomPad = 28;
   const chartW = width - leftPad - rightPad;
   const chartH = height - topPad - bottomPad;
@@ -4949,9 +4949,9 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
   const skipNpIdx = i => dayKeys && isReportNonProductionDay(dayKeys[i], reportActualByDay);
   const width = 500;
   const height = 170;
-  const leftPad = 36;
+  const leftPad = 48;
   const rightPad = 12;
-  const topPad = 14;
+  const topPad = 22;
   const bottomPad = 28;
   const chartW = width - leftPad - rightPad;
   const chartH = height - topPad - bottomPad;
@@ -5184,9 +5184,9 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
 
   const width = 500;
   const height = 170;
-  const leftPad = 36;
+  const leftPad = 48;
   const rightPad = 12;
-  const topPad = 14;
+  const topPad = 22;
   const bottomPad = 28;
   const chartW = width - leftPad - rightPad;
   const chartH = height - topPad - bottomPad;

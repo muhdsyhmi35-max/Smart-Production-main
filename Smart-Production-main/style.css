@@ -59,12 +59,6 @@ body.is-fullscreen .fullscreen-btn{
   .summary-graph-card{
     padding:5px;
   }
-  .summary-chart-plan-actual{
-    max-height:20vh;
-  }
-  .summary-chart-svg{
-    max-height:20vh;
-  }
   .trend-title{
     font-size:14px;
   }
@@ -99,12 +93,6 @@ body.is-fullscreen .fullscreen-btn{
   }
   .summary-graphs{
     gap:12px;
-  }
-  .summary-chart-plan-actual{
-    max-height:27vh;
-  }
-  .summary-chart-svg{
-    max-height:27vh;
   }
 }
 :root{
@@ -1201,7 +1189,7 @@ body.role-operator .dashboard > .card:nth-child(6){
 
 body.role-operator .card-countdown .big-number,
 body.role-operator .dashboard > .card:nth-child(1) .big-number{
-  font-size:clamp(84px, 13.5vh, 148px);
+  font-size:clamp(48px, 22cqh, 148px);
   font-weight:800;
 }
 
@@ -1227,6 +1215,7 @@ body.role-operator .card-actual,
 body.role-operator .card-balance{
   border-radius:10px;
   overflow:hidden;
+  container-type:size;
 }
 
 body.role-operator .card-countdown::before,
@@ -1399,7 +1388,7 @@ body.role-operator .card-expected .big-number,
 body.role-operator .card-actual .big-number{
   color:#22c55e !important;
   text-align:center;
-  font-size:clamp(88px, 14vh, 160px);
+  font-size:clamp(40px, 52cqh, 160px);
   font-weight:800;
   line-height:.92;
 }
@@ -1452,7 +1441,7 @@ body.role-operator .card-balance.is-even h3{
 
 body.role-operator .card-balance .big-number{
   text-align:center;
-  font-size:clamp(88px, 14vh, 160px);
+  font-size:clamp(40px, 52cqh, 160px);
   font-weight:800;
   line-height:.92;
 }
@@ -2001,6 +1990,15 @@ body.appearance-mode{
   overflow:hidden;
 }
 
+body.graph-mode .graph-page.open{
+  overflow:auto;
+}
+
+:fullscreen body.graph-mode .graph-page.open,
+:-webkit-full-screen body.graph-mode .graph-page.open{
+  overflow:hidden;
+}
+
 .summary-page{
   display:none;
   position:fixed;
@@ -2434,9 +2432,10 @@ span.flatpickr-weekday{
 
 .report-kpi strong{
   display:inline-block;
-  font-size:34px;
+  font-size:clamp(22px, 3.4vh, 34px);
   line-height:1.1;
   color:#60a5fa;
+  overflow:visible;
 }
 
 .report-kpi strong.neg{ color:#ef4444; }
@@ -2462,6 +2461,7 @@ span.flatpickr-weekday{
   height:100%;
   display:flex;
   flex-direction:column;
+  min-height:0;
 }
 
 .report-bottom-grid{
@@ -2476,6 +2476,7 @@ span.flatpickr-weekday{
 .report-bottom-grid > .summary-graph-card,
 .report-bottom-grid > .report-table-wrap{
   height:100%;
+  min-height:0;
 }
 
 .report-bottom-grid > .summary-graph-card{
@@ -2485,14 +2486,21 @@ span.flatpickr-weekday{
 
 .report-eff-wt-wrap{
   padding:4px;
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+  height:100%;
+  overflow:hidden;
 }
 
 .report-eff-wt-grid{
   display:grid;
   grid-template-columns:1fr 1fr;
+  grid-template-rows:minmax(0, 1fr) minmax(0, 1fr);
   gap:5px;
   margin-top:0;
   flex:1 1 auto;
+  min-height:0;
 }
 
 .report-eff-wt-card{
@@ -2501,26 +2509,30 @@ span.flatpickr-weekday{
   justify-content:center;
   align-items:center;
   text-align:center;
-  gap:8px;
+  gap:clamp(2px, 0.8vh, 8px);
   border:1px solid rgba(71,85,105,.45);
   border-radius:6px;
   background:rgba(15,23,42,.58);
-  padding:4px 6px;
-  min-height:84px;
+  padding:clamp(4px, 0.8vh, 8px) 6px;
+  min-height:0;
+  overflow:hidden;
+  container-type:size;
 }
 
 .report-eff-wt-card span{
-  font-size:16px;
+  font-size:clamp(11px, 18cqh, 16px);
   color:#93c5fd;
   text-transform:uppercase;
   letter-spacing:.6px;
+  line-height:1.15;
 }
 
 .report-eff-wt-card strong{
-  font-size:clamp(34px, 4vh, 46px);
+  font-size:clamp(22px, 42cqh, 46px);
   font-weight:900;
   color:#ffffff;
   line-height:1;
+  overflow:visible;
 }
 
 .report-eff-wt-card strong.neg{
@@ -2531,11 +2543,14 @@ span.flatpickr-weekday{
   color:#22c55e;
 }
 
+.report-chart-grid > .summary-graph-card .summary-chart-svg,
 .report-bottom-grid > .summary-graph-card .summary-chart-svg{
   flex:1 1 auto;
   width:100%;
   height:100%;
   max-height:none;
+  min-height:0;
+  overflow:visible;
 }
 
 .report-table-wrap{
@@ -2622,7 +2637,7 @@ span.flatpickr-weekday{
 .summary-chart-plan-actual{
   max-width:100%;
   margin:0 auto;
-  max-height:24vh;
+  max-height:none;
 }
 
 .trend-chart-host{
@@ -2828,7 +2843,8 @@ path.trend-area-fill{
   width:100%;
   height:auto;
   display:block;
-  max-height:24vh;
+  max-height:none;
+  overflow:visible;
 }
 
 .summary-chart-svg .summary-bar{
