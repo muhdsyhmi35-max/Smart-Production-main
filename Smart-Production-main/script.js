@@ -4380,6 +4380,20 @@ function animateSummaryBarValues(container) {
   });
 }
 
+/** Skip a stride tick that would sit too close to the last day (e.g. 28 Sept vs 30 Sept). */
+function getChartXLabelStride(count) {
+  if (count > 24) return 3;
+  if (count > 16) return 2;
+  return 1;
+}
+
+function shouldShowChartXLabel(i, count, stride) {
+  if (count <= 1 || stride <= 1) return true;
+  if (i === 0 || i === count - 1) return true;
+  if (i % stride !== 0) return false;
+  return (count - 1) - i >= stride;
+}
+
 function buildSummaryBarChart(title, labels, values, color, valueSuffix = "", yAxisLabel = "", animOpts = {}) {
   if (!labels.length || !values.length) {
     return `<div class="summary-graph-empty">No data</div>`;
@@ -4402,14 +4416,14 @@ function buildSummaryBarChart(title, labels, values, color, valueSuffix = "", yA
   const maxVal = Math.max(...values, 1);
   const stepX = chartW / labels.length;
   const barW = Math.max(Math.min(stepX * 0.58, 36), 10);
-  const labelStride = labels.length > 24 ? 3 : labels.length > 16 ? 2 : 1;
+  const labelStride = getChartXLabelStride(labels.length);
 
   const bars = labels.map((label, i) => {
     const v = values[i];
     const x = leftPad + (i * stepX) + ((stepX - barW) / 2);
     const h = Math.max((v / maxVal) * chartH, v > 0 ? 2 : 0);
     const y = topPad + (chartH - h);
-    const showLabel = i % labelStride === 0 || i === labels.length - 1;
+    const showLabel = shouldShowChartXLabel(i, labels.length, labelStride);
     const cx = (x + (barW / 2)).toFixed(2);
     const valueY = (Math.max(y - 5, 12)).toFixed(2);
     const barDelayMs = i * barStaggerMs;
@@ -4483,9 +4497,9 @@ function buildSummaryLineChart(title, labels, values, color, valueSuffix = "", y
       <title>${labels[i]}: ${p.value}${valueSuffix}</title>
     </circle>
   `).join("");
-  const labelStride = labels.length > 24 ? 3 : labels.length > 16 ? 2 : 1;
+  const labelStride = getChartXLabelStride(labels.length);
   const xLabels = labels.map((label, i) => {
-    if (i % labelStride !== 0 && i !== labels.length - 1) return "";
+    if (!shouldShowChartXLabel(i, labels.length, labelStride)) return "";
     return `<text x="${(leftPad + stepX * i).toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>`;
   }).join("");
   const yTicks = 4;
@@ -4655,9 +4669,9 @@ function buildEfficiencyTrendChart(title, labels, actualValues, planValues, valu
     return `<circle class="${dotClass}" data-chart-tip data-tip-kind="${tipKind}" data-tip-label="${tipLabel}" data-tip-value="${isNp ? "" : valTxt}" style="animation-delay:${i * 45}ms; cursor:pointer" cx="${p.x.toFixed(2)}" cy="${cy.toFixed(2)}" r="3.8" fill="${dotFill}"></circle>`;
   }).join("");
 
-  const labelStride = labels.length > 24 ? 3 : labels.length > 16 ? 2 : 1;
+  const labelStride = getChartXLabelStride(labels.length);
   const xLabels = labels.map((label, i) => {
-    if (i % labelStride !== 0 && i !== labels.length - 1) return "";
+    if (!shouldShowChartXLabel(i, labels.length, labelStride)) return "";
     const x = points[i]?.x ?? (leftPad + stepX * i);
     return `<text x="${x.toFixed(2)}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>`;
   }).join("");
@@ -4907,9 +4921,9 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
     <line x1="${leftPad}" y1="${topPad.toFixed(2)}" x2="${leftPad}" y2="${yBase.toFixed(2)}" stroke="${axisStroke}" stroke-width="2" stroke-linecap="round"></line>
     <line x1="${leftPad}" y1="${yBase.toFixed(2)}" x2="${(width - rightPad).toFixed(2)}" y2="${yBase.toFixed(2)}" stroke="${axisStroke}" stroke-width="2" stroke-linecap="round"></line>
   `;
-  const labelStride = dayKeys.length > 24 ? 3 : dayKeys.length > 16 ? 2 : 1;
+  const labelStride = getChartXLabelStride(dayKeys.length);
   const xLabels = dayKeys.map((k, i) => {
-    if (i % labelStride !== 0 && i !== dayKeys.length - 1) return "";
+    if (!shouldShowChartXLabel(i, dayKeys.length, labelStride)) return "";
     const d = new Date(`${k}T00:00:00`);
     const label = d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
     const x = dayCount <= 1 ? leftPad + chartW / 2 : leftPad + xStep * i;
