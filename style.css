@@ -1201,7 +1201,7 @@ body.role-operator .dashboard > .card:nth-child(6){
 
 body.role-operator .card-countdown .big-number,
 body.role-operator .dashboard > .card:nth-child(1) .big-number{
-  font-size:clamp(72px, 12vh, 128px);
+  font-size:clamp(84px, 13.5vh, 148px);
   font-weight:800;
 }
 
@@ -1293,10 +1293,10 @@ body.role-operator .op-countdown-inner{
 }
 
 body.role-operator .op-timer-icon{
-  width:clamp(48px, 7vh, 72px);
-  height:clamp(48px, 7vh, 72px);
+  width:clamp(72px, 10vh, 104px);
+  height:clamp(72px, 10vh, 104px);
   color:#3b82f6;
-  margin-bottom:6px;
+  margin-bottom:8px;
 }
 
 body.role-operator .op-timer-icon svg{
@@ -1318,7 +1318,7 @@ body.role-operator .op-cycle-meta{
 
 body.role-operator .op-cycle-label{
   color:#64748b;
-  font-size:clamp(15px, 2vh, 18px);
+  font-size:clamp(18px, 2.4vh, 22px);
   font-weight:600;
 }
 
@@ -1353,8 +1353,8 @@ body.role-operator .card-balance .op-kpi-icon{
   grid-column:1;
   grid-row:1;
   align-self:center;
-  width:clamp(56px, 8.5vh, 84px);
-  height:clamp(56px, 8.5vh, 84px);
+  width:clamp(78px, 12vh, 120px);
+  height:clamp(78px, 12vh, 120px);
 }
 
 body.role-operator .op-kpi-copy{
@@ -1390,7 +1390,7 @@ body.role-operator .card-actual h3{
   margin:0;
   color:#22c55e;
   letter-spacing:.12em;
-  font-size:clamp(16px, 2.4vh, 24px);
+  font-size:clamp(20px, 3.2vh, 32px);
   font-weight:800;
   text-align:center;
 }
@@ -1399,7 +1399,7 @@ body.role-operator .card-expected .big-number,
 body.role-operator .card-actual .big-number{
   color:#22c55e !important;
   text-align:center;
-  font-size:clamp(72px, 12vh, 140px);
+  font-size:clamp(88px, 14vh, 160px);
   font-weight:800;
   line-height:.92;
 }
@@ -1437,7 +1437,7 @@ body.role-operator .card-balance h3{
   margin:0;
   color:#ef4444;
   letter-spacing:.12em;
-  font-size:clamp(16px, 2.4vh, 24px);
+  font-size:clamp(20px, 3.2vh, 32px);
   font-weight:800;
   text-align:center;
 }
@@ -1452,7 +1452,7 @@ body.role-operator .card-balance.is-even h3{
 
 body.role-operator .card-balance .big-number{
   text-align:center;
-  font-size:clamp(72px, 12vh, 140px);
+  font-size:clamp(88px, 14vh, 160px);
   font-weight:800;
   line-height:.92;
 }
