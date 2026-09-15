@@ -4409,7 +4409,7 @@ function buildSummaryBarChart(title, labels, values, color, valueSuffix = "", yA
     return `
       <rect class="summary-bar" style="animation-delay:${barDelayMs}ms" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" fill="${color}" opacity="0.9"></rect>
       ${showLabel ? `<text class="summary-bar-axis-label" x="${cx}" y="${(height - 10).toFixed(2)}" text-anchor="middle" fill="#94a3b8" font-size="9">${label}</text>` : ""}
-      ${v > 0 ? `<text class="summary-bar-value" style="animation-delay:${valueDelayMs}ms" data-delay-ms="${valueDelayMs}" data-count-ms="${valueCountMs}" data-value="${v}" data-suffix="${valueSuffix}" x="${cx}" y="${valueY}" text-anchor="middle" fill="#f8fafc" font-size="10" font-weight="700">0${valueSuffix}</text>` : ""}
+      <text class="summary-bar-value" style="animation-delay:${valueDelayMs}ms" data-delay-ms="${valueDelayMs}" data-count-ms="${valueCountMs}" data-value="${v}" data-suffix="${valueSuffix}" x="${cx}" y="${valueY}" text-anchor="middle" fill="#f8fafc" font-size="10" font-weight="700">0${valueSuffix}</text>
     `;
   }).join("");
   const yTicks = 4;
@@ -5165,20 +5165,20 @@ function calcActualEffPct(planUnits, actualUnits, planWtMins, actualWtMins) {
 }
 
 function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, rangeLabel) {
+  const planEffPct = PLAN_EFF_PCT;
+  const planWtMins = getPlanWtMinsForDay(dayKey);
   const nonProdDay = dayKey && isReportNonProductionDay(dayKey, dayProduced);
+
   const planUnits = dayTarget?.[dayKey] || 0;
   const actualUnits = dayProduced?.[dayKey] || 0;
-  const idleDay = !!nonProdDay || (planUnits <= 0 && actualUnits <= 0);
+  const actualWtMins = nonProdDay ? 0 : calcActualWtMinsForDay(dayKey, planUnits);
 
-  const planEffPct = idleDay ? null : PLAN_EFF_PCT;
-  const planWtMins = idleDay ? null : getPlanWtMinsForDay(dayKey);
-  const actualWtMins = idleDay ? null : calcActualWtMinsForDay(dayKey, planUnits);
-  const actualEffPct = idleDay ? null : calcActualEffPct(planUnits, actualUnits, planWtMins, actualWtMins);
-  const actualEffClass = idleDay
-    ? ""
+  const actualEffPct = nonProdDay ? 0 : calcActualEffPct(planUnits, actualUnits, planWtMins, actualWtMins);
+  const actualEffClass = nonProdDay
+    ? "neg"
     : actualEffPct == null
       ? ""
-      : actualEffPct < PLAN_EFF_PCT
+      : actualEffPct < planEffPct
         ? "neg"
         : "pos";
 
@@ -5188,7 +5188,7 @@ function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, 
     <div class="report-eff-wt-grid">
       <div class="report-eff-wt-card">
         <span>Plan EFF</span>
-        <strong>${planEffPct == null ? "—" : `${planEffPct}%`}</strong>
+        <strong>${planEffPct}%</strong>
       </div>
       <div class="report-eff-wt-card">
         <span>Actual EFF</span>
@@ -5196,7 +5196,7 @@ function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, 
       </div>
       <div class="report-eff-wt-card">
         <span>Plan W/T (MINS)</span>
-        <strong>${planWtMins == null ? "—" : planWtMins.toFixed(1)}</strong>
+        <strong>${planWtMins.toFixed(1)}</strong>
       </div>
       <div class="report-eff-wt-card">
         <span>Actual W/T (MINS)</span>
