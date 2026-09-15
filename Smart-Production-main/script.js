@@ -189,6 +189,10 @@ function canOperateLine() {
   return getAppRole() === "operator" || isMasterRole();
 }
 
+function canAdjustWorkingHour() {
+  return true;
+}
+
 function setAppRole(role) {
   if (role === "master" || role === "admin") return;
   try {
@@ -224,11 +228,12 @@ function applyMainPcEditLock() {
     setScanInputsEnabled(canOperate);
   }
   const wtWrap = document.querySelector(".header-wt-dd-wrap");
-  if (wtWrap) wtWrap.classList.toggle("wt-locked", !master);
+  if (wtWrap) wtWrap.classList.toggle("wt-locked", !canAdjustWorkingHour());
   const wtTrigger = document.getElementById("graphWtTrigger");
   if (wtTrigger) {
-    wtTrigger.disabled = !master;
-    wtTrigger.setAttribute("aria-disabled", master ? "false" : "true");
+    const allowWt = canAdjustWorkingHour();
+    wtTrigger.disabled = !allowWt;
+    wtTrigger.setAttribute("aria-disabled", allowWt ? "false" : "true");
   }
 }
 
@@ -436,7 +441,7 @@ function publishMasterSettingsFromInputs() {
 /** Main PC publishes graph filters; monitors mirror so Production Trend matches everywhere. */
 function publishGraphSettingsToFirebase() {
   if (!firebaseLiveStateRef) return;
-  if (isMonitor && !isMasterRole()) return;
+  if (!canAdjustWorkingHour()) return;
   firebaseLiveStateRef.update({
     graphWtPreset: graphWtPreset,
     nonProductionDays: getNonProductionDaysArray(),
@@ -660,7 +665,7 @@ function applyNonProductionMode() {
 function applyGraphWtPresetEffects(prevPreset) {
   if (isMonitor) {
     applyGraphWtControlUi();
-    if (isMasterRole()) publishMasterSettingsFromInputs();
+    publishGraphSettingsToFirebase();
     return;
   }
   if (isNonProductionMode()) {
@@ -668,7 +673,7 @@ function applyGraphWtPresetEffects(prevPreset) {
     return;
   }
   document.body.classList.remove("non-production-mode");
-  setScanInputsEnabled(true);
+  applyMainPcEditLock();
   if (prevPreset === "nonproduction") {
     updateDisplay();
     updateLiveStateOnly();
@@ -699,7 +704,7 @@ function toggleGraphWtDropdown(forceOpen) {
 
 function onGraphWtTriggerClick(event) {
   event.stopPropagation();
-  if (!isMasterRole()) return;
+  if (!canAdjustWorkingHour()) return;
   toggleGraphWtDropdown();
 }
 
@@ -721,7 +726,7 @@ function applyGraphWtControlUi() {
 function onGraphWtOptionClick(event, preset) {
   event.stopPropagation();
   toggleGraphWtDropdown(false);
-  if (!isMasterRole()) return;
+  if (!canAdjustWorkingHour()) return;
   const p = normalizeGraphWtPreset(preset);
   if (graphWtPreset === p) return;
   const prev = graphWtPreset;
@@ -731,7 +736,6 @@ function onGraphWtOptionClick(event, preset) {
   applyGraphWtControlUi();
   applyGraphWtPresetEffects(prev);
   publishGraphSettingsToFirebase();
-  if (isMonitor && isMasterRole()) publishMasterSettingsFromInputs();
   renderGraphCharts();
 }
 
