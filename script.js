@@ -4429,20 +4429,71 @@ function formatBarChartValue(v) {
 /** Green / purple actual trend lines: stroke draw + dots timed along the path. */
 function animateTrendLines(container) {
   if (!container) return;
-  const lines = container.querySelectorAll("path.trend-line-actual, path.trend-line");
-  lines.forEach(path => {
-    path.style.strokeDasharray = "none";
-    path.style.strokeDashoffset = "0";
-    path.style.animation = "none";
-  });
-  container.querySelectorAll("circle.trend-dot").forEach(dot => {
-    dot.style.opacity = "1";
-    dot.style.animation = "none";
-  });
-  container.querySelectorAll("path.trend-area-fill").forEach(area => {
-    area.style.opacity = "1";
-    area.style.animation = "none";
-  });
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const run = () => {
+    const lines = container.querySelectorAll("path.trend-line-actual, path.trend-line");
+    lines.forEach((path, lineIdx) => {
+      let len = 0;
+      try {
+        len = path.getTotalLength();
+      } catch (_) {
+        len = 0;
+      }
+      if (!Number.isFinite(len) || len <= 0) {
+        path.style.strokeDasharray = "";
+        path.style.strokeDashoffset = "";
+        path.style.animation = "none";
+        return;
+      }
+
+      const durationSec = Math.min(1.75, Math.max(0.9, len / 320));
+      const baseDelayMs = lineIdx * 90;
+
+      if (reduceMotion) {
+        path.style.strokeDasharray = "";
+        path.style.strokeDashoffset = "";
+        path.style.animation = "none";
+      } else {
+        path.style.strokeDasharray = `${len}`;
+        path.style.strokeDashoffset = `${len}`;
+        path.style.animation = "none";
+        void path.getBoundingClientRect();
+        path.style.animation = `trendLineDraw ${durationSec}s var(--ease-smooth) ${baseDelayMs}ms forwards`;
+      }
+
+      const svg = path.closest("svg");
+      if (!svg) return;
+      const dots = [...svg.querySelectorAll("circle.trend-dot")];
+      const n = dots.length;
+      dots.forEach((dot, i) => {
+        const along = n <= 1 ? 1 : i / (n - 1);
+        const dotDelay = Math.round(baseDelayMs + durationSec * 1000 * along * 0.92);
+        if (reduceMotion) {
+          dot.style.animation = "none";
+          dot.style.opacity = "1";
+          return;
+        }
+        dot.style.opacity = "0";
+        dot.style.animation = "none";
+        void dot.getBoundingClientRect();
+        dot.style.animation = `trendDotPop .4s var(--ease-soft) ${dotDelay}ms forwards`;
+      });
+    });
+
+    container.querySelectorAll("path.trend-area-fill").forEach((area, i) => {
+      if (reduceMotion) {
+        area.style.opacity = "1";
+        area.style.animation = "none";
+        return;
+      }
+      const delay = 180 + i * 100;
+      area.style.opacity = "0";
+      area.style.animation = "none";
+      void area.getBoundingClientRect();
+      area.style.animation = `trendAreaFade 0.85s var(--ease-smooth) ${delay}ms forwards`;
+    });
+  };
+  requestAnimationFrame(() => requestAnimationFrame(run));
 }
 
 /** Smooth HTML tooltip for Production Trend target / actual hover. */
