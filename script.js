@@ -3886,14 +3886,15 @@ function ensureOperatorCountdownTicks() {
   const g = document.getElementById("countdownTickGroup");
   if (!g) return;
   const n = 48;
-  if (g.dataset.built === "1" && g.childElementCount === n) return;
+  const RING_VER = "3";
+  if (g.dataset.built === RING_VER && g.childElementCount === n) return;
   g.replaceChildren();
   const ns = "http://www.w3.org/2000/svg";
   const cx = 120;
   const cy = 120;
-  const r = 104;
-  const tickW = 10.5;
-  const tickH = 15;
+  const r = 114;
+  const tickW = 10;
+  const tickH = 13;
   for (let i = 0; i < n; i++) {
     const deg = (i / n) * 360;
     const a = ((deg - 90) * Math.PI) / 180;
@@ -3909,7 +3910,7 @@ function ensureOperatorCountdownTicks() {
     rect.setAttribute("class", "op-tick");
     g.appendChild(rect);
   }
-  g.dataset.built = "1";
+  g.dataset.built = RING_VER;
 }
 
 function syncOperatorDashboardChrome() {

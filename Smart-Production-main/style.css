@@ -1189,7 +1189,7 @@ body.role-operator .dashboard > .card:nth-child(6){
 
 body.role-operator .card-countdown .big-number,
 body.role-operator .dashboard > .card:nth-child(1) .big-number{
-  font-size:clamp(48px, 22cqh, 148px);
+  font-size:clamp(40px, 18cqh, 120px);
   font-weight:800;
 }
 
@@ -1279,6 +1279,9 @@ body.role-operator .op-countdown-inner{
   align-items:center;
   justify-content:center;
   gap:2px;
+  width:54%;
+  max-width:54%;
+  box-sizing:border-box;
 }
 
 body.role-operator .op-timer-icon{
@@ -1296,8 +1299,9 @@ body.role-operator .op-timer-icon svg{
 
 body.role-operator .card-countdown #countdown{
   color:#f8fafc;
-  letter-spacing:.08em;
+  letter-spacing:.04em;
   line-height:1;
+  max-width:100%;
 }
 
 body.role-operator .op-cycle-meta{
