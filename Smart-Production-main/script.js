@@ -55,6 +55,7 @@ let graphPeriod = "week";
 let graphWtPreset = "normal";
 let graphRangeStartDate = null;
 let graphRangeEndDate = null;
+let graphRangePickerSyncing = false;
 let graphFocusedDayKey = null; // when clicking Production Trend, cards show this day only
 let graphReportCache = null; // cached maps for the currently rendered Production Report range
 let historyFilterDate = null;
@@ -878,7 +879,7 @@ function setDatePickerValue(el, isoDate) {
   if (!el) return;
   const fp = datePickerRegistry.get(el);
   if (fp) {
-    if (isoDate) fp.setDate(isoDate, false);
+    if (isoDate) fp.setDate(isoDate, false, "Y-m-d");
     else fp.clear();
     return;
   }
@@ -900,6 +901,7 @@ function initDatePicker(el, options = {}) {
     animate: !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     ...options,
     onChange(selectedDates, dateStr, instance) {
+      if (graphRangePickerSyncing) return;
       if (typeof userOnChange === "function") userOnChange(selectedDates, dateStr, instance);
     }
   });
@@ -912,24 +914,22 @@ function initGraphRangeDatePickers() {
   const endEl = document.getElementById("graphRangeEnd");
   if (!startEl || !endEl) return;
 
-  let startFp;
-  let endFp;
-
-  endFp = initDatePicker(endEl, {
+  const range = getActiveGraphRange();
+  graphRangePickerSyncing = true;
+  initDatePicker(endEl, {
+    defaultDate: range.end,
     onChange() {
-      if (endEl.value) startFp?.set("maxDate", endEl.value);
       onGraphRangeFilterChange();
     }
   });
-  startFp = initDatePicker(startEl, {
+  initDatePicker(startEl, {
+    defaultDate: range.start,
     onChange() {
-      if (endEl.value) endFp?.set("minDate", startEl.value);
       onGraphRangeFilterChange();
     }
   });
-
-  if (startEl.value) endFp.set("minDate", startEl.value);
-  if (endEl.value) startFp.set("maxDate", endEl.value);
+  graphRangePickerSyncing = false;
+  syncGraphRangePickerUi();
 }
 
 function initSingleDayDatePicker(el, onChange) {
@@ -940,8 +940,16 @@ function syncGraphRangePickerUi() {
   const startEl = document.getElementById("graphRangeStart");
   const endEl = document.getElementById("graphRangeEnd");
   const range = getActiveGraphRange();
+  const startFp = startEl ? datePickerRegistry.get(startEl) : null;
+  const endFp = endEl ? datePickerRegistry.get(endEl) : null;
+  graphRangePickerSyncing = true;
+  if (startFp) startFp.set("maxDate", null);
+  if (endFp) endFp.set("minDate", null);
   setDatePickerValue(startEl, range.start);
   setDatePickerValue(endEl, range.end);
+  if (startFp && range.end) startFp.set("maxDate", range.end);
+  if (endFp && range.start) endFp.set("minDate", range.start);
+  graphRangePickerSyncing = false;
 }
 
 function onGraphRangeFilterChange() {
@@ -955,31 +963,28 @@ function onGraphRangeFilterChange() {
   if (!keys.length) return;
   graphRangeStartDate = keys[0];
   graphRangeEndDate = keys[keys.length - 1];
-  graphFilterDate = graphRangeStartDate;
-  syncGraphRangePickerUi();
+  graphFilterDate = graphRangeEndDate;
+  graphRangePickerSyncing = true;
+  const startFp = datePickerRegistry.get(startEl);
+  const endFp = datePickerRegistry.get(endEl);
+  if (startFp) startFp.set("maxDate", graphRangeEndDate);
+  if (endFp) endFp.set("minDate", graphRangeStartDate);
+  graphRangePickerSyncing = false;
   renderGraphCharts();
 }
 
 function onGraphRangeTodayClick() {
   const today = toIsoDateLocal(new Date());
-  graphRangeStartDate = today;
-  graphRangeEndDate = today;
   graphFilterDate = null;
+  applyGraphPeriodRange(today, graphPeriod, false);
   syncGraphRangePickerUi();
   renderGraphCharts();
 }
 
 function onGraphPeriodChange(period) {
   graphPeriod = (period === "week" || period === "month") ? period : "week";
-  // Anchor on the latest selected day to avoid landing on empty early dates
-  // when toggling Day/Week/Month back-to-back.
-  const anchor = graphRangeEndDate || graphRangeStartDate || getActiveGraphDayKey();
-  graphFilterDate = anchor;
-  const periodKeys = getPeriodDayKeys(anchor, graphPeriod);
-  if (periodKeys.length) {
-    graphRangeStartDate = periodKeys[0];
-    graphRangeEndDate = periodKeys[periodKeys.length - 1];
-  }
+  const preferred = graphRangeEndDate || graphRangeStartDate || getActiveGraphDayKey();
+  applyGraphPeriodRange(preferred, graphPeriod, true);
   syncGraphPeriodButtonsUi();
   syncGraphRangePickerUi();
   renderGraphCharts();
@@ -1043,6 +1048,55 @@ function getWeekStartIso(anchorIso) {
   const mondayOffset = day === 0 ? -6 : (1 - day);
   dt.setDate(dt.getDate() + mondayOffset);
   return toIsoDateLocal(dt);
+}
+
+function getScanDayKeyFromRow(row) {
+  if (!row) return null;
+  const cells = row.cells || row.querySelectorAll("td");
+  const rowDay = row.dataset?.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
+  return /^\d{4}-\d{2}-\d{2}$/.test(rowDay || "") ? rowDay : null;
+}
+
+function getLatestScanDayKey() {
+  let latest = null;
+  document.querySelectorAll("#scanTable tr").forEach(row => {
+    const rowDay = getScanDayKeyFromRow(row);
+    if (!rowDay) return;
+    if (!latest || rowDay > latest) latest = rowDay;
+  });
+  return latest;
+}
+
+function countScansInDayKeys(dayKeys) {
+  const set = new Set(dayKeys || []);
+  if (!set.size) return 0;
+  let n = 0;
+  document.querySelectorAll("#scanTable tr").forEach(row => {
+    const rowDay = getScanDayKeyFromRow(row);
+    if (rowDay && set.has(rowDay)) n++;
+  });
+  return n;
+}
+
+/** Prefer a week/month that actually has scans so Week/Month don't open blank. */
+function resolvePeriodAnchorIso(preferredAnchor, period) {
+  const fallback = preferredAnchor || toIsoDateLocal(new Date());
+  const keys = getPeriodDayKeys(fallback, period);
+  if (countScansInDayKeys(keys) > 0) return fallback;
+  const latest = getLatestScanDayKey();
+  return latest || fallback;
+}
+
+function applyGraphPeriodRange(anchorIso, period, snapToData) {
+  const anchor = snapToData
+    ? resolvePeriodAnchorIso(anchorIso, period)
+    : (anchorIso || toIsoDateLocal(new Date()));
+  graphFilterDate = anchor;
+  const periodKeys = getPeriodDayKeys(anchor, period);
+  if (periodKeys.length) {
+    graphRangeStartDate = periodKeys[0];
+    graphRangeEndDate = periodKeys[periodKeys.length - 1];
+  }
 }
 
 function getPeriodDayKeys(anchorIso, period) {
@@ -4761,13 +4815,7 @@ function buildPlanVsActualChart(dayKey = getActiveGraphDayKey(), period = graphP
   const diff = totalActual - totalPlan;
   const diffNote = totalPlan > 0
     ? (diff === 0 ? "On target" : diff > 0 ? `Ahead by ${diff}` : `Behind by ${Math.abs(diff)}`)
-    : "";
-
-  if (totalPlan <= 0 && totalActual <= 0) {
-    return `
-      <div class="summary-graph-card-title">Plan vs Actual</div>
-      <div class="summary-graph-empty">No daily plan or actual output yet</div>`;
-  }
+    : (totalActual > 0 ? `Produced ${totalActual}` : "No output this period");
 
   const width = 500;
   const height = 170;
@@ -5351,6 +5399,9 @@ function showGraphPage() {
     <div class="report-body" id="graphChartsBody">
     </div>
   `;
+  if (!graphRangeStartDate || !graphRangeEndDate) {
+    applyGraphPeriodRange(getActiveGraphDayKey(), graphPeriod, true);
+  }
   syncGraphRangePickerUi();
   syncGraphPeriodButtonsUi();
   initGraphRangeDatePickers();
@@ -6033,6 +6084,11 @@ function loadLiveData() {
         maybeReconcileLocalActualFromSheet();
         reconcileNonProductionMarksFromSheet();
         if (document.body.classList.contains("graph-mode")) {
+          const rangeKeys = getDayKeysBetween(graphRangeStartDate, graphRangeEndDate);
+          if (!rangeKeys.length || countScansInDayKeys(rangeKeys) === 0) {
+            applyGraphPeriodRange(getActiveGraphDayKey(), graphPeriod, true);
+            syncGraphRangePickerUi();
+          }
           renderGraphCharts();
         }
         if (document.body.classList.contains("summary-mode")) {
