@@ -200,7 +200,7 @@ function canDriveProductionFromThisScreen() {
 }
 
 function canAdjustWorkingHour() {
-  return !isMonitor;
+  return !isMonitor || isMasterRole();
 }
 
 function setAppRole(role) {
@@ -680,7 +680,7 @@ function setScanInputsEnabled(enabled) {
 }
 
 function applyNonProductionMode() {
-  if (isMonitor) return;
+  if (isMonitor && !canAdjustWorkingHour()) return;
   document.body.classList.add("non-production-mode");
   clearInterval(timer);
   timer = null;
@@ -698,7 +698,7 @@ function applyNonProductionMode() {
 }
 
 function applyGraphWtPresetEffects(prevPreset) {
-  if (isMonitor) {
+  if (isMonitor && !canAdjustWorkingHour()) {
     applyGraphWtControlUi();
     return;
   }
