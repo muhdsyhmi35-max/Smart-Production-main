@@ -1114,30 +1114,30 @@ body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-mini-c
 }
 
 /* Operator: only Countdown, Expected, Actual, Balance — one screen */
-body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode){
+body.role-operator.monitor-mode:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode){
   display:flex;
   flex-direction:column;
   height:100vh;
   overflow:hidden;
 }
 
-body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .header,
-body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .controls{
+body.role-operator.monitor-mode:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .header,
+body.role-operator.monitor-mode:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .controls{
   flex:0 0 auto;
 }
 
-body.role-operator .card-delay,
-body.role-operator .card-plan,
-body.role-operator .card-downtime,
-body.role-operator .card-efficiency,
-body.role-operator .dashboard > .card:nth-child(4),
-body.role-operator .dashboard > .card:nth-child(5),
-body.role-operator .dashboard > .card:nth-child(7),
-body.role-operator .dashboard > .card:nth-child(8){
+body.role-operator.monitor-mode .card-delay,
+body.role-operator.monitor-mode .card-plan,
+body.role-operator.monitor-mode .card-downtime,
+body.role-operator.monitor-mode .card-efficiency,
+body.role-operator.monitor-mode .dashboard > .card:nth-child(4),
+body.role-operator.monitor-mode .dashboard > .card:nth-child(5),
+body.role-operator.monitor-mode .dashboard > .card:nth-child(7),
+body.role-operator.monitor-mode .dashboard > .card:nth-child(8){
   display:none !important;
 }
 
-body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .bottom-row{
+body.role-operator.monitor-mode:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .bottom-row{
   display:none !important;
 }
 
@@ -1146,7 +1146,7 @@ body.role-operator #monitorDataNotice{
   display:none !important;
 }
 
-body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .dashboard{
+body.role-operator.monitor-mode:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .dashboard{
   --op-card-gap:clamp(10px, 1.2vw, 14px);
   flex:1 1 auto;
   min-height:0;
@@ -1157,8 +1157,8 @@ body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.a
   margin-bottom:clamp(12px, 1.8vh, 18px);
 }
 
-body.role-operator .card-countdown,
-body.role-operator .dashboard > .card:nth-child(1){
+body.role-operator.monitor-mode .card-countdown,
+body.role-operator.monitor-mode .dashboard > .card:nth-child(1){
   grid-column:1;
   grid-row:1 / span 3;
   justify-content:flex-start;
@@ -1166,73 +1166,73 @@ body.role-operator .dashboard > .card:nth-child(1){
   min-height:0;
 }
 
-body.role-operator .card-expected,
-body.role-operator .dashboard > .card:nth-child(3){
+body.role-operator.monitor-mode .card-expected,
+body.role-operator.monitor-mode .dashboard > .card:nth-child(3){
   grid-column:2;
   grid-row:1;
   min-height:0;
 }
 
-body.role-operator .card-actual,
-body.role-operator .dashboard > .card:nth-child(2){
+body.role-operator.monitor-mode .card-actual,
+body.role-operator.monitor-mode .dashboard > .card:nth-child(2){
   grid-column:2;
   grid-row:2;
   min-height:0;
 }
 
-body.role-operator .card-balance,
-body.role-operator .dashboard > .card:nth-child(6){
+body.role-operator.monitor-mode .card-balance,
+body.role-operator.monitor-mode .dashboard > .card:nth-child(6){
   grid-column:2;
   grid-row:3;
   min-height:0;
 }
 
-body.role-operator .card-countdown .big-number,
-body.role-operator .dashboard > .card:nth-child(1) .big-number{
+body.role-operator.monitor-mode .card-countdown .big-number,
+body.role-operator.monitor-mode .dashboard > .card:nth-child(1) .big-number{
   font-size:clamp(40px, 18cqh, 120px);
   font-weight:800;
 }
 
-body:not(.role-operator) .card-title-operator,
-body:not(.role-operator) .op-countdown-svg,
-body:not(.role-operator) .op-timer-icon,
-body:not(.role-operator) .op-cycle-meta,
-body:not(.role-operator) .op-kpi-icon{
+body:not(.role-operator.monitor-mode) .card-title-operator,
+body:not(.role-operator.monitor-mode) .op-countdown-svg,
+body:not(.role-operator.monitor-mode) .op-timer-icon,
+body:not(.role-operator.monitor-mode) .op-cycle-meta,
+body:not(.role-operator.monitor-mode) .op-kpi-icon{
   display:none !important;
 }
 
-body:not(.role-operator) .op-kpi-copy{
+body:not(.role-operator.monitor-mode) .op-kpi-copy{
   display:contents;
 }
 
-body.role-operator .card-title-default{
+body.role-operator.monitor-mode .card-title-default{
   display:none !important;
 }
 
-body.role-operator .card-countdown,
-body.role-operator .card-expected,
-body.role-operator .card-actual,
-body.role-operator .card-balance{
+body.role-operator.monitor-mode .card-countdown,
+body.role-operator.monitor-mode .card-expected,
+body.role-operator.monitor-mode .card-actual,
+body.role-operator.monitor-mode .card-balance{
   border-radius:10px;
   overflow:hidden;
   container-type:size;
 }
 
-body.role-operator .card-countdown::before,
-body.role-operator .card-expected::before,
-body.role-operator .card-actual::before,
-body.role-operator .card-balance::before{
+body.role-operator.monitor-mode .card-countdown::before,
+body.role-operator.monitor-mode .card-expected::before,
+body.role-operator.monitor-mode .card-actual::before,
+body.role-operator.monitor-mode .card-balance::before{
   display:none;
 }
 
-body.role-operator .card-countdown{
+body.role-operator.monitor-mode .card-countdown{
   background:#050b18;
   border:1px solid #1e4ed8;
   box-shadow:inset 0 0 0 1px rgba(37,99,235,.18), 0 10px 28px rgba(2,6,23,.5);
   padding:clamp(14px, 1.8vh, 22px) clamp(12px, 1.6vw, 20px) clamp(10px, 1.4vh, 16px);
 }
 
-body.role-operator .card-countdown .card-title-operator{
+body.role-operator.monitor-mode .card-countdown .card-title-operator{
   color:#3b82f6;
   letter-spacing:.14em;
   font-size:clamp(20px, 3.4vh, 34px);
@@ -1243,7 +1243,7 @@ body.role-operator .card-countdown .card-title-operator{
   white-space:nowrap;
 }
 
-body.role-operator .op-countdown-visual{
+body.role-operator.monitor-mode .op-countdown-visual{
   position:relative;
   width:min(92%, 520px);
   aspect-ratio:1;
@@ -1255,7 +1255,7 @@ body.role-operator .op-countdown-visual{
   min-height:0;
 }
 
-body.role-operator .op-countdown-svg{
+body.role-operator.monitor-mode .op-countdown-svg{
   position:absolute;
   inset:0;
   width:100%;
@@ -1263,15 +1263,15 @@ body.role-operator .op-countdown-svg{
   overflow:visible;
 }
 
-body.role-operator .op-tick{
+body.role-operator.monitor-mode .op-tick{
   fill:#1e3a5f;
 }
 
-body.role-operator .op-tick.is-lit{
+body.role-operator.monitor-mode .op-tick.is-lit{
   fill:#2f80ed;
 }
 
-body.role-operator .op-countdown-inner{
+body.role-operator.monitor-mode .op-countdown-inner{
   position:relative;
   z-index:1;
   display:flex;
@@ -1284,53 +1284,53 @@ body.role-operator .op-countdown-inner{
   box-sizing:border-box;
 }
 
-body.role-operator .op-timer-icon{
+body.role-operator.monitor-mode .op-timer-icon{
   width:clamp(72px, 10vh, 104px);
   height:clamp(72px, 10vh, 104px);
   color:#3b82f6;
   margin-bottom:8px;
 }
 
-body.role-operator .op-timer-icon svg{
+body.role-operator.monitor-mode .op-timer-icon svg{
   width:100%;
   height:100%;
   display:block;
 }
 
-body.role-operator .card-countdown #countdown{
+body.role-operator.monitor-mode .card-countdown #countdown{
   color:#f8fafc;
   letter-spacing:.04em;
   line-height:1;
   max-width:100%;
 }
 
-body.role-operator .op-cycle-meta{
+body.role-operator.monitor-mode .op-cycle-meta{
   margin-top:6px;
   text-align:center;
 }
 
-body.role-operator .op-cycle-label{
+body.role-operator.monitor-mode .op-cycle-label{
   color:#64748b;
   font-size:clamp(18px, 2.4vh, 22px);
   font-weight:600;
 }
 
-body.role-operator .op-cycle-value{
+body.role-operator.monitor-mode .op-cycle-value{
   color:#3b82f6;
   font-size:clamp(42px, 6.8vh, 68px);
   font-weight:800;
   font-family:Consolas, "Courier New", monospace;
 }
 
-body.role-operator .op-kpi-icon svg{
+body.role-operator.monitor-mode .op-kpi-icon svg{
   width:100%;
   height:100%;
   display:block;
 }
 
-body.role-operator .card-expected,
-body.role-operator .card-actual,
-body.role-operator .card-balance{
+body.role-operator.monitor-mode .card-expected,
+body.role-operator.monitor-mode .card-actual,
+body.role-operator.monitor-mode .card-balance{
   display:grid !important;
   grid-template-columns:auto minmax(0, 1fr);
   grid-template-rows:minmax(0, 1fr);
@@ -1340,9 +1340,9 @@ body.role-operator .card-balance{
   padding:clamp(10px, 1.4vh, 16px) clamp(16px, 1.8vw, 22px);
 }
 
-body.role-operator .card-expected .op-kpi-icon,
-body.role-operator .card-actual .op-kpi-icon,
-body.role-operator .card-balance .op-kpi-icon{
+body.role-operator.monitor-mode .card-expected .op-kpi-icon,
+body.role-operator.monitor-mode .card-actual .op-kpi-icon,
+body.role-operator.monitor-mode .card-balance .op-kpi-icon{
   grid-column:1;
   grid-row:1;
   align-self:center;
@@ -1350,7 +1350,7 @@ body.role-operator .card-balance .op-kpi-icon{
   height:clamp(78px, 12vh, 120px);
 }
 
-body.role-operator .op-kpi-copy{
+body.role-operator.monitor-mode .op-kpi-copy{
   grid-column:2;
   grid-row:1;
   display:flex;
@@ -1362,24 +1362,24 @@ body.role-operator .op-kpi-copy{
   text-align:center;
 }
 
-body.role-operator .card-expected,
-body.role-operator .card-actual{
+body.role-operator.monitor-mode .card-expected,
+body.role-operator.monitor-mode .card-actual{
   background:#03150c;
   border:1px solid #16a34a;
   box-shadow:inset 0 0 0 1px rgba(34,197,94,.18), 0 8px 18px rgba(2,6,23,.45);
 }
 
-body.role-operator .card-expected .op-kpi-icon,
-body.role-operator .card-actual .op-kpi-icon{
+body.role-operator.monitor-mode .card-expected .op-kpi-icon,
+body.role-operator.monitor-mode .card-actual .op-kpi-icon{
   color:#22c55e;
 }
 
-body.role-operator .card-actual .op-kpi-icon svg{
+body.role-operator.monitor-mode .card-actual .op-kpi-icon svg{
   fill:currentColor;
 }
 
-body.role-operator .card-expected h3,
-body.role-operator .card-actual h3{
+body.role-operator.monitor-mode .card-expected h3,
+body.role-operator.monitor-mode .card-actual h3{
   margin:0;
   color:#22c55e;
   letter-spacing:.12em;
@@ -1388,8 +1388,8 @@ body.role-operator .card-actual h3{
   text-align:center;
 }
 
-body.role-operator .card-expected .big-number,
-body.role-operator .card-actual .big-number{
+body.role-operator.monitor-mode .card-expected .big-number,
+body.role-operator.monitor-mode .card-actual .big-number{
   color:#22c55e !important;
   text-align:center;
   font-size:clamp(40px, 52cqh, 160px);
@@ -1397,36 +1397,36 @@ body.role-operator .card-actual .big-number{
   line-height:.92;
 }
 
-body.role-operator .card-balance{
+body.role-operator.monitor-mode .card-balance{
   background:#160507;
   border:1px solid #e11d2e;
   box-shadow:inset 0 0 0 1px rgba(239,68,68,.22), 0 8px 18px rgba(2,6,23,.45);
 }
 
-body.role-operator .card-balance.is-ahead{
+body.role-operator.monitor-mode .card-balance.is-ahead{
   background:#04140c;
   border-color:#16a34a;
   box-shadow:inset 0 0 0 1px rgba(34,197,94,.16), 0 8px 18px rgba(2,6,23,.45);
 }
 
-body.role-operator .card-balance.is-even{
+body.role-operator.monitor-mode .card-balance.is-even{
   background:#07111f;
   border-color:#2563eb;
 }
 
-body.role-operator .card-balance .op-kpi-icon{
+body.role-operator.monitor-mode .card-balance .op-kpi-icon{
   color:#ef4444;
 }
 
-body.role-operator .card-balance.is-ahead .op-kpi-icon{
+body.role-operator.monitor-mode .card-balance.is-ahead .op-kpi-icon{
   color:#22c55e;
 }
 
-body.role-operator .card-balance.is-even .op-kpi-icon{
+body.role-operator.monitor-mode .card-balance.is-even .op-kpi-icon{
   color:#3b82f6;
 }
 
-body.role-operator .card-balance h3{
+body.role-operator.monitor-mode .card-balance h3{
   margin:0;
   color:#ef4444;
   letter-spacing:.12em;
@@ -1435,30 +1435,30 @@ body.role-operator .card-balance h3{
   text-align:center;
 }
 
-body.role-operator .card-balance.is-ahead h3{
+body.role-operator.monitor-mode .card-balance.is-ahead h3{
   color:#22c55e;
 }
 
-body.role-operator .card-balance.is-even h3{
+body.role-operator.monitor-mode .card-balance.is-even h3{
   color:#60a5fa;
 }
 
-body.role-operator .card-balance .big-number{
+body.role-operator.monitor-mode .card-balance .big-number{
   text-align:center;
   font-size:clamp(40px, 52cqh, 160px);
   font-weight:800;
   line-height:.92;
 }
 
-body.role-operator .card-balance.is-behind .big-number,
-body.role-operator .card-balance .big-number.status-red{
+body.role-operator.monitor-mode .card-balance.is-behind .big-number,
+body.role-operator.monitor-mode .card-balance .big-number.status-red{
   color:#ef4444 !important;
 }
 
-body.role-operator .card-countdown:hover,
-body.role-operator .card-expected:hover,
-body.role-operator .card-actual:hover,
-body.role-operator .card-balance:hover{
+body.role-operator.monitor-mode .card-countdown:hover,
+body.role-operator.monitor-mode .card-expected:hover,
+body.role-operator.monitor-mode .card-actual:hover,
+body.role-operator.monitor-mode .card-balance:hover{
   transform:none;
 }
 
@@ -3057,8 +3057,8 @@ path.trend-area-fill{
   row-gap:clamp(12px, 1.5vw, 22px);
 }
 
-:fullscreen body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .dashboard,
-:-webkit-full-screen body.role-operator:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .dashboard{
+:fullscreen body.role-operator.monitor-mode:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .dashboard,
+:-webkit-full-screen body.role-operator.monitor-mode:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode) .dashboard{
   grid-template-columns:minmax(0, 1.15fr) minmax(0, 1fr);
   grid-template-rows:repeat(3, minmax(0, 1fr));
   column-gap:clamp(10px, 1.2vw, 14px);
