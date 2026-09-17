@@ -3953,6 +3953,24 @@ function syncOperatorDashboardChrome() {
     balCard.classList.toggle("is-ahead", v > 0);
     balCard.classList.toggle("is-even", v === 0);
   }
+
+  const expEl = document.getElementById("expected");
+  const actEl = document.getElementById("actual");
+  const expCard = document.querySelector(".card-expected");
+  if (expEl && actEl) {
+    const exp = parseInt(String(expEl.innerText).replace(/[^\-0-9]/g, ""), 10);
+    const act = parseInt(String(actEl.innerText).replace(/[^\-0-9]/g, ""), 10);
+    const expectedN = Number.isFinite(exp) ? exp : 0;
+    const actualN = Number.isFinite(act) ? act : 0;
+    const behindCycle = expectedN > 0 && actualN < expectedN;
+    if (expCard) {
+      expCard.classList.toggle("is-behind", behindCycle);
+      expCard.classList.toggle("is-on-pace", !behindCycle);
+    }
+    if (document.body.classList.contains("role-operator") && document.body.classList.contains("monitor-mode")) {
+      expEl.className = behindCycle ? "big-number status-red" : "big-number status-green";
+    }
+  }
 }
 
 if (document.getElementById("countdownTickGroup")) {

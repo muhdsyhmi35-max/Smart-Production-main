@@ -1369,9 +1369,19 @@ body.role-operator.monitor-mode .card-actual{
   box-shadow:inset 0 0 0 1px rgba(34,197,94,.18), 0 8px 18px rgba(2,6,23,.45);
 }
 
+body.role-operator.monitor-mode .card-expected.is-behind{
+  background:#160507;
+  border-color:#e11d2e;
+  box-shadow:inset 0 0 0 1px rgba(239,68,68,.22), 0 8px 18px rgba(2,6,23,.45);
+}
+
 body.role-operator.monitor-mode .card-expected .op-kpi-icon,
 body.role-operator.monitor-mode .card-actual .op-kpi-icon{
   color:#22c55e;
+}
+
+body.role-operator.monitor-mode .card-expected.is-behind .op-kpi-icon{
+  color:#ef4444;
 }
 
 body.role-operator.monitor-mode .card-actual .op-kpi-icon svg{
@@ -1388,6 +1398,10 @@ body.role-operator.monitor-mode .card-actual h3{
   text-align:center;
 }
 
+body.role-operator.monitor-mode .card-expected.is-behind h3{
+  color:#ef4444;
+}
+
 body.role-operator.monitor-mode .card-expected .big-number,
 body.role-operator.monitor-mode .card-actual .big-number{
   color:#22c55e !important;
@@ -1395,6 +1409,11 @@ body.role-operator.monitor-mode .card-actual .big-number{
   font-size:clamp(40px, 52cqh, 160px);
   font-weight:800;
   line-height:.92;
+}
+
+body.role-operator.monitor-mode .card-expected.is-behind .big-number,
+body.role-operator.monitor-mode .card-expected .big-number.status-red{
+  color:#ef4444 !important;
 }
 
 body.role-operator.monitor-mode .card-balance{
