@@ -200,7 +200,7 @@ function canDriveProductionFromThisScreen() {
 }
 
 function canAdjustWorkingHour() {
-  return true;
+  return !isMonitor;
 }
 
 function setAppRole(role) {
@@ -245,6 +245,7 @@ function applyMainPcEditLock() {
     wtTrigger.disabled = !allowWt;
     wtTrigger.setAttribute("aria-disabled", allowWt ? "false" : "true");
   }
+  if (!canAdjustWorkingHour()) toggleGraphWtDropdown(false);
 }
 
 function showAdminLoginModal() {
@@ -441,7 +442,7 @@ function getNonProductionDaysArray() {
   return [...loadNonProductionDaysSet()];
 }
 
-/** Cycle / plan / lot / WT from Master Control — main PC and monitor both write these. */
+/** Cycle / plan / lot from Master Control. Working hour is published from the main PC only. */
 function publishMasterSettingsFromInputs() {
   if (!isMasterRole() || !firebaseLiveStateRef) return;
   clearTimeout(masterSettingsPublishTimer);
@@ -450,21 +451,24 @@ function publishMasterSettingsFromInputs() {
     const cycleTimeMin = parseFloat(document.getElementById("cycleTarget")?.value) || SETTINGS.defaultCycle;
     const lotNo = document.getElementById("lotInput")?.value || "";
     const plan = getDashboardPlan();
-    firebaseLiveStateRef.update({
+    const payload = {
       plan,
       dailyPlan: configuredPlan,
       cycleTimeMin,
       lotNo,
       ramadanMode,
-      graphWtPreset,
-      nonProductionDays: getNonProductionDaysArray(),
       settings: {
         dailyPlan: configuredPlan,
         cycleTimeMin
       },
       sender: syncClientId,
       updatedAt: firebase.database.ServerValue.TIMESTAMP
-    }).catch(err => {
+    };
+    if (canAdjustWorkingHour()) {
+      payload.graphWtPreset = graphWtPreset;
+      payload.nonProductionDays = getNonProductionDaysArray();
+    }
+    firebaseLiveStateRef.update(payload).catch(err => {
       console.log("Firebase master settings publish error:", err);
     });
   }, 250);
@@ -486,7 +490,6 @@ function publishGraphSettingsToFirebase() {
 
 function applyGraphSettingsFromRemote(state) {
   if (!state || !isMonitor) return;
-  if (state.sender && state.sender === syncClientId) return;
   let changed = false;
   if (state.graphWtPreset) {
     const next = normalizeGraphWtPreset(state.graphWtPreset);
@@ -697,7 +700,6 @@ function applyNonProductionMode() {
 function applyGraphWtPresetEffects(prevPreset) {
   if (isMonitor) {
     applyGraphWtControlUi();
-    publishGraphSettingsToFirebase();
     return;
   }
   if (isNonProductionMode()) {
@@ -3097,6 +3099,7 @@ function initFirebaseSync() {
         }
         monitorLiveStateReceived = true;
         if (liveState.sender === syncClientId && hasLocalSession && timer) {
+          applyGraphSettingsFromRemote(liveState);
           updateMonitorDataNotice();
           return;
         }
@@ -6067,7 +6070,7 @@ function updateLiveStateOnly() {
     })
   });
 
-  publishLiveStateToFirebase({
+  const livePayload = {
     plan: plan,
     dailyPlan: configuredPlan,
     cycleTimeMin: cycleTimeMin,
@@ -6084,10 +6087,13 @@ function updateLiveStateOnly() {
     delay: delay,
     efficiency: efficiency,
     firstScanAtMs: firstScanAtMs,
-    lastScanAtMs: lastScanWallMs != null ? lastScanWallMs : null,
-    graphWtPreset: graphWtPreset,
-    nonProductionDays: getNonProductionDaysArray()
-  });
+    lastScanAtMs: lastScanWallMs != null ? lastScanWallMs : null
+  };
+  if (canAdjustWorkingHour()) {
+    livePayload.graphWtPreset = graphWtPreset;
+    livePayload.nonProductionDays = getNonProductionDaysArray();
+  }
+  publishLiveStateToFirebase(livePayload);
 }
 
 function sendToSheet(chassis, model, engine, key, lot, status, downtimeEvent) {
