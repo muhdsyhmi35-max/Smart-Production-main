@@ -3714,218 +3714,217 @@ function resetProduction(shouldSync = true) {
   updateLiveStateOnly();
 }
 
-/* ===== SCAN CHASSIS ===== */
+/* ===== SCAN BOXES: auto-advance after each scan ===== */
 
-document.getElementById("chassisInput").addEventListener("keydown", function(e) {
-  if (e.key === "Enter" && this.value.trim() !== "") {
-    if (!canOperateLine() || isNonProductionMode()) {
-      this.value = "";
-      return;
+const SCAN_COMMIT_IDLE_MS = 80;
+
+function focusScanField(id) {
+  const el = document.getElementById(id);
+  if (!el || el.disabled) return;
+  setTimeout(() => {
+    el.focus();
+    if (typeof el.select === "function") el.select();
+  }, 0);
+}
+
+function bindScanField(inputId, onCommit) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  let idleTimer = null;
+  const commit = () => {
+    if (idleTimer) {
+      clearTimeout(idleTimer);
+      idleTimer = null;
     }
-    const value = this.value.trim();
+    const value = el.value.trim();
+    if (!value) return;
+    onCommit(value, el);
+  };
+  el.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== "Tab") return;
+    if (!el.value.trim()) return;
+    e.preventDefault();
+    commit();
+  });
+  el.addEventListener("input", () => {
+    if (!el.value.trim()) return;
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(commit, SCAN_COMMIT_IDLE_MS);
+  });
+}
 
-    duplicateLock = false;
-    pendingChassis = value;
-
-    this.value = "";
-    document.getElementById("modelInput").focus();
+function rejectIfScanBlocked(el) {
+  if (!canOperateLine() || isNonProductionMode()) {
+    el.value = "";
+    return true;
   }
+  return false;
+}
+
+bindScanField("chassisInput", (value, el) => {
+  if (rejectIfScanBlocked(el)) return;
+  duplicateLock = false;
+  pendingChassis = value;
+  el.value = "";
+  focusScanField("modelInput");
 });
 
-/* ===== SCAN MODEL ===== */
-
-document.getElementById("modelInput").addEventListener("keydown", function(e) {
-  if (e.key === "Enter" && this.value.trim() !== "") {
-    if (!canOperateLine() || isNonProductionMode()) {
-      this.value = "";
-      return;
-    }
-    if (pendingChassis === "") return;
-
-    const model = this.value.trim();
-
-    duplicateLock = false;
-    pendingModel = model;
-
-    this.value = "";
-    document.getElementById("engineInput").focus();
-  }
+bindScanField("modelInput", (value, el) => {
+  if (rejectIfScanBlocked(el)) return;
+  if (pendingChassis === "") return;
+  duplicateLock = false;
+  pendingModel = value;
+  el.value = "";
+  focusScanField("engineInput");
 });
 
-/* ===== SCAN ENGINE NO ===== */
-
-document.getElementById("engineInput").addEventListener("keydown", function(e) {
-  if (e.key === "Enter" && this.value.trim() !== "") {
-    if (!canOperateLine() || isNonProductionMode()) {
-      this.value = "";
-      return;
-    }
-    if (pendingModel === "") return;
-
-    const value = this.value.trim();
-
-    duplicateLock = false;
-    pendingEngine = value;
-
-    this.value = "";
-    document.getElementById("keyInput").focus();
-  }
+bindScanField("engineInput", (value, el) => {
+  if (rejectIfScanBlocked(el)) return;
+  if (pendingModel === "") return;
+  duplicateLock = false;
+  pendingEngine = value;
+  el.value = "";
+  focusScanField("keyInput");
 });
 
-/* ===== SCAN KEY ===== */
+bindScanField("keyInput", (value, el) => {
+  completeKeyScan(value, el);
+});
 
-document.getElementById("keyInput").addEventListener("keydown", function(e) {
-  if (e.key === "Enter" && this.value.trim() !== "") {
-    if (!canOperateLine() || isNonProductionMode()) {
-      this.value = "";
-      return;
-    }
-    if (!canRunProductionNow(new Date()) && !isAdminRole()) {
-      setOffShiftStatus();
-      this.value = "";
-      return;
-    }
-    if (pendingChassis === "" || pendingModel === "" || pendingEngine === "") return;
+function completeKeyScan(key, el) {
+  if (rejectIfScanBlocked(el)) return;
+  if (!canRunProductionNow(new Date()) && !isAdminRole()) {
+    setOffShiftStatus();
+    el.value = "";
+    return;
+  }
+  if (pendingChassis === "" || pendingModel === "" || pendingEngine === "") return;
 
-    const key = this.value.trim();
-    const unitId = unitScanFingerprint(pendingChassis, pendingEngine, key);
+  const unitId = unitScanFingerprint(pendingChassis, pendingEngine, key);
 
-    /* ===== DUPLICATE CHECK (completed units only, after all 4 scans) ===== */
-    if (scannedUnits.has(unitId)) {
-      rejectDuplicateScan("DUPLICATE SCAN (same chassis, engine & key already logged today)");
-      this.value = "";
-      return;
-    }
+  if (scannedUnits.has(unitId)) {
+    rejectDuplicateScan("DUPLICATE SCAN (same chassis, engine & key already logged today)");
+    el.value = "";
+    return;
+  }
 
-    duplicateLock = false;
+  duplicateLock = false;
+  pendingKey = key;
 
-    pendingKey = key;
+  if (!timer) {
+    startProduction();
+  }
 
-    /* --- START COUNTDOWN ONLY AFTER ALL 4 SCANS COMPLETE --- */
-    if (!timer) {
-      startProduction();
-    }
+  const chassis = pendingChassis;
+  const model = pendingModel;
+  const engine = pendingEngine;
+  const lot = document.getElementById("lotInput").value || "-";
+  const planForRow = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
 
-    const chassis = pendingChassis;
-    const model = pendingModel;
-    const engine = pendingEngine;
-    const lot = document.getElementById("lotInput").value || "-";
-    const planForRow = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+  const now = new Date();
+  const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
 
-    const now = new Date();
-    const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
+  const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+  let downtimeEvent = "";
 
-    const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
-    let downtimeEvent = "";
+  let t0Ms = null;
+  const firstUnit = actualCount === 0;
+  if (!firstUnit && lastScanWallMs != null) {
+    t0Ms = lastScanWallMs;
+  } else if (firstUnit && SETTINGS.shiftSchedule.enableAutoWindow) {
+    const shiftStartMs = getTodayShiftStartMs(now);
+    const lineMs = startTime ? startTime.getTime() : shiftStartMs;
+    t0Ms = Math.max(shiftStartMs, lineMs);
+    if (now.getTime() <= t0Ms) t0Ms = null;
+  } else if (firstUnit && startTime) {
+    t0Ms = startTime.getTime();
+    if (now.getTime() <= t0Ms) t0Ms = null;
+  }
 
-    // Baseline: previous unit end; first unit of session uses shift start vs line start (max)
-    // so idle from shift open to first scan books downtime (and stale Firebase lastScan is ignored).
-    let t0Ms = null;
-    const firstUnit = actualCount === 0;
-    if (!firstUnit && lastScanWallMs != null) {
-      t0Ms = lastScanWallMs;
-    } else if (firstUnit && SETTINGS.shiftSchedule.enableAutoWindow) {
-      const shiftStartMs = getTodayShiftStartMs(now);
-      const lineMs = startTime ? startTime.getTime() : shiftStartMs;
-      t0Ms = Math.max(shiftStartMs, lineMs);
-      if (now.getTime() <= t0Ms) t0Ms = null;
-    } else if (firstUnit && startTime) {
-      t0Ms = startTime.getTime();
-      if (now.getTime() <= t0Ms) t0Ms = null;
-    }
-
-    if (t0Ms != null) {
-      const t1 = now.getTime();
-      const wallSec = Math.floor((t1 - t0Ms) / 1000);
-      const breakSec = scheduledBreakOverlapSec(t0Ms, t1);
-      const idleSecExBreak = Math.max(0, wallSec - breakSec);
-      // Match Excel logic: booked downtime is only the amount beyond one cycle.
-      if (idleSecExBreak > cycleTimeSec) {
-        const actualDowntime = idleSecExBreak - cycleTimeSec;
-
-        // Count downtime only before target (or when plan is open-ended 0).
-        if (plan === 0 || (actualCount + 1) <= plan) {
-          downtimeEvent = format(actualDowntime);
-          downtimeSeconds += actualDowntime;
-          isDowntime = true;
-        } else {
-          downtimeEvent = "";
-          isDowntime = false;
-        }
+  if (t0Ms != null) {
+    const t1 = now.getTime();
+    const wallSec = Math.floor((t1 - t0Ms) / 1000);
+    const breakSec = scheduledBreakOverlapSec(t0Ms, t1);
+    const idleSecExBreak = Math.max(0, wallSec - breakSec);
+    if (idleSecExBreak > cycleTimeSec) {
+      const actualDowntime = idleSecExBreak - cycleTimeSec;
+      if (plan === 0 || (actualCount + 1) <= plan) {
+        downtimeEvent = format(actualDowntime);
+        downtimeSeconds += actualDowntime;
+        isDowntime = true;
       } else {
+        downtimeEvent = "";
         isDowntime = false;
       }
     } else {
       isDowntime = false;
     }
-
-    lastScanTime = now;
-    lastScanWallMs = now.getTime();
-    if (!firstScanAtMs) {
-      firstScanAtMs = now.getTime();
-    }
-
-    const row = document.getElementById("scanTable").insertRow(0);
-
-    row.insertCell(0).innerText = "";
-    row.insertCell(1).innerText = now.toLocaleDateString();
-    row.insertCell(2).innerText = now.toLocaleTimeString();
-    row.insertCell(3).innerText = lot;
-    row.insertCell(4).innerText = model;
-    row.insertCell(5).innerText = chassis;
-    row.insertCell(6).innerText = engine;
-    row.insertCell(7).innerText = key;
-
-    const statusCell = row.insertCell(8);
-    const downtimeCell = row.insertCell(9);
-
-    if (downtimeEvent) {
-      statusCell.innerText = "DOWN TIME";
-      statusCell.classList.add("status-red");
-      downtimeCell.innerText = downtimeEvent;
-      downtimeCell.classList.add("status-red");
-    } else {
-      statusCell.innerText = "SCANNED";
-      statusCell.classList.add("status-green");
-      downtimeCell.innerText = "";
-    }
-
-    row.dataset.scanDate = toIsoDateLocal(now);
-    row.dataset.scanMs = String(now.getTime());
-    row.dataset.scanPlan = String(planForRow);
-    renumberScanTable();
-    rebuildScannedSetsFromTable();
-
-    // One completed 4-scan cycle = one actual unit.
-    actualCount++;
-    hasLocalSession = true;
-    countdownValue = cycleTimeSec;
+  } else {
     isDowntime = false;
-
-    updateDisplay();
-
-    sendToSheet(
-      chassis,
-      model,
-      engine,
-      key,
-      lot,
-      statusCell.innerText,
-      downtimeEvent
-    );
-
-    pendingChassis = "";
-    pendingModel = "";
-    pendingEngine = "";
-    pendingKey = "";
-
-    this.value = "";
-
-    setTimeout(() => {
-      document.getElementById("chassisInput").focus();
-    }, 50);
   }
-});
+
+  lastScanTime = now;
+  lastScanWallMs = now.getTime();
+  if (!firstScanAtMs) {
+    firstScanAtMs = now.getTime();
+  }
+
+  const row = document.getElementById("scanTable").insertRow(0);
+
+  row.insertCell(0).innerText = "";
+  row.insertCell(1).innerText = now.toLocaleDateString();
+  row.insertCell(2).innerText = now.toLocaleTimeString();
+  row.insertCell(3).innerText = lot;
+  row.insertCell(4).innerText = model;
+  row.insertCell(5).innerText = chassis;
+  row.insertCell(6).innerText = engine;
+  row.insertCell(7).innerText = key;
+
+  const statusCell = row.insertCell(8);
+  const downtimeCell = row.insertCell(9);
+
+  if (downtimeEvent) {
+    statusCell.innerText = "DOWN TIME";
+    statusCell.classList.add("status-red");
+    downtimeCell.innerText = downtimeEvent;
+    downtimeCell.classList.add("status-red");
+  } else {
+    statusCell.innerText = "SCANNED";
+    statusCell.classList.add("status-green");
+    downtimeCell.innerText = "";
+  }
+
+  row.dataset.scanDate = toIsoDateLocal(now);
+  row.dataset.scanMs = String(now.getTime());
+  row.dataset.scanPlan = String(planForRow);
+  renumberScanTable();
+  rebuildScannedSetsFromTable();
+
+  actualCount++;
+  hasLocalSession = true;
+  countdownValue = cycleTimeSec;
+  isDowntime = false;
+
+  updateDisplay();
+
+  sendToSheet(
+    chassis,
+    model,
+    engine,
+    key,
+    lot,
+    statusCell.innerText,
+    downtimeEvent
+  );
+
+  pendingChassis = "";
+  pendingModel = "";
+  pendingEngine = "";
+  pendingKey = "";
+
+  el.value = "";
+  focusScanField("chassisInput");
+}
 
 /* ===== UPDATE DISPLAY ===== */
 
