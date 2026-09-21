@@ -1748,6 +1748,7 @@ function getShiftPeriodKey(d = new Date()) {
 
 function applyShiftScheduleTick() {
   if (isMonitor || !SETTINGS.shiftSchedule.enableAutoWindow) return;
+  if (!initialLiveStateHydrated) return;
   if (isNonProductionMode()) {
     if (timer) stopProduction(false);
     setStatus("NON PRODUCTION", "status-blue");
@@ -1759,6 +1760,7 @@ function applyShiftScheduleTick() {
   const inWindow = isWithinShiftWindow(now);
   const overtime = isOvertimeActive(now);
   const canRun = inWindow || overtime;
+  let enteredNewShift = false;
 
   if (inWindow) {
     const periodKey = getShiftPeriodKey(now);
@@ -1780,6 +1782,7 @@ function applyShiftScheduleTick() {
       } catch (_) {}
     } else if (outsideWindow || newCalendarShift) {
       resetProduction(false);
+      enteredNewShift = true;
       try {
         localStorage.setItem(SHIFT_WINDOW_STATE_KEY, "in");
         localStorage.setItem(SHIFT_PERIOD_KEY, periodKey);
@@ -1802,7 +1805,8 @@ function applyShiftScheduleTick() {
     return;
   }
 
-  if (!timer && document.getElementById("status")?.innerText?.trim() !== "PAUSED") {
+  // Auto-start only when the shift window just opened — never on a mid-shift refresh.
+  if (enteredNewShift && !timer && document.getElementById("status")?.innerText?.trim() !== "PAUSED") {
     startProduction(false);
   }
 }
@@ -3220,56 +3224,61 @@ function startLiveCountdownTicker(baseCountdown, status, updatedAt, anchorScanMs
   liveCountdownInterval = setInterval(render, 1000);
 }
 
-function restoreProductionTimerFromLiveState(status, countdown, expected, syncedFirstScanAtMs, syncedUpdatedAt, syncedLastScanAtMs) {
+function restoreProductionTimerFromLiveState(status, countdown, expected, syncedFirstScanAtMs, syncedUpdatedAt, syncedLastScanAtMs, syncedStartedAtMs) {
   if (isMonitor) return;
-  if (status !== "RUNNING" && status !== "DOWN TIME") return;
-  if (timer) return;
+
+  if (syncedStartedAtMs) {
+    const started = Number(syncedStartedAtMs);
+    if (Number.isFinite(started) && started > 0) startTime = new Date(started);
+  }
+  if (syncedFirstScanAtMs) {
+    firstScanAtMs = Number(syncedFirstScanAtMs);
+  }
+  if (syncedLastScanAtMs) {
+    lastScanWallMs = Number(syncedLastScanAtMs);
+    lastScanTime = new Date(lastScanWallMs);
+  }
+
+  if (status !== "RUNNING" && status !== "DOWN TIME") {
+    countdownValue = parseInt(countdown, 10) || 0;
+    return;
+  }
 
   const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
   const nowMs = syncedNowMs();
   let adjustedCountdown = parseInt(countdown, 10) || 0;
-  let elapsedInCycle = Math.max(cycleTimeSec - adjustedCountdown, 0);
+  const anchorMs = lastScanWallMs || (startTime ? startTime.getTime() : null);
 
-  if (syncedLastScanAtMs) {
-    adjustedCountdown = computeRunningCountdownSec(
-      cycleTimeSec,
-      nowMs,
-      null,
-      null,
-      Number(syncedLastScanAtMs)
-    );
-    elapsedInCycle = Math.max(cycleTimeSec - adjustedCountdown, 0);
+  if (anchorMs) {
+    adjustedCountdown = computeRunningCountdownSec(cycleTimeSec, nowMs, null, null, anchorMs);
   } else {
     const syncedAtMs = Number(syncedUpdatedAt) || nowMs;
     const syncedCountdown = parseInt(countdown, 10) || 0;
     adjustedCountdown = computeRunningCountdownSec(cycleTimeSec, nowMs, syncedCountdown, syncedAtMs);
-    elapsedInCycle = Math.max(cycleTimeSec - adjustedCountdown, 0);
+    if (!startTime && cycleTimeSec > adjustedCountdown) {
+      startTime = new Date(nowMs - (cycleTimeSec - adjustedCountdown) * 1000);
+    }
   }
+
+  const elapsedInCycle = Math.max(cycleTimeSec - adjustedCountdown, 0);
   const elapsedForExpected = Math.max((parseInt(expected, 10) || 0) * cycleTimeSec, 0);
-  const now = new Date();
-  const reconstructedBaseTime = new Date(now.getTime() - (elapsedInCycle * 1000));
-  const reconstructedFirstScanAtMs = now.getTime() - (elapsedForExpected + elapsedInCycle) * 1000;
-
-  // Expected output is locked to first scan time.
-  if (syncedFirstScanAtMs) {
-    firstScanAtMs = Number(syncedFirstScanAtMs);
-  } else if (!firstScanAtMs) {
-    firstScanAtMs = reconstructedFirstScanAtMs;
+  if (!firstScanAtMs) {
+    firstScanAtMs = nowMs - (elapsedForExpected + elapsedInCycle) * 1000;
   }
-
-  if (actualCount > 0) {
-    lastScanTime = syncedLastScanAtMs ? new Date(Number(syncedLastScanAtMs)) : reconstructedBaseTime;
-    lastScanWallMs = syncedLastScanAtMs ? Number(syncedLastScanAtMs) : reconstructedBaseTime.getTime();
+  if (actualCount > 0 && !lastScanWallMs) {
+    lastScanWallMs = nowMs - elapsedInCycle * 1000;
+    lastScanTime = new Date(lastScanWallMs);
   }
-
-  // Downtime is booked on each completed 4-scan (same as the scan table). Offline gap is
-  // included in the next scan's diff; booking it here would double-count.
 
   countdownValue = adjustedCountdown;
-
-  // Mark as active session and resume real downtime logic.
+  isDowntime = countdownValue === 0;
   hasLocalSession = true;
-  startProduction(false);
+
+  if (timer) {
+    updateDisplay();
+    return;
+  }
+  startProduction(false, { restore: true });
 }
 
 function parseFirebaseInt(val) {
@@ -3397,7 +3406,7 @@ function applyLiveState(state) {
     status = actual > 0 ? "PAUSED" : "READY";
   }
 
-  // Set last-scan anchor before countdown ticker (every monitor must use Firebase lastScanAtMs).
+  // Set last-scan / session-start anchors before countdown ticker.
   let anchorScanMs = null;
   if (actual > 0 && state.lastScanAtMs) {
     anchorScanMs = Number(state.lastScanAtMs);
@@ -3406,6 +3415,10 @@ function applyLiveState(state) {
   } else if (actual === 0) {
     lastScanTime = null;
     lastScanWallMs = null;
+  }
+  if (state.startedAtMs) {
+    const started = Number(state.startedAtMs);
+    if (Number.isFinite(started) && started > 0) startTime = new Date(started);
   }
 
   startLiveCountdownTicker(countdown, status, state.updatedAt, anchorScanMs);
@@ -3416,7 +3429,15 @@ function applyLiveState(state) {
   downtimeSeconds = downtimeSecToDisplay;
   document.getElementById("downtime").innerText = format(downtimeSecToDisplay);
   syncDowntimeAccumulatedHighlight();
-  restoreProductionTimerFromLiveState(status, countdown, expected, state.firstScanAtMs, state.updatedAt, state.lastScanAtMs);
+  restoreProductionTimerFromLiveState(
+    status,
+    countdown,
+    expected,
+    state.firstScanAtMs,
+    state.updatedAt,
+    state.lastScanAtMs,
+    state.startedAtMs
+  );
 
   const balanceEl = document.getElementById("balance");
   if (balance < 0) {
@@ -3489,6 +3510,7 @@ function loadInitialLiveState() {
   if (!firebaseLiveStateRef) {
     initialLiveStateHydrated = true;
     maybeResetDashboardForNewCalendarDay();
+    if (!isMonitor) applyShiftScheduleTick();
     return;
   }
 
@@ -3498,11 +3520,13 @@ function loadInitialLiveState() {
       if (liveState) applyLiveState(liveState);
       initialLiveStateHydrated = true;
       maybeResetDashboardForNewCalendarDay();
+      if (!isMonitor) applyShiftScheduleTick();
     })
     .catch(err => {
       console.log("Firebase initial live state error:", err);
       initialLiveStateHydrated = true;
       maybeResetDashboardForNewCalendarDay();
+      if (!isMonitor) applyShiftScheduleTick();
     });
 }
 
@@ -3588,7 +3612,7 @@ function applyRemoteCommand(action) {
 
 /* ===== START ===== */
 
-function startProduction(shouldSync = true) {
+function startProduction(shouldSync = true, opts = {}) {
   if (!canDriveProductionFromThisScreen()) return;
   if (isMonitor && isApplyingRemoteCommand) return;
   if (isNonProductionMode()) {
@@ -3601,6 +3625,7 @@ function startProduction(shouldSync = true) {
     return;
   }
 
+  const restoring = !!(opts && opts.restore);
   hasLocalSession = true;
   stopLiveCountdownTicker();
 
@@ -3613,8 +3638,8 @@ function startProduction(shouldSync = true) {
     startTime = new Date();
   }
 
-  // If no scan yet, set initial countdown
-  if (countdownValue === 0) {
+  // Fresh Start only. After refresh, keep remaining time / downtime at 00:00.
+  if (!restoring && countdownValue === 0 && !lastScanWallMs) {
     countdownValue = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
   }
 
@@ -6110,7 +6135,8 @@ function updateLiveStateOnly() {
     delay: delay,
     efficiency: efficiency,
     firstScanAtMs: firstScanAtMs,
-    lastScanAtMs: lastScanWallMs != null ? lastScanWallMs : null
+    lastScanAtMs: lastScanWallMs != null ? lastScanWallMs : null,
+    startedAtMs: startTime ? startTime.getTime() : null
   };
   if (canAdjustWorkingHour()) {
     livePayload.graphWtPreset = graphWtPreset;
