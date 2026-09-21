@@ -783,6 +783,16 @@ function onGraphWtOptionClick(event, preset) {
 // 🔴 GANTI DENGAN LINK /exec WEB APP ANDA
 const API_URL = "https://script.google.com/macros/s/AKfycbwwLUYjoT7GH0sfFCGZMJoeLApmPWWKEF5LsdNqvkRpstZjerG9d3zG78bh0RTA1Fu48Q/exec";
 
+/** Apps Script accepts JSON in the body. text/plain avoids a CORS preflight that silently drops the row. */
+function postToAppsScript(payload) {
+  return fetch(API_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(payload)
+  }).catch(err => console.log("Sheet post error:", err));
+}
+
 // Detect monitor mode (?monitor)
 const isMonitor = window.location.search.includes("monitor");
 const MONITOR_LAYOUT_DATASET_KEY = "monitorLayoutV1";
@@ -2841,16 +2851,9 @@ async function checkAccess() {
       return false;
     }
 
-    await fetch(API_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        lockRequest: true,
-        deviceId: deviceId
-      })
+    await postToAppsScript({
+      lockRequest: true,
+      deviceId: deviceId
     });
   } catch (err) {
     console.log("Lock error:", err);
@@ -3714,28 +3717,34 @@ function resetProduction(shouldSync = true) {
   updateLiveStateOnly();
 }
 
-/* ===== SCAN BOXES: auto-advance after each scan ===== */
+/* ===== SCAN BOXES: Enter/Tab for keyboard; auto-advance only for scanner bursts ===== */
 
-const SCAN_COMMIT_IDLE_MS = 80;
+const SCAN_BURST_GAP_MS = 45;
+const SCAN_BURST_IDLE_MS = 70;
+const SCAN_BURST_MIN_CHARS = 3;
 
 function focusScanField(id) {
   const el = document.getElementById(id);
   if (!el || el.disabled) return;
   setTimeout(() => {
     el.focus();
-    if (typeof el.select === "function") el.select();
   }, 0);
 }
 
 function bindScanField(inputId, onCommit) {
   const el = document.getElementById(inputId);
   if (!el) return;
+  el.autocomplete = "off";
+  el.spellcheck = false;
   let idleTimer = null;
+  let burstChars = 0;
+  let lastInputAt = 0;
   const commit = () => {
     if (idleTimer) {
       clearTimeout(idleTimer);
       idleTimer = null;
     }
+    burstChars = 0;
     const value = el.value.trim();
     if (!value) return;
     onCommit(value, el);
@@ -3746,10 +3755,31 @@ function bindScanField(inputId, onCommit) {
     e.preventDefault();
     commit();
   });
-  el.addEventListener("input", () => {
-    if (!el.value.trim()) return;
+  el.addEventListener("input", (e) => {
+    if (!el.value.trim()) {
+      burstChars = 0;
+      return;
+    }
+    const now = Date.now();
+    const gap = lastInputAt ? now - lastInputAt : 999;
+    lastInputAt = now;
+    const inserted = String(e.data || "");
+    const isPaste =
+      e.inputType === "insertFromPaste" ||
+      e.inputType === "insertFromDrop" ||
+      inserted.length > 1;
     if (idleTimer) clearTimeout(idleTimer);
-    idleTimer = setTimeout(commit, SCAN_COMMIT_IDLE_MS);
+    if (isPaste) {
+      idleTimer = setTimeout(commit, 40);
+      return;
+    }
+    burstChars = gap < SCAN_BURST_GAP_MS ? burstChars + 1 : 1;
+    idleTimer = setTimeout(() => {
+      if (burstChars >= SCAN_BURST_MIN_CHARS && el.value.trim().length >= SCAN_BURST_MIN_CHARS) {
+        commit();
+      }
+      burstChars = 0;
+    }, SCAN_BURST_IDLE_MS);
   });
 }
 
@@ -6093,28 +6123,21 @@ function updateLiveStateOnly() {
     countdownValue = 0;
   }
 
-  fetch(API_URL, {
-    method: "POST",
-    mode: "no-cors",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      liveOnly: true,
-      plan: plan,
-      dailyPlan: configuredPlan,
-      cycleTimeMin: cycleTimeMin,
-      actual: actual,
-      balance: balance,
-      status: status,
-      ramadanMode: ramadanMode,
-      countdown: countdownValue,
-      totalDowntime: bookedDowntime,
-      downtimeDay: getActiveDowntimeDayKey(),
-      expected: expected,
-      delay: delay,
-      efficiency: efficiency
-    })
+  postToAppsScript({
+    liveOnly: true,
+    plan: plan,
+    dailyPlan: configuredPlan,
+    cycleTimeMin: cycleTimeMin,
+    actual: actual,
+    balance: balance,
+    status: status,
+    ramadanMode: ramadanMode,
+    countdown: countdownValue,
+    totalDowntime: bookedDowntime,
+    downtimeDay: getActiveDowntimeDayKey(),
+    expected: expected,
+    delay: delay,
+    efficiency: efficiency
   });
 
   const livePayload = {
@@ -6149,28 +6172,18 @@ function sendToSheet(chassis, model, engine, key, lot, status, downtimeEvent) {
   const actual = actualCount;
   const downtimeSec = downtimeEvent ? parseMmSsToSeconds(downtimeEvent) : 0;
 
-  fetch(API_URL, {
-    method: "POST",
-    mode: "no-cors",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      lot: lot,
-      model: model,
-      chassis: chassis,
-      engine: engine,
-      key: key,
-      status: status,
-      plan: plan,
-      actual: actual,
-      // Keep scan row payload in strict sheet column order.
-      downtimeEvent: downtimeEvent,
-      // Seconds avoids Sheets auto-formatting "04:27" as a clock time (4:27 AM).
-      downtimeEventSeconds: downtimeSec
-    })
-  })
-    .catch(err => console.log("Sheet error:", err));
+  postToAppsScript({
+    lot: lot,
+    model: model,
+    chassis: chassis,
+    engine: engine,
+    key: key,
+    status: status,
+    plan: plan,
+    actual: actual,
+    downtimeEvent: downtimeEvent,
+    downtimeEventSeconds: downtimeSec
+  });
 }
 
 function cleanDowntime(raw) {
