@@ -203,6 +203,10 @@ function canAdjustWorkingHour() {
   return !isMonitor || isMasterRole();
 }
 
+function canEditLineSettings() {
+  return isMasterRole() || (!isMonitor && canOperateLine());
+}
+
 function setAppRole(role) {
   if (role === "master" || role === "admin") return;
   try {
@@ -223,11 +227,12 @@ function grantAdminAfterLogin() {
 function applyMainPcEditLock() {
   const master = isMasterRole();
   const canOperate = canOperateLine();
+  const canEditSettings = canEditLineSettings();
   ["cycleTarget", "dailyPlanTarget", "lotInput"].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
-    el.readOnly = !master;
-    el.classList.toggle("settings-locked", !master);
+    el.readOnly = !canEditSettings;
+    el.classList.toggle("settings-locked", !canEditSettings);
   });
   document.querySelectorAll(".main-pc-actions button").forEach(btn => {
     btn.disabled = isMonitor ? !master : !canOperate;
@@ -6531,7 +6536,7 @@ document.getElementById("cycleTarget").value = SETTINGS.defaultCycle;
 document.getElementById("dailyPlanTarget").value = SETTINGS.defaultPlan > 0 ? String(SETTINGS.defaultPlan) : "";
 
 document.getElementById("cycleTarget").addEventListener("input", () => {
-  if (!isMasterRole()) return;
+  if (!canEditLineSettings()) return;
   if (!timer) {
     countdownValue = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
   }
@@ -6542,7 +6547,7 @@ document.getElementById("cycleTarget").addEventListener("input", () => {
 });
 
 document.getElementById("dailyPlanTarget").addEventListener("input", () => {
-  if (!isMasterRole()) return;
+  if (!canEditLineSettings()) return;
   const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
   syncTodayScanPlanOnRows(plan);
   hasLocalSession = true;
@@ -6553,7 +6558,7 @@ document.getElementById("dailyPlanTarget").addEventListener("input", () => {
 });
 
 document.getElementById("lotInput").addEventListener("input", () => {
-  if (!isMasterRole()) return;
+  if (!canEditLineSettings()) return;
   hasLocalSession = true;
   if (isMonitor) publishMasterSettingsFromInputs();
   else updateLiveStateOnly();
