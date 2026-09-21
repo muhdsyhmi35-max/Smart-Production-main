@@ -38,7 +38,6 @@ exports.tickProductionClock = onSchedule("every 1 minutes", async () => {
   const cycleTimeSec = Math.max(Math.floor(cycleTimeMin * 60), 1);
 
   const previousCountdown = Math.max(toInt(state.countdown, cycleTimeSec), 0);
-  const previousDowntime = Math.max(toInt(state.totalDowntime, 0), 0);
   const previousUpdatedAt = toInt(state.updatedAt, nowMs);
   const firstScanAtMs = toInt(state.firstScanAtMs, 0);
   const lastScanAtMs = toInt(state.lastScanAtMs, 0);
@@ -49,9 +48,6 @@ exports.tickProductionClock = onSchedule("every 1 minutes", async () => {
   }
 
   const adjustedCountdown = Math.max(previousCountdown - elapsedSec, 0);
-  const extraDowntime = Math.max(elapsedSec - previousCountdown, 0);
-  const allowDowntime = plan === 0 || actual < plan;
-  const totalDowntime = allowDowntime ? previousDowntime + extraDowntime : previousDowntime;
 
   let expected = 0;
   if (firstScanAtMs > 0) {
@@ -68,7 +64,6 @@ exports.tickProductionClock = onSchedule("every 1 minutes", async () => {
 
   await liveRef.update({
     countdown: adjustedCountdown,
-    totalDowntime: totalDowntime,
     expected: expected,
     delay: delay,
     balance: balance,

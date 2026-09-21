@@ -40,6 +40,14 @@ const SETTINGS = {
     startMinute: (8 * 60),      // 08:00
     endMinute: (17 * 60) + 30,  // 17:30
     enableAutoWindow: true
+  },
+  /**
+   * Auto downtime (no operator tap).
+   * Late scan within cycle + grace = Delay only (conveyor still running).
+   * Gap longer than cycle + grace = booked as Downtime (treat as line stop).
+   */
+  downtime: {
+    graceMinutes: 4
   }
 };
 
@@ -3274,7 +3282,7 @@ function restoreProductionTimerFromLiveState(status, countdown, expected, synced
   }
 
   countdownValue = adjustedCountdown;
-  isDowntime = countdownValue === 0;
+  isDowntime = false;
   hasLocalSession = true;
 
   if (timer) {
@@ -3649,9 +3657,11 @@ function startProduction(shouldSync = true, opts = {}) {
   timer = setInterval(() => {
     const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
     countdownValue = computeRunningCountdownSec(cycleTimeSec);
-
-    if (countdownValue === 0) {
-      isDowntime = true;
+    const graceSec = Math.max(0, (SETTINGS.downtime?.graceMinutes ?? 4) * 60);
+    const t0Ms = lastScanWallMs != null ? lastScanWallMs : (startTime ? startTime.getTime() : null);
+    if (t0Ms != null) {
+      const idleSec = Math.max(0, Math.floor((Date.now() - t0Ms) / 1000) - scheduledBreakOverlapSec(t0Ms, Date.now()));
+      isDowntime = idleSec > cycleTimeSec + graceSec;
     } else {
       isDowntime = false;
     }
@@ -3909,7 +3919,10 @@ function completeKeyScan(key, el) {
     const wallSec = Math.floor((t1 - t0Ms) / 1000);
     const breakSec = scheduledBreakOverlapSec(t0Ms, t1);
     const idleSecExBreak = Math.max(0, wallSec - breakSec);
-    if (idleSecExBreak > cycleTimeSec) {
+    const graceSec = Math.max(0, (SETTINGS.downtime?.graceMinutes ?? 4) * 60);
+    const stopThresholdSec = cycleTimeSec + graceSec;
+    // Late scan inside the grace window = Delay only. Longer gap = auto downtime.
+    if (idleSecExBreak > stopThresholdSec) {
       const actualDowntime = idleSecExBreak - cycleTimeSec;
       if (plan === 0 || (actualCount + 1) <= plan) {
         downtimeEvent = format(actualDowntime);
@@ -6453,7 +6466,7 @@ function maybeReconcileLocalActualFromSheet() {
   const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
   if (!isMonitor && (statusText === "RUNNING" || statusText === "DOWN TIME" || statusText === "BREAK TIME")) {
     countdownValue = computeRunningCountdownSec(cycleTimeSec);
-    isDowntime = countdownValue === 0;
+    isDowntime = false;
   }
 
   applyReconciledActualToDashboard();
