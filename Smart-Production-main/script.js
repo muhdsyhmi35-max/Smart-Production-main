@@ -678,7 +678,7 @@ function setScanInputsEnabled(enabled) {
     const el = document.getElementById(id);
     if (!el) return;
     el.disabled = !enabled;
-    el.readOnly = !enabled;
+    el.readOnly = false;
     el.classList.toggle("scan-disabled", !enabled);
     if (!enabled) el.blur();
   });
@@ -3717,21 +3717,25 @@ function resetProduction(shouldSync = true) {
   updateLiveStateOnly();
 }
 
-/* ===== SCAN BOXES: keyboard = type + Enter; scanner = auto-advance ===== */
+/* ===== SCAN BOXES =====
+   Keyboard: type any length, then Enter or Tab.
+   Scanner: auto-advance only when the whole code arrives in a fast burst.
+*/
 
-const SCAN_IDLE_MS = 160;
-const SCAN_MAX_MS_PER_CHAR = 90;
+const SCAN_IDLE_MS = 180;
+const SCAN_MAX_MS_PER_CHAR = 110;
 
 function focusScanField(id) {
   const el = document.getElementById(id);
   if (!el || el.disabled) return;
-  setTimeout(() => el.focus(), 0);
+  try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); }
 }
 
 function isScanCommitKey(e) {
   return (
     e.key === "Enter" ||
     e.key === "Tab" ||
+    e.code === "Enter" ||
     e.code === "NumpadEnter" ||
     e.keyCode === 13 ||
     e.which === 13
@@ -3754,84 +3758,96 @@ function bindScanField(inputId, onCommit) {
       idleTimer = null;
     }
     firstCharAt = 0;
-    const value = el.value.trim();
+    const value = String(el.value || "").trim();
     if (!value) return;
     committing = true;
-    onCommit(value, el);
-    setTimeout(() => { committing = false; }, 50);
-  };
-
-  const commitAfterFlush = () => {
-    setTimeout(commit, 30);
+    try {
+      onCommit(value, el);
+    } finally {
+      setTimeout(() => { committing = false; }, 80);
+    }
   };
 
   el.addEventListener("keydown", (e) => {
     if (!isScanCommitKey(e)) return;
-    if (!el.value.trim()) return;
     e.preventDefault();
-    commitAfterFlush();
+    setTimeout(commit, 20);
   });
   el.addEventListener("keyup", (e) => {
     if (!isScanCommitKey(e)) return;
-    if (!el.value.trim()) return;
     e.preventDefault();
-    commitAfterFlush();
+    setTimeout(commit, 20);
   });
-  el.addEventListener("input", () => {
-    const value = el.value.trim();
-    if (!value) {
+  el.addEventListener("input", (e) => {
+    const text = String(el.value || "").trim();
+    if (!text) {
       firstCharAt = 0;
+      if (idleTimer) clearTimeout(idleTimer);
       return;
     }
-    const now = Date.now();
-    if (!firstCharAt) firstCharAt = now;
+    if (!firstCharAt) firstCharAt = Date.now();
     if (idleTimer) clearTimeout(idleTimer);
+    const inserted = String(e.data || "");
+    const isPaste =
+      e.inputType === "insertFromPaste" ||
+      e.inputType === "insertFromDrop" ||
+      inserted.length > 1;
+    if (isPaste) {
+      idleTimer = setTimeout(commit, 40);
+      return;
+    }
     idleTimer = setTimeout(() => {
-      const text = el.value.trim();
+      const value = String(el.value || "").trim();
       const started = firstCharAt;
       firstCharAt = 0;
-      if (text.length < 3 || !started) return;
-      const msPerChar = (Date.now() - started) / text.length;
+      if (value.length < 3 || !started) return;
+      const msPerChar = (Date.now() - started) / value.length;
       if (msPerChar <= SCAN_MAX_MS_PER_CHAR) commit();
     }, SCAN_IDLE_MS);
   });
 }
 
 function rejectIfScanBlocked(el) {
-  if (!canOperateLine() || isNonProductionMode()) {
+  if (isMonitor) {
+    el.value = "";
+    return true;
+  }
+  if (isNonProductionMode()) {
+    el.value = "";
+    setStatus("NON PRODUCTION", "status-blue");
+    return true;
+  }
+  if (!canOperateLine()) {
     el.value = "";
     return true;
   }
   return false;
 }
 
-bindScanField("chassisInput", (value, el) => {
-  if (rejectIfScanBlocked(el)) return;
-  duplicateLock = false;
-  pendingChassis = value;
+function acceptScanValue(value, el, nextId, assign) {
+  if (rejectIfScanBlocked(el)) return false;
+  assign(value);
   el.value = "";
-  updateDisplay();
-  focusScanField("modelInput");
+  if (nextId) focusScanField(nextId);
+  try { updateDisplay(); } catch (_) {}
+  return true;
+}
+
+bindScanField("chassisInput", (value, el) => {
+  duplicateLock = false;
+  acceptScanValue(value, el, "modelInput", (v) => { pendingChassis = v; });
 });
 
 bindScanField("modelInput", (value, el) => {
-  if (rejectIfScanBlocked(el)) return;
-  if (pendingChassis === "") return;
+  if (!pendingChassis) return;
   duplicateLock = false;
-  pendingModel = value;
-  el.value = "";
-  updateDisplay();
-  focusScanField("engineInput");
+  acceptScanValue(value, el, "engineInput", (v) => { pendingModel = v; });
 });
 
 bindScanField("engineInput", (value, el) => {
-  if (rejectIfScanBlocked(el)) return;
-  if (pendingModel === "") return;
+  if (!pendingModel) return;
   duplicateLock = false;
-  pendingEngine = value;
-  el.value = "";
-  updateDisplay();
-  focusScanField("keyInput");
+  acceptScanValue(value, el, "keyInput", (v) => { pendingEngine = v; });
 });
 
 bindScanField("keyInput", (value, el) => {

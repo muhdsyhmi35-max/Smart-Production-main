@@ -486,6 +486,14 @@ body.role-management #ramadanToggle{
   display:none !important;
 }
 
+body.role-management:not(.monitor-mode) .bottom-row > .card.wide:first-child{
+  display:none !important;
+}
+
+body.role-management:not(.monitor-mode) .bottom-row > .card.wide:last-child{
+  grid-column:1 / -1;
+}
+
 input.settings-locked{
   pointer-events:none;
   opacity:.88;
