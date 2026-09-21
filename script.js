@@ -3717,18 +3717,25 @@ function resetProduction(shouldSync = true) {
   updateLiveStateOnly();
 }
 
-/* ===== SCAN BOXES: Enter/Tab for keyboard; auto-advance only for scanner bursts ===== */
+/* ===== SCAN BOXES: keyboard = type + Enter; scanner = auto-advance ===== */
 
-const SCAN_BURST_GAP_MS = 45;
-const SCAN_BURST_IDLE_MS = 70;
-const SCAN_BURST_MIN_CHARS = 3;
+const SCAN_IDLE_MS = 160;
+const SCAN_MAX_MS_PER_CHAR = 90;
 
 function focusScanField(id) {
   const el = document.getElementById(id);
   if (!el || el.disabled) return;
-  setTimeout(() => {
-    el.focus();
-  }, 0);
+  setTimeout(() => el.focus(), 0);
+}
+
+function isScanCommitKey(e) {
+  return (
+    e.key === "Enter" ||
+    e.key === "Tab" ||
+    e.code === "NumpadEnter" ||
+    e.keyCode === 13 ||
+    e.which === 13
+  );
 }
 
 function bindScanField(inputId, onCommit) {
@@ -3737,49 +3744,56 @@ function bindScanField(inputId, onCommit) {
   el.autocomplete = "off";
   el.spellcheck = false;
   let idleTimer = null;
-  let burstChars = 0;
-  let lastInputAt = 0;
+  let firstCharAt = 0;
+  let committing = false;
+
   const commit = () => {
+    if (committing) return;
     if (idleTimer) {
       clearTimeout(idleTimer);
       idleTimer = null;
     }
-    burstChars = 0;
+    firstCharAt = 0;
     const value = el.value.trim();
     if (!value) return;
+    committing = true;
     onCommit(value, el);
+    setTimeout(() => { committing = false; }, 50);
   };
+
+  const commitAfterFlush = () => {
+    setTimeout(commit, 30);
+  };
+
   el.addEventListener("keydown", (e) => {
-    if (e.key !== "Enter" && e.key !== "Tab") return;
+    if (!isScanCommitKey(e)) return;
     if (!el.value.trim()) return;
     e.preventDefault();
-    commit();
+    commitAfterFlush();
   });
-  el.addEventListener("input", (e) => {
-    if (!el.value.trim()) {
-      burstChars = 0;
+  el.addEventListener("keyup", (e) => {
+    if (!isScanCommitKey(e)) return;
+    if (!el.value.trim()) return;
+    e.preventDefault();
+    commitAfterFlush();
+  });
+  el.addEventListener("input", () => {
+    const value = el.value.trim();
+    if (!value) {
+      firstCharAt = 0;
       return;
     }
     const now = Date.now();
-    const gap = lastInputAt ? now - lastInputAt : 999;
-    lastInputAt = now;
-    const inserted = String(e.data || "");
-    const isPaste =
-      e.inputType === "insertFromPaste" ||
-      e.inputType === "insertFromDrop" ||
-      inserted.length > 1;
+    if (!firstCharAt) firstCharAt = now;
     if (idleTimer) clearTimeout(idleTimer);
-    if (isPaste) {
-      idleTimer = setTimeout(commit, 40);
-      return;
-    }
-    burstChars = gap < SCAN_BURST_GAP_MS ? burstChars + 1 : 1;
     idleTimer = setTimeout(() => {
-      if (burstChars >= SCAN_BURST_MIN_CHARS && el.value.trim().length >= SCAN_BURST_MIN_CHARS) {
-        commit();
-      }
-      burstChars = 0;
-    }, SCAN_BURST_IDLE_MS);
+      const text = el.value.trim();
+      const started = firstCharAt;
+      firstCharAt = 0;
+      if (text.length < 3 || !started) return;
+      const msPerChar = (Date.now() - started) / text.length;
+      if (msPerChar <= SCAN_MAX_MS_PER_CHAR) commit();
+    }, SCAN_IDLE_MS);
   });
 }
 
@@ -3796,6 +3810,7 @@ bindScanField("chassisInput", (value, el) => {
   duplicateLock = false;
   pendingChassis = value;
   el.value = "";
+  updateDisplay();
   focusScanField("modelInput");
 });
 
@@ -3805,6 +3820,7 @@ bindScanField("modelInput", (value, el) => {
   duplicateLock = false;
   pendingModel = value;
   el.value = "";
+  updateDisplay();
   focusScanField("engineInput");
 });
 
@@ -3814,6 +3830,7 @@ bindScanField("engineInput", (value, el) => {
   duplicateLock = false;
   pendingEngine = value;
   el.value = "";
+  updateDisplay();
   focusScanField("keyInput");
 });
 
