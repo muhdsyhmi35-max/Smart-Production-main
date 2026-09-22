@@ -3756,14 +3756,15 @@ function resetProduction(shouldSync = true) {
 }
 
 /* ===== SCAN BOXES =====
-   Keyboard: type any length, then Enter or Tab.
-   Scanner: auto-advance only when the whole code arrives in a fast burst
-   (timing is first-to-last character, not including the pause after typing).
+   Same as before: scanner fills the box and moves on.
+   Most guns send Enter at the end — that is the main path.
+   Guns with no Enter: accept the full dump after a short pause.
+   Keyboard: type the full value (any length), then Enter.
 */
 
-const SCAN_IDLE_MS = 220;
-const SCAN_BURST_MAX_MS = 400;
-const SCAN_MAX_MS_PER_CHAR = 40;
+const SCAN_IDLE_MS = 140;
+const SCAN_MAX_GAP_MS = 90;
+const SCAN_MIN_AUTO_LEN = 6;
 
 function focusScanField(id) {
   const el = document.getElementById(id);
@@ -3789,8 +3790,8 @@ function bindScanField(inputId, onCommit) {
   el.spellcheck = false;
   el.removeAttribute("maxlength");
   let idleTimer = null;
-  let firstCharAt = 0;
   let lastInputAt = 0;
+  let slowGap = false;
   let committing = false;
 
   const commit = () => {
@@ -3799,8 +3800,8 @@ function bindScanField(inputId, onCommit) {
       clearTimeout(idleTimer);
       idleTimer = null;
     }
-    firstCharAt = 0;
     lastInputAt = 0;
+    slowGap = false;
     const value = String(el.value || "").trim();
     if (!value) return;
     committing = true;
@@ -3814,23 +3815,18 @@ function bindScanField(inputId, onCommit) {
   el.addEventListener("keydown", (e) => {
     if (!isScanCommitKey(e)) return;
     e.preventDefault();
-    setTimeout(commit, 20);
-  });
-  el.addEventListener("keyup", (e) => {
-    if (!isScanCommitKey(e)) return;
-    e.preventDefault();
-    setTimeout(commit, 20);
+    setTimeout(commit, 50);
   });
   el.addEventListener("input", (e) => {
     const text = String(el.value || "").trim();
     if (!text) {
-      firstCharAt = 0;
       lastInputAt = 0;
+      slowGap = false;
       if (idleTimer) clearTimeout(idleTimer);
       return;
     }
     const now = Date.now();
-    if (!firstCharAt) firstCharAt = now;
+    if (lastInputAt && now - lastInputAt > SCAN_MAX_GAP_MS) slowGap = true;
     lastInputAt = now;
     if (idleTimer) clearTimeout(idleTimer);
     const isPaste =
@@ -3841,12 +3837,10 @@ function bindScanField(inputId, onCommit) {
       return;
     }
     idleTimer = setTimeout(() => {
+      if (slowGap) return;
       const value = String(el.value || "").trim();
-      if (value.length < 3 || !firstCharAt || !lastInputAt) return;
-      const typedMs = lastInputAt - firstCharAt;
-      if (typedMs <= 0 || typedMs > SCAN_BURST_MAX_MS) return;
-      const gaps = Math.max(value.length - 1, 1);
-      if (typedMs / gaps <= SCAN_MAX_MS_PER_CHAR) commit();
+      if (value.length < SCAN_MIN_AUTO_LEN) return;
+      commit();
     }, SCAN_IDLE_MS);
   });
 }
