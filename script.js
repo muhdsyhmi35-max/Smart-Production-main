@@ -3733,7 +3733,7 @@ function resetProduction(shouldSync = true) {
 */
 
 const SCAN_IDLE_MS = 180;
-const SCAN_MAX_MS_PER_CHAR = 110;
+const SCAN_MAX_MS_PER_CHAR = 45;
 
 function focusScanField(id) {
   const el = document.getElementById(id);
