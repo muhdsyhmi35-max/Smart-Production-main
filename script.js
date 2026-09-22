@@ -80,8 +80,11 @@ let pendingChassis = "";
 let pendingModel = "";
 let pendingEngine = "";
 let pendingKey = "";
-/** Completed 4-scan units for today (visible history rows only). */
+/** Completed unique IDs for today (today's table rows only, not history filter). */
 let scannedUnits = new Set();
+let scannedChassis = new Set();
+let scannedEngine = new Set();
+let scannedKey = new Set();
 
 /** Same value in sheet vs scanner may differ by case/spaces; use for duplicate checks only. */
 function normalizeScanId(value) {
@@ -109,6 +112,7 @@ const GRAPH_WT_PRESET_MINS = {
 const GRAPH_WT_PRESET_STORAGE_KEY = "TF2_GRAPH_WT_PRESET";
 const NON_PRODUCTION_DAYS_KEY = "TF2_NON_PRODUCTION_DAYS";
 let duplicateLock = false;
+let duplicateStatusText = "DUPLICATE SCAN";
 let lastUpdateTime = 0;
 let lastTableData = "";
 let efficiencyPercent = 0;
@@ -700,6 +704,7 @@ function applyNonProductionMode() {
   countdownValue = 0;
   isDowntime = false;
   duplicateLock = false;
+  duplicateStatusText = "DUPLICATE SCAN";
   pendingChassis = "";
   pendingModel = "";
   pendingEngine = "";
@@ -1577,29 +1582,48 @@ function scanTableRowMatchesActiveDay(tr) {
   return !!rowDay && rowDay === dayKey;
 }
 
-/** Duplicate checks use only completed rows for the active history day (matches visible table). */
+function scanTableRowIsToday(tr) {
+  if (!tr || !tr.cells || tr.cells.length < 8) return false;
+  const rowDay = tr.dataset.scanDate || parseDisplayDateToIsoKey(tr.cells[1]?.innerText);
+  return !!rowDay && rowDay === toIsoDateLocal(new Date());
+}
+
+/** Duplicate checks use completed rows for calendar today (not the History date picker). */
 function rebuildScannedSetsFromTable() {
   scannedUnits.clear();
+  scannedChassis.clear();
+  scannedEngine.clear();
+  scannedKey.clear();
   document.querySelectorAll("#scanTable tr").forEach(row => {
-    if (!scanTableRowMatchesActiveDay(row)) return;
+    if (!scanTableRowIsToday(row)) return;
     const cells = row.cells;
-    if (!cells || cells.length < 8) return;
     const chassis = (cells[5]?.innerText || "").trim();
     const engine = (cells[6]?.innerText || "").trim();
     const key = (cells[7]?.innerText || "").trim();
+    if (isUsableScanId(chassis)) scannedChassis.add(normalizeScanId(chassis));
+    if (isUsableScanId(engine)) scannedEngine.add(normalizeScanId(engine));
+    if (isUsableScanId(key)) scannedKey.add(normalizeScanId(key));
     if (isUsableScanId(chassis) && isUsableScanId(engine) && isUsableScanId(key)) {
       scannedUnits.add(unitScanFingerprint(chassis, engine, key));
     }
   });
 }
 
-function rejectDuplicateScan(message) {
+function rejectDuplicateScan(message, el) {
   duplicateLock = true;
-  setStatus(message, "status-red blink");
+  duplicateStatusText = message || "DUPLICATE SCAN";
+  setStatus(duplicateStatusText, "status-red blink");
   pendingChassis = "";
   pendingModel = "";
   pendingEngine = "";
   pendingKey = "";
+  ["chassisInput", "modelInput", "engineInput", "keyInput"].forEach(id => {
+    const input = document.getElementById(id);
+    if (input) input.value = "";
+  });
+  if (el) el.value = "";
+  focusScanField("chassisInput");
+  try { updateDisplay(); } catch (_) {}
 }
 
 /** Heading + number turn red whenever accumulated downtime &gt; 0 (not only live DOWN TIME). */
@@ -3718,8 +3742,12 @@ function resetProduction(shouldSync = true) {
   pendingEngine = "";
   pendingKey = "";
   scannedUnits.clear();
+  scannedChassis.clear();
+  scannedEngine.clear();
+  scannedKey.clear();
   isDowntime = false;
   duplicateLock = false;
+  duplicateStatusText = "DUPLICATE SCAN";
   document.getElementById("scanTable").innerHTML = "";
 
   setStatus("READY", "status-blue");
@@ -3729,11 +3757,13 @@ function resetProduction(shouldSync = true) {
 
 /* ===== SCAN BOXES =====
    Keyboard: type any length, then Enter or Tab.
-   Scanner: auto-advance only when the whole code arrives in a fast burst.
+   Scanner: auto-advance only when the whole code arrives in a fast burst
+   (timing is first-to-last character, not including the pause after typing).
 */
 
-const SCAN_IDLE_MS = 180;
-const SCAN_MAX_MS_PER_CHAR = 45;
+const SCAN_IDLE_MS = 220;
+const SCAN_BURST_MAX_MS = 400;
+const SCAN_MAX_MS_PER_CHAR = 40;
 
 function focusScanField(id) {
   const el = document.getElementById(id);
@@ -3757,8 +3787,10 @@ function bindScanField(inputId, onCommit) {
   if (!el) return;
   el.autocomplete = "off";
   el.spellcheck = false;
+  el.removeAttribute("maxlength");
   let idleTimer = null;
   let firstCharAt = 0;
+  let lastInputAt = 0;
   let committing = false;
 
   const commit = () => {
@@ -3768,6 +3800,7 @@ function bindScanField(inputId, onCommit) {
       idleTimer = null;
     }
     firstCharAt = 0;
+    lastInputAt = 0;
     const value = String(el.value || "").trim();
     if (!value) return;
     committing = true;
@@ -3792,27 +3825,28 @@ function bindScanField(inputId, onCommit) {
     const text = String(el.value || "").trim();
     if (!text) {
       firstCharAt = 0;
+      lastInputAt = 0;
       if (idleTimer) clearTimeout(idleTimer);
       return;
     }
-    if (!firstCharAt) firstCharAt = Date.now();
+    const now = Date.now();
+    if (!firstCharAt) firstCharAt = now;
+    lastInputAt = now;
     if (idleTimer) clearTimeout(idleTimer);
-    const inserted = String(e.data || "");
     const isPaste =
       e.inputType === "insertFromPaste" ||
-      e.inputType === "insertFromDrop" ||
-      inserted.length > 1;
+      e.inputType === "insertFromDrop";
     if (isPaste) {
       idleTimer = setTimeout(commit, 40);
       return;
     }
     idleTimer = setTimeout(() => {
       const value = String(el.value || "").trim();
-      const started = firstCharAt;
-      firstCharAt = 0;
-      if (value.length < 3 || !started) return;
-      const msPerChar = (Date.now() - started) / value.length;
-      if (msPerChar <= SCAN_MAX_MS_PER_CHAR) commit();
+      if (value.length < 3 || !firstCharAt || !lastInputAt) return;
+      const typedMs = lastInputAt - firstCharAt;
+      if (typedMs <= 0 || typedMs > SCAN_BURST_MAX_MS) return;
+      const gaps = Math.max(value.length - 1, 1);
+      if (typedMs / gaps <= SCAN_MAX_MS_PER_CHAR) commit();
     }, SCAN_IDLE_MS);
   });
 }
@@ -3844,6 +3878,11 @@ function acceptScanValue(value, el, nextId, assign) {
 }
 
 bindScanField("chassisInput", (value, el) => {
+  if (rejectIfScanBlocked(el)) return;
+  if (scannedChassis.has(normalizeScanId(value))) {
+    rejectDuplicateScan("DUPLICATE CHASSIS", el);
+    return;
+  }
   duplicateLock = false;
   acceptScanValue(value, el, "modelInput", (v) => { pendingChassis = v; });
 });
@@ -3856,6 +3895,10 @@ bindScanField("modelInput", (value, el) => {
 
 bindScanField("engineInput", (value, el) => {
   if (!pendingModel) return;
+  if (scannedEngine.has(normalizeScanId(value))) {
+    rejectDuplicateScan("DUPLICATE ENGINE", el);
+    return;
+  }
   duplicateLock = false;
   acceptScanValue(value, el, "keyInput", (v) => { pendingEngine = v; });
 });
@@ -3874,10 +3917,18 @@ function completeKeyScan(key, el) {
   if (pendingChassis === "" || pendingModel === "" || pendingEngine === "") return;
 
   const unitId = unitScanFingerprint(pendingChassis, pendingEngine, key);
+  const keyId = normalizeScanId(key);
 
-  if (scannedUnits.has(unitId)) {
-    rejectDuplicateScan("DUPLICATE SCAN (same chassis, engine & key already logged today)");
-    el.value = "";
+  if (scannedChassis.has(normalizeScanId(pendingChassis))) {
+    rejectDuplicateScan("DUPLICATE CHASSIS", el);
+    return;
+  }
+  if (scannedEngine.has(normalizeScanId(pendingEngine))) {
+    rejectDuplicateScan("DUPLICATE ENGINE", el);
+    return;
+  }
+  if (scannedKey.has(keyId) || scannedUnits.has(unitId)) {
+    rejectDuplicateScan("DUPLICATE KEY", el);
     return;
   }
 
@@ -4167,20 +4218,12 @@ function updateDisplay() {
   }
 
   /* ================= LOGIK STATUS BARU ================= */
-  if (
-    pendingChassis === "" &&
-    pendingModel === "" &&
-    pendingEngine === "" &&
-    pendingKey === ""
-  ) {
-    duplicateLock = false;
-  }
   if (isNonProductionMode()) {
     setStatus("NON PRODUCTION", "status-blue");
   } else if (isBreakTime()) {
     setStatus("BREAK TIME", "status-orange");
   } else if (duplicateLock) {
-    setStatus("DUPLICATE SCAN", "status-red blink");
+    setStatus(duplicateStatusText || "DUPLICATE SCAN", "status-red blink");
   } else if (isDowntime) {
     setStatus("DOWN TIME", "status-red blink");
   } else if (actualCount >= plan && plan > 0) {
