@@ -2993,24 +2993,102 @@ function ensureAppearanceMenuItem() {
 
 /* ================= STRICT GLOBAL LOCK ================= */
 
+const DEVICE_ID_STORAGE_KEY = "DEVICE_ID";
+const TAB_ID_STORAGE_KEY = "TF2_TAB_ID";
+const LOCK_HOLDER_STORAGE_KEY = "TF2_LOCK_DEVICE_ID";
+let lockHeartbeatInterval = null;
+
+function getOrCreateDeviceId() {
+  let deviceId = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+  if (!deviceId) {
+    deviceId = "DEV-" + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+    localStorage.setItem(DEVICE_ID_STORAGE_KEY, deviceId);
+  }
+  return deviceId;
+}
+
+/** Unique per browser tab so the LOCK sheet can show which tab holds the main PC. */
+function getOrCreateTabId() {
+  let tabId = sessionStorage.getItem(TAB_ID_STORAGE_KEY);
+  if (!tabId) {
+    tabId = "TAB-" + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+    sessionStorage.setItem(TAB_ID_STORAGE_KEY, tabId);
+  }
+  return tabId;
+}
+
+function getLockPayload() {
+  const deviceId = getOrCreateDeviceId();
+  const tabId = getOrCreateTabId();
+  return {
+    lockRequest: true,
+    id: deviceId,
+    deviceId,
+    tabId
+  };
+}
+
+function getRemoteLockDeviceId(data) {
+  if (!data || typeof data !== "object") return "";
+  return String(
+    data.deviceId || data.lockDeviceId || data.lockedBy || data.lockOwner || data.id || ""
+  ).trim();
+}
+
+function getRemoteLockTabId(data) {
+  if (!data || typeof data !== "object") return "";
+  return String(data.tabId || data.lockTabId || "").trim();
+}
+
+function isLockHeldByThisDevice(data, deviceId, tabId) {
+  const remoteId = getRemoteLockDeviceId(data);
+  const remoteTab = getRemoteLockTabId(data);
+  if (remoteTab && tabId && remoteTab === tabId) return true;
+  if (remoteId && remoteId === deviceId) return true;
+  return localStorage.getItem(LOCK_HOLDER_STORAGE_KEY) === deviceId;
+}
+
+function acquireDeviceLock() {
+  const payload = getLockPayload();
+  localStorage.setItem(LOCK_HOLDER_STORAGE_KEY, payload.deviceId);
+  const qs = new URLSearchParams({
+    lockRequest: "true",
+    id: payload.deviceId,
+    deviceId: payload.deviceId,
+    tabId: payload.tabId
+  });
+  postToAppsScript(payload);
+  return fetch(`${API_URL}?${qs.toString()}`, { cache: "no-store" }).catch(err => {
+    console.log("Lock write error:", err);
+  });
+}
+
+function startLockHeartbeat() {
+  if (isMonitor) return;
+  acquireDeviceLock();
+  if (lockHeartbeatInterval) clearInterval(lockHeartbeatInterval);
+  lockHeartbeatInterval = setInterval(acquireDeviceLock, 15000);
+}
+
 async function checkAccess() {
-  // ✅ Allow monitor screen
+  // Monitor TVs do not take the one-device lock.
   if (window.location.search.includes("monitor")) {
     return true;
   }
 
-  // Restore one-device lock using Apps Script lock endpoints.
-  let deviceId = localStorage.getItem("DEVICE_ID");
-  if (!deviceId) {
-    deviceId = "DEV-" + Math.random().toString(36).substring(2);
-    localStorage.setItem("DEVICE_ID", deviceId);
-  }
+  const deviceId = getOrCreateDeviceId();
+  const tabId = getOrCreateTabId();
 
   try {
-    const res = await fetch(API_URL + "?checkLock=true");
+    const checkUrl = `${API_URL}?checkLock=true&id=${encodeURIComponent(deviceId)}&deviceId=${encodeURIComponent(deviceId)}&tabId=${encodeURIComponent(tabId)}`;
+    const res = await fetch(checkUrl, { cache: "no-store" });
     const data = await res.json();
+    const locked = !!(data && data.lock);
+    const heldByThisDevice = isLockHeldByThisDevice(data, deviceId, tabId);
+    const remoteId = getRemoteLockDeviceId(data);
+    const heldByOther = locked && remoteId && remoteId !== deviceId;
 
-    if (data.lock) {
+    if (locked && !heldByThisDevice && (heldByOther || !remoteId)) {
       document.body.innerHTML = `
         <h1 style="
           color:red;
@@ -3024,12 +3102,10 @@ async function checkAccess() {
       return false;
     }
 
-    await postToAppsScript({
-      lockRequest: true,
-      deviceId: deviceId
-    });
+    startLockHeartbeat();
   } catch (err) {
     console.log("Lock error:", err);
+    startLockHeartbeat();
   }
 
   return true;
