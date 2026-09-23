@@ -1032,15 +1032,19 @@ function parseSheetDateTime(raw) {
   }
   const t = String(raw || "").trim();
   if (!t) return null;
-  const dm = t.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  const dm = t.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:[,\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?)?/i);
   if (dm) {
     let y = parseInt(dm[3], 10);
     if (y < 100) y += 2000;
+    let hh = parseInt(dm[4] || "0", 10);
+    const ap = String(dm[7] || "").toLowerCase();
+    if (ap === "pm" && hh < 12) hh += 12;
+    if (ap === "am" && hh === 12) hh = 0;
     const d = new Date(
       y,
       parseInt(dm[2], 10) - 1,
       parseInt(dm[1], 10),
-      parseInt(dm[4] || "0", 10),
+      hh,
       parseInt(dm[5] || "0", 10),
       parseInt(dm[6] || "0", 10)
     );
@@ -1050,6 +1054,8 @@ function parseSheetDateTime(raw) {
   if (Number.isFinite(ms)) return new Date(ms);
   return null;
 }
+
+function parseDisplayDateToIsoKey(dateText) {
   const t = String(dateText || "").trim();
   if (!t) return null;
   const dm = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
@@ -6685,8 +6691,10 @@ function loadLiveData() {
   fetch(API_URL, { cache: "no-store" })
     .then(res => res.json())
     .then(data => {
+      const table = document.getElementById("scanTable");
+      const tableEmpty = !table || !table.rows.length;
       const now = Date.now();
-      if (now - lastUpdateTime < 1000) return;
+      if (!tableEmpty && now - lastUpdateTime < 1000) return;
       lastUpdateTime = now;
 
       // ✅ Scan table stays from Google Sheet only
@@ -6722,11 +6730,10 @@ function loadLiveData() {
       const idxDowntime = resolveDowntimeEventColumnIndex(scanHeader);
       const downtimeCandidateIdxs = resolveDowntimeCandidateIndices(scanHeader);
       const legacyLayout = idxStatusByHeader < 0 && idxStatus < 0;
-      const table = document.getElementById("scanTable");
+      if (!table) return;
 
       // Convert to string for comparison
       const newTableData = JSON.stringify(scanRows);
-      const tableEmpty = !table.rows.length;
 
       if (newTableData !== lastTableData || tableEmpty) {
         lastTableData = newTableData;
@@ -6734,15 +6741,17 @@ function loadLiveData() {
         table.innerHTML = "";
 
         scanRows.sort((a, b) => {
-          const ta = a && a[0] ? new Date(a[0]).getTime() : 0;
-          const tb = b && b[0] ? new Date(b[0]).getTime() : 0;
+          const da = parseSheetDateTime(a && a[0]);
+          const db = parseSheetDateTime(b && b[0]);
+          const ta = da && Number.isFinite(da.getTime()) ? da.getTime() : 0;
+          const tb = db && Number.isFinite(db.getTime()) ? db.getTime() : 0;
           return tb - ta;
         });
 
         scanRows.forEach(row => {
+          const fullDateTime = parseSheetDateTime(row[0]);
+          if (!fullDateTime || !Number.isFinite(fullDateTime.getTime())) return;
           const newRow = table.insertRow();
-
-          const fullDateTime = parseSheetDateTime(row[0]) || new Date(row[0]);
           newRow.insertCell(0).innerText = "";
           newRow.insertCell(1).innerText = fullDateTime.toLocaleDateString("en-GB");
           newRow.insertCell(2).innerText = fullDateTime.toLocaleTimeString("en-GB", {
