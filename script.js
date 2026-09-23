@@ -3622,8 +3622,7 @@ function applyLiveState(state) {
 
   const downtimeCard = document.getElementById("downtimeCard");
   const downtimeText = document.getElementById("downtime");
-  const liveDt = computeLiveDowntimeState();
-  const statusNow = liveDt.inDowntime ? "DOWN TIME" : status;
+  const statusNow = computeLiveDowntimeState().inDowntime ? "DOWN TIME" : status;
 
   if (statusNow === "DOWN TIME") {
     setStatus("DOWN TIME", "status-red blink");
