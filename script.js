@@ -1636,12 +1636,12 @@ function syncDowntimeAccumulatedHighlight() {
 }
 
 function refreshDowntimeCardFromTable() {
-  const table = document.getElementById("scanTable");
-  const total = table && table.rows.length > 0
-    ? sumBookedDowntimeFromScanTable()
-    : 0;
-  downtimeSeconds = total;
-  document.getElementById("downtime").innerText = format(total);
+  const live = computeLiveDowntimeState();
+  isDowntime = live.inDowntime;
+  const booked = getBookedDowntimeSec();
+  downtimeSeconds = booked + live.openSec;
+  const el = document.getElementById("downtime");
+  if (el) el.innerText = format(downtimeSeconds);
   renderDowntimeDebugPanel();
   syncDowntimeAccumulatedHighlight();
 }
@@ -1775,6 +1775,63 @@ function getTodayShiftStartMs(d = new Date()) {
   const hh = Math.floor(startMin / 60) % 24;
   const mm = startMin % 60;
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), hh, mm, 0, 0).getTime();
+}
+
+function getPaceAnchorMs() {
+  if (lastScanWallMs != null && Number.isFinite(lastScanWallMs)) return lastScanWallMs;
+  if (startTime) return startTime.getTime();
+  if (SETTINGS.shiftSchedule.enableAutoWindow) {
+    const shiftStartMs = getTodayShiftStartMs();
+    if (Date.now() >= shiftStartMs) return shiftStartMs;
+  }
+  return null;
+}
+
+function getIdleSecExBreak(nowMs = Date.now()) {
+  const t0 = getPaceAnchorMs();
+  if (t0 == null) return 0;
+  const wallSec = Math.max(0, Math.floor((nowMs - t0) / 1000));
+  return Math.max(0, wallSec - scheduledBreakOverlapSec(t0, nowMs));
+}
+
+/** Open downtime starts after cycle + 4 min with no scan. Amount booked/shown is idle − cycle. */
+function computeLiveDowntimeState(nowMs = Date.now()) {
+  const cycleTimeSec = Math.max(
+    Math.floor((parseFloat(document.getElementById("cycleTarget")?.value) || SETTINGS.defaultCycle) * 60),
+    1
+  );
+  const graceSec = Math.max(0, (SETTINGS.downtime?.graceMinutes ?? 4) * 60);
+  const idleSec = getIdleSecExBreak(nowMs);
+  const inDowntime = idleSec > cycleTimeSec + graceSec;
+  return {
+    cycleTimeSec,
+    graceSec,
+    idleSec,
+    inDowntime,
+    openSec: inDowntime ? idleSec - cycleTimeSec : 0
+  };
+}
+
+function applyLiveDowntimeUi() {
+  if (isNonProductionMode() || isBreakTime()) return;
+  const live = computeLiveDowntimeState();
+  isDowntime = live.inDowntime;
+  const booked = getBookedDowntimeSec();
+  downtimeSeconds = booked + live.openSec;
+  const textEl = document.getElementById("downtime");
+  if (textEl) textEl.innerText = format(downtimeSeconds);
+  const card = document.getElementById("downtimeCard");
+  if (card && textEl) {
+    if (live.inDowntime) {
+      card.classList.add("downtime-alert", "blink");
+      textEl.classList.add("status-red", "blink");
+      setStatus("DOWN TIME", "status-red blink");
+    } else {
+      card.classList.remove("downtime-alert", "blink");
+      textEl.classList.remove("status-red", "blink");
+    }
+  }
+  syncDowntimeAccumulatedHighlight();
 }
 
 function isOvertimeActive(d = new Date()) {
@@ -3309,6 +3366,7 @@ function startLiveCountdownTicker(baseCountdown, status, updatedAt, anchorScanMs
     countdownValue = adjusted;
     countdownEl.innerText = format(adjusted);
     refreshLivePaceCards();
+    applyLiveDowntimeUi();
     syncOperatorDashboardChrome();
   };
 
@@ -3498,7 +3556,10 @@ function applyLiveState(state) {
   if (isMonitor && !np && effectivePlan > 0 && actual < effectivePlan && status === "TARGET ACHIEVED") {
     status = actual > 0 ? "PAUSED" : "READY";
   }
-  if (
+  const liveDt = computeLiveDowntimeState();
+  if (isMonitor && liveDt.inDowntime) {
+    status = "DOWN TIME";
+  } else if (
     isMonitor &&
     !np &&
     (isWithinShiftWindow() || isOvertimeActive()) &&
@@ -3533,13 +3594,7 @@ function applyLiveState(state) {
   }
 
   startLiveCountdownTicker(countdown, status, state.updatedAt, anchorScanMs);
-  const downtimeSecToDisplay =
-    isMonitor && hasFirebaseTotalDowntime
-      ? firebaseTotalDowntime
-      : getBookedDowntimeSec();
-  downtimeSeconds = downtimeSecToDisplay;
-  document.getElementById("downtime").innerText = format(downtimeSecToDisplay);
-  syncDowntimeAccumulatedHighlight();
+  applyLiveDowntimeUi();
   restoreProductionTimerFromLiveState(
     status,
     countdown,
@@ -3563,15 +3618,18 @@ function applyLiveState(state) {
   }
 
   refreshLivePaceCards();
+  applyLiveDowntimeUi();
 
   const downtimeCard = document.getElementById("downtimeCard");
   const downtimeText = document.getElementById("downtime");
+  const liveDt = computeLiveDowntimeState();
+  const statusNow = liveDt.inDowntime ? "DOWN TIME" : status;
 
-  if (status === "DOWN TIME") {
+  if (statusNow === "DOWN TIME") {
     setStatus("DOWN TIME", "status-red blink");
     downtimeCard.classList.add("downtime-alert", "blink");
     downtimeText.classList.add("status-red", "blink");
-  } else if (status === "RUNNING") {
+  } else if (statusNow === "RUNNING") {
     setStatus("RUNNING", "status-green pulse");
     downtimeCard.classList.remove("downtime-alert", "blink");
     downtimeText.classList.remove("status-red", "blink");
@@ -3750,14 +3808,8 @@ function startProduction(shouldSync = true, opts = {}) {
   timer = setInterval(() => {
     const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
     countdownValue = computeRunningCountdownSec(cycleTimeSec);
-    const graceSec = Math.max(0, (SETTINGS.downtime?.graceMinutes ?? 4) * 60);
-    const t0Ms = lastScanWallMs != null ? lastScanWallMs : (startTime ? startTime.getTime() : null);
-    if (t0Ms != null) {
-      const idleSec = Math.max(0, Math.floor((Date.now() - t0Ms) / 1000) - scheduledBreakOverlapSec(t0Ms, Date.now()));
-      isDowntime = idleSec > cycleTimeSec + graceSec;
-    } else {
-      isDowntime = false;
-    }
+    const live = computeLiveDowntimeState();
+    isDowntime = live.inDowntime;
 
     updateDisplay();
     updateLiveStateOnly();
