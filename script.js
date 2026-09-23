@@ -810,9 +810,18 @@ function onGraphWtOptionClick(event, preset) {
 // 🔴 GANTI DENGAN LINK /exec WEB APP ANDA
 const API_URL = "https://script.google.com/macros/s/AKfycbwwLUYjoT7GH0sfFCGZMJoeLApmPWWKEF5LsdNqvkRpstZjerG9d3zG78bh0RTA1Fu48Q/exec";
 
-/** Apps Script accepts JSON in the body. text/plain avoids a CORS preflight that silently drops the row. */
+/** Apps Script reads either JSON body or URL query fields (e.parameter). */
 function postToAppsScript(payload) {
-  return fetch(API_URL, {
+  const qs = new URLSearchParams();
+  Object.keys(payload || {}).forEach(key => {
+    const value = payload[key];
+    if (value === undefined || value === null) return;
+    if (typeof value === "object") return;
+    qs.set(key, String(value));
+  });
+  const q = qs.toString();
+  const url = q ? `${API_URL}?${q}` : API_URL;
+  return fetch(url, {
     method: "POST",
     mode: "no-cors",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -3051,15 +3060,12 @@ function isLockHeldByThisDevice(data, deviceId, tabId) {
 function acquireDeviceLock() {
   const payload = getLockPayload();
   localStorage.setItem(LOCK_HOLDER_STORAGE_KEY, payload.deviceId);
-  const qs = new URLSearchParams({
-    lockRequest: "true",
-    id: payload.deviceId,
+  // Same payload the original Apps Script expected, plus tabId.
+  return postToAppsScript({
+    lockRequest: true,
     deviceId: payload.deviceId,
+    id: payload.deviceId,
     tabId: payload.tabId
-  });
-  postToAppsScript(payload);
-  return fetch(`${API_URL}?${qs.toString()}`, { cache: "no-store" }).catch(err => {
-    console.log("Lock write error:", err);
   });
 }
 
@@ -3080,8 +3086,7 @@ async function checkAccess() {
   const tabId = getOrCreateTabId();
 
   try {
-    const checkUrl = `${API_URL}?checkLock=true&id=${encodeURIComponent(deviceId)}&deviceId=${encodeURIComponent(deviceId)}&tabId=${encodeURIComponent(tabId)}`;
-    const res = await fetch(checkUrl, { cache: "no-store" });
+    const res = await fetch(`${API_URL}?checkLock=true`, { cache: "no-store" });
     const data = await res.json();
     const locked = !!(data && data.lock);
     const heldByThisDevice = isLockHeldByThisDevice(data, deviceId, tabId);
