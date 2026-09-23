@@ -37,7 +37,7 @@ const SETTINGS = {
     zeroTargetOnInactiveWeekends: true
   },
   shiftSchedule: {
-    startMinute: (8 * 60),      // 08:00
+    startMinute: (8 * 60) + 15, // 08:15 — daily reset + Expected/countdown start
     endMinute: (17 * 60) + 30,  // 17:30
     enableAutoWindow: true
   },
@@ -1751,6 +1751,14 @@ function maybeResetDashboardForNewCalendarDay() {
   } catch (_) {}
 }
 
+const DEFAULT_SHIFT_START_MIN = (8 * 60) + 15; // 08:15
+const LEGACY_SHIFT_START_MIN = 8 * 60; // 08:00 — old default, treat as 08:15
+
+function coerceShiftStartMinute(start) {
+  if (start === LEGACY_SHIFT_START_MIN) return DEFAULT_SHIFT_START_MIN;
+  return start;
+}
+
 function getLocalMinuteOfDay(d = new Date()) {
   return (d.getHours() * 60) + d.getMinutes();
 }
@@ -1822,6 +1830,7 @@ function applyShiftScheduleTick() {
         localStorage.setItem(SHIFT_WINDOW_STATE_KEY, "in");
         localStorage.setItem(SHIFT_PERIOD_KEY, periodKey);
       } catch (_) {}
+      enteredNewShift = !timer;
     } else if (outsideWindow || newCalendarShift) {
       resetProduction(false);
       enteredNewShift = true;
@@ -1847,8 +1856,15 @@ function applyShiftScheduleTick() {
     return;
   }
 
-  // Auto-start only when the shift window just opened — never on a mid-shift refresh.
-  if (enteredNewShift && !timer && document.getElementById("status")?.innerText?.trim() !== "PAUSED") {
+  const statusNow = document.getElementById("status")?.innerText?.trim() || "";
+  if (timer || statusNow === "PAUSED") return;
+
+  // 08:15 (or first open after that): count from shift start, not from whenever the PC woke up.
+  if (enteredNewShift || statusNow === "READY" || statusNow === "OFF SHIFT") {
+    if (!startTime) {
+      const shiftStartMs = getTodayShiftStartMs(now);
+      startTime = new Date(now.getTime() >= shiftStartMs ? shiftStartMs : now.getTime());
+    }
     startProduction(false);
   }
 }
@@ -1897,11 +1913,12 @@ function loadShiftScheduleFromStorage() {
     const raw = localStorage.getItem(SHIFT_SCHEDULE_STORAGE_KEY);
     if (!raw) return;
     const cfg = JSON.parse(raw);
-    const start = parseInt(cfg.startMinute, 10);
+    const start = coerceShiftStartMinute(parseInt(cfg.startMinute, 10));
     const end = parseInt(cfg.endMinute, 10);
     if (Number.isFinite(start) && start >= 0 && start < 1440) SETTINGS.shiftSchedule.startMinute = start;
     if (Number.isFinite(end) && end > 0 && end <= 1440) SETTINGS.shiftSchedule.endMinute = end;
     if (typeof cfg.enableAutoWindow === "boolean") SETTINGS.shiftSchedule.enableAutoWindow = cfg.enableAutoWindow;
+    if (parseInt(cfg.startMinute, 10) === LEGACY_SHIFT_START_MIN) saveShiftScheduleToStorage();
   } catch (_) {}
 }
 
@@ -1918,7 +1935,7 @@ function saveShiftScheduleToStorage() {
 function applyShiftScheduleFromRemote(payload) {
   if (!payload || typeof payload !== "object") return;
   if (payload.sender && payload.sender === syncClientId) return;
-  const start = parseInt(payload.startMinute, 10);
+  const start = coerceShiftStartMinute(parseInt(payload.startMinute, 10));
   const end = parseInt(payload.endMinute, 10);
   if (!Number.isFinite(start) || start < 0 || start >= 1440) return;
   if (!Number.isFinite(end) || end <= 0 || end > 1440 || start >= end) return;
@@ -1928,6 +1945,9 @@ function applyShiftScheduleFromRemote(payload) {
   SETTINGS.shiftSchedule.enableAutoWindow = enableAutoWindow;
   saveShiftScheduleToStorage();
   updateShiftMenuLabel();
+  if (parseInt(payload.startMinute, 10) === LEGACY_SHIFT_START_MIN && !isMonitor) {
+    publishShiftScheduleToFirebase();
+  }
   applyShiftScheduleTick();
 }
 
@@ -3678,9 +3698,13 @@ function startProduction(shouldSync = true, opts = {}) {
     publishSyncCommand("start");
   }
 
-  // Set start time if first run
+  // First start of the day counts from 08:15, even if the PC opened later.
   if (!startTime) {
-    startTime = new Date();
+    const nowMs = Date.now();
+    const shiftStartMs = SETTINGS.shiftSchedule.enableAutoWindow
+      ? getTodayShiftStartMs(new Date(nowMs))
+      : nowMs;
+    startTime = new Date(nowMs >= shiftStartMs ? shiftStartMs : nowMs);
   }
 
   // Fresh Start only. After refresh, keep remaining time / downtime at 00:00.
