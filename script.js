@@ -2978,7 +2978,6 @@ function isBreakTime() {
 }
 
 function calculateExpectedOutput() {
-  if (isLiveDisplayOnly()) return 0;
   if (isNonProductionMode()) return 0;
 
   const plan = getDashboardPlan();
@@ -3018,6 +3017,22 @@ function calculateExpectedOutput() {
   }
 
   return expected;
+}
+
+function refreshLivePaceCards() {
+  if (isNonProductionMode()) return;
+  const expected = calculateExpectedOutput();
+  const delay = actualCount - expected;
+  const expEl = document.getElementById("expected");
+  const delayEl = document.getElementById("delay");
+  if (expEl) expEl.innerText = String(expected);
+  if (delayEl) {
+    delayEl.className = "big-number";
+    if (delay < 0) delayEl.classList.add("status-red");
+    else if (delay > 0) delayEl.classList.add("status-green");
+    else delayEl.classList.add("status-blue");
+    delayEl.innerText = delay > 0 ? ("+" + delay) : String(delay);
+  }
 }
 
 function getTotalDowntimeSec() {
@@ -3244,13 +3259,17 @@ function startLiveCountdownTicker(baseCountdown, status, updatedAt, anchorScanMs
   const snapshotUpdatedAt = Number(updatedAt) || syncedNowMs();
 
   const render = () => {
-    // Main PC is source of truth — mirror its published countdown snapshot only.
-    const adjusted = computeMonitorCountdownFromMainPublish(
+    const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget")?.value) || SETTINGS.defaultCycle) * 60;
+    const adjusted = computeRunningCountdownSec(
+      cycleTimeSec,
+      syncedNowMs(),
       baseCountdown,
-      snapshotUpdatedAt
+      snapshotUpdatedAt,
+      anchorScanMs
     );
     countdownValue = adjusted;
     countdownEl.innerText = format(adjusted);
+    refreshLivePaceCards();
     syncOperatorDashboardChrome();
   };
 
@@ -3435,7 +3454,7 @@ function applyLiveState(state) {
     lotInput.value = lotNo;
   }
   document.getElementById("actual").innerText = actual;
-  document.getElementById("expected").innerText = expected;
+  refreshLivePaceCards();
 
   if (isMonitor && !np && effectivePlan > 0 && actual < effectivePlan && status === "TARGET ACHIEVED") {
     status = actual > 0 ? "PAUSED" : "READY";
@@ -3447,6 +3466,8 @@ function applyLiveState(state) {
     anchorScanMs = Number(state.lastScanAtMs);
     lastScanTime = new Date(anchorScanMs);
     lastScanWallMs = anchorScanMs;
+  } else if (actual > 0 && lastScanWallMs) {
+    anchorScanMs = lastScanWallMs;
   } else if (actual === 0) {
     lastScanTime = null;
     lastScanWallMs = null;
@@ -3486,18 +3507,7 @@ function applyLiveState(state) {
     balanceEl.innerText = "0";
   }
 
-  const delayEl = document.getElementById("delay");
-  delayEl.className = "big-number";
-
-  if (delay < 0) {
-    delayEl.classList.add("status-red");
-  } else if (delay > 0) {
-    delayEl.classList.add("status-green");
-  } else {
-    delayEl.classList.add("status-blue");
-  }
-
-  delayEl.innerText = delay > 0 ? ("+" + delay) : delay;
+  refreshLivePaceCards();
 
   const downtimeCard = document.getElementById("downtimeCard");
   const downtimeText = document.getElementById("downtime");
@@ -6476,6 +6486,8 @@ function applyReconciledActualToDashboard() {
     else balanceEl.className = "big-number status-blue";
     balanceEl.innerText = displayBalance;
   }
+
+  refreshLivePaceCards();
 
   if (isMonitor) {
     const statusText = document.getElementById("status")?.innerText?.trim() || "";

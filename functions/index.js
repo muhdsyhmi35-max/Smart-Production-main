@@ -16,7 +16,8 @@ function toNum(value, fallback = 0) {
   return Number.isFinite(num) ? num : fallback;
 }
 
-// Keeps countdown/downtime advancing even when no browser is open.
+// Keeps countdown advancing even when no browser is open.
+// Does not zero Expected when firstScanAtMs is missing — that made TVs show Delay = Actual.
 exports.tickProductionClock = onSchedule("every 1 minutes", async () => {
   const nowMs = Date.now();
   const liveRef = db.ref(LIVE_STATE_PATH);
@@ -41,36 +42,38 @@ exports.tickProductionClock = onSchedule("every 1 minutes", async () => {
   const previousUpdatedAt = toInt(state.updatedAt, nowMs);
   const firstScanAtMs = toInt(state.firstScanAtMs, 0);
   const lastScanAtMs = toInt(state.lastScanAtMs, 0);
+  const startedAtMs = toInt(state.startedAtMs, 0);
 
   const elapsedSec = Math.max(Math.floor((nowMs - previousUpdatedAt) / 1000), 0);
-  if (elapsedSec <= 0) {
+  if (elapsedSec <= 0 && lastScanAtMs <= 0) {
     return;
   }
 
-  const adjustedCountdown = Math.max(previousCountdown - elapsedSec, 0);
+  let adjustedCountdown;
+  if (lastScanAtMs > 0) {
+    const idleSec = Math.max(Math.floor((nowMs - lastScanAtMs) / 1000), 0);
+    adjustedCountdown = Math.max(cycleTimeSec - idleSec, 0);
+  } else {
+    adjustedCountdown = Math.max(previousCountdown - elapsedSec, 0);
+  }
 
-  let expected = 0;
-  if (firstScanAtMs > 0) {
-    const expectedElapsedSec = Math.max(Math.floor((nowMs - firstScanAtMs) / 1000), 0);
-    expected = Math.floor(expectedElapsedSec / cycleTimeSec);
+  const patch = {
+    countdown: adjustedCountdown,
+    lastScanAtMs: lastScanAtMs || null,
+    updatedAt: nowMs
+  };
+
+  const expectedAnchor = firstScanAtMs > 0 ? firstScanAtMs : (startedAtMs > 0 ? startedAtMs : 0);
+  if (expectedAnchor > 0) {
+    let expected = Math.floor(Math.max(nowMs - expectedAnchor, 0) / 1000 / cycleTimeSec);
     if (plan > 0) {
       expected = Math.min(expected, plan);
     }
+    patch.expected = expected;
+    patch.delay = actual - expected;
+    patch.balance = actual - plan;
+    patch.firstScanAtMs = firstScanAtMs || null;
   }
 
-  const delay = actual - expected;
-  const balance = actual - plan;
-  const efficiency = expected > 0 ? Math.floor((actual / expected) * 100) : 0;
-
-  await liveRef.update({
-    countdown: adjustedCountdown,
-    expected: expected,
-    delay: delay,
-    balance: balance,
-    efficiency: efficiency,
-    firstScanAtMs: firstScanAtMs || null,
-    lastScanAtMs: lastScanAtMs || null,
-    updatedAt: nowMs
-  });
+  await liveRef.update(patch);
 });
-
