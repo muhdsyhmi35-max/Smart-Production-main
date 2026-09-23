@@ -1815,6 +1815,9 @@ function computeLiveDowntimeState(nowMs = Date.now()) {
     1
   );
   const graceSec = Math.max(0, (SETTINGS.downtime?.graceMinutes ?? 4) * 60);
+  if (isNonProductionMode() || isBreakTime()) {
+    return { cycleTimeSec, graceSec, idleSec: 0, inDowntime: false, openSec: 0 };
+  }
   const idleSec = getIdleSecExBreak(nowMs);
   const inDowntime = idleSec > cycleTimeSec + graceSec;
   return {
@@ -1826,25 +1829,27 @@ function computeLiveDowntimeState(nowMs = Date.now()) {
   };
 }
 
+function setDowntimeAlertUi(on) {
+  const card = document.getElementById("downtimeCard");
+  const textEl = document.getElementById("downtime");
+  if (card) card.classList.toggle("downtime-alert", !!on);
+  if (card) card.classList.toggle("blink", !!on);
+  if (textEl) {
+    textEl.classList.toggle("status-red", !!on);
+    textEl.classList.toggle("blink", !!on);
+  }
+}
+
 function applyLiveDowntimeUi() {
-  if (isNonProductionMode() || isBreakTime()) return;
   const live = computeLiveDowntimeState();
   isDowntime = live.inDowntime;
   const booked = getBookedDowntimeSec();
   downtimeSeconds = booked + live.openSec;
   const textEl = document.getElementById("downtime");
   if (textEl) textEl.innerText = format(downtimeSeconds);
-  const card = document.getElementById("downtimeCard");
-  if (card && textEl) {
-    if (live.inDowntime) {
-      card.classList.add("downtime-alert", "blink");
-      textEl.classList.add("status-red", "blink");
-      setStatus("DOWN TIME", "status-red blink");
-    } else {
-      card.classList.remove("downtime-alert", "blink");
-      textEl.classList.remove("status-red", "blink");
-    }
-  }
+  const alertOn = live.inDowntime && downtimeSeconds > 0 && !isBreakTime();
+  setDowntimeAlertUi(alertOn);
+  if (alertOn) setStatus("DOWN TIME", "status-red blink");
   syncDowntimeAccumulatedHighlight();
 }
 
@@ -3638,10 +3643,9 @@ function applyLiveState(state) {
   const downtimeText = document.getElementById("downtime");
   const statusNow = computeLiveDowntimeState().inDowntime ? "DOWN TIME" : status;
 
-  if (statusNow === "DOWN TIME") {
+  const alertOn = statusNow === "DOWN TIME" && !isBreakTime() && computeLiveDowntimeState().inDowntime && downtimeSeconds > 0;
+  if (statusNow === "DOWN TIME" && !isBreakTime()) {
     setStatus("DOWN TIME", "status-red blink");
-    downtimeCard.classList.add("downtime-alert", "blink");
-    downtimeText.classList.add("status-red", "blink");
   } else if (statusNow === "RUNNING") {
     setStatus("RUNNING", "status-green pulse");
     downtimeCard.classList.remove("downtime-alert", "blink");
@@ -3654,6 +3658,8 @@ function applyLiveState(state) {
     setStatus("BEHIND SCHEDULE", "status-red blink");
   } else if (status === "BREAK TIME") {
     setStatus("BREAK TIME", "status-orange");
+    downtimeCard.classList.remove("downtime-alert", "blink");
+    downtimeText.classList.remove("status-red", "blink");
   } else if (status === "PAUSED") {
     setStatus("PAUSED", "status-orange");
   } else if (status === "NON PRODUCTION" || np) {
@@ -4373,7 +4379,7 @@ function updateDisplay() {
 
   const downtimeCard = document.getElementById("downtimeCard");
   const downtimeText = document.getElementById("downtime");
-  if (isDowntime) {
+  if (isDowntime && !isBreakTime() && downtimeSeconds > 0) {
     downtimeCard.classList.add("downtime-alert", "blink");
     downtimeText.classList.add("status-red", "blink");
   } else {
