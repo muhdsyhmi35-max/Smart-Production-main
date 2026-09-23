@@ -1791,9 +1791,21 @@ function setOffShiftStatus() {
   setStatus(text, cls);
 }
 
-/** Unique key for one scheduled shift session on a calendar day (local operator TZ). */
+/** One production day (do not include shift clock — editing 08:00→08:15 must not reset today's actual). */
 function getShiftPeriodKey(d = new Date()) {
-  return `${toIsoDateLocal(d)}_${SETTINGS.shiftSchedule.startMinute}_${SETTINGS.shiftSchedule.endMinute}`;
+  return toIsoDateLocal(d);
+}
+
+function todayHasLoggedProduction() {
+  if (actualCount > 0) return true;
+  if (lastScanWallMs != null) return true;
+  const table = document.getElementById("scanTable");
+  if (!table) return false;
+  const today = toIsoDateLocal(new Date());
+  return Array.from(table.rows).some(tr => {
+    const rowDay = tr.dataset.scanDate || parseDisplayDateToIsoKey(tr.cells?.[1]?.innerText);
+    return rowDay === today;
+  });
 }
 
 function applyShiftScheduleTick() {
@@ -1832,7 +1844,7 @@ function applyShiftScheduleTick() {
       } catch (_) {}
       enteredNewShift = !timer;
     } else if (outsideWindow || newCalendarShift) {
-      resetProduction(false);
+      if (!todayHasLoggedProduction()) resetProduction(false);
       enteredNewShift = true;
       try {
         localStorage.setItem(SHIFT_WINDOW_STATE_KEY, "in");
@@ -3269,9 +3281,16 @@ function startLiveCountdownTicker(baseCountdown, status, updatedAt, anchorScanMs
     return;
   }
 
-  if (status !== "RUNNING") {
+  const inShift = isWithinShiftWindow() || isOvertimeActive();
+  const tickPace =
+    status === "RUNNING" ||
+    status === "DOWN TIME" ||
+    (inShift && status !== "PAUSED" && status !== "BREAK TIME");
+
+  if (!tickPace) {
     countdownValue = baseCountdown;
     countdownEl.innerText = format(baseCountdown);
+    refreshLivePaceCards();
     syncOperatorDashboardChrome();
     return;
   }
@@ -3479,6 +3498,17 @@ function applyLiveState(state) {
   if (isMonitor && !np && effectivePlan > 0 && actual < effectivePlan && status === "TARGET ACHIEVED") {
     status = actual > 0 ? "PAUSED" : "READY";
   }
+  if (
+    isMonitor &&
+    !np &&
+    (isWithinShiftWindow() || isOvertimeActive()) &&
+    status !== "PAUSED" &&
+    status !== "BREAK TIME" &&
+    status !== "TARGET ACHIEVED" &&
+    status !== "DOWN TIME"
+  ) {
+    status = "RUNNING";
+  }
 
   // Set last-scan / session-start anchors before countdown ticker.
   let anchorScanMs = null;
@@ -3495,6 +3525,11 @@ function applyLiveState(state) {
   if (state.startedAtMs) {
     const started = Number(state.startedAtMs);
     if (Number.isFinite(started) && started > 0) startTime = new Date(started);
+  }
+  if (!anchorScanMs && (isWithinShiftWindow() || isOvertimeActive())) {
+    const shiftStartMs = getTodayShiftStartMs();
+    if (!startTime) startTime = new Date(shiftStartMs);
+    anchorScanMs = lastScanWallMs || shiftStartMs;
   }
 
   startLiveCountdownTicker(countdown, status, state.updatedAt, anchorScanMs);
@@ -6457,10 +6492,10 @@ function getCompletedUnitStatsFromScanTableForDay(dayKey) {
       statusText === "DOWNTIME";
     if (!isCompleted) return;
 
+    count++;
     const scanMs = Number(tr.dataset.scanMs);
     if (!Number.isFinite(scanMs)) return;
 
-    count++;
     firstScanMs = firstScanMs == null ? scanMs : Math.min(firstScanMs, scanMs);
     lastScanMs = lastScanMs == null ? scanMs : Math.max(lastScanMs, scanMs);
   });
@@ -6475,15 +6510,7 @@ function getCompletedUnitStatsFromScanTableForDay(dayKey) {
 function reconcileActualCountFromSheet(dayKey) {
   const stats = getCompletedUnitStatsFromScanTableForDay(dayKey);
   if (stats.count <= 0) return false;
-  if (stats.count === actualCount) return false;
-
-  if (stats.count > actualCount) {
-    // Sheet ahead of live counter — only apply when clearly newer (avoid mid-scan flicker).
-    if (!Number.isFinite(stats.lastScanMs)) return false;
-    const skewMs = 30000;
-    if (lastScanWallMs != null && stats.lastScanMs <= lastScanWallMs + skewMs) return false;
-    if (!isMonitor && timer) return false;
-  }
+  if (stats.count <= actualCount) return false;
 
   actualCount = stats.count;
   if (Number.isFinite(stats.firstScanMs)) firstScanAtMs = stats.firstScanMs;
@@ -6514,13 +6541,20 @@ function applyReconciledActualToDashboard() {
   refreshLivePaceCards();
 
   if (isMonitor) {
-    const statusText = document.getElementById("status")?.innerText?.trim() || "";
-    if (plan > 0 && actualCount >= plan) {
+    const planOk = plan > 0 && actualCount >= plan;
+    if (planOk) {
       setStatus("TARGET ACHIEVED", "status-green");
-    } else if (statusText === "TARGET ACHIEVED" && actualCount < plan) {
-      setStatus(actualCount > 0 ? "PAUSED" : "READY", actualCount > 0 ? "status-orange" : "status-blue");
+    } else if (isWithinShiftWindow() || isOvertimeActive()) {
+      setStatus("RUNNING", "status-green pulse");
+      startLiveCountdownTicker(
+        countdownValue,
+        "RUNNING",
+        Date.now(),
+        lastScanWallMs || getTodayShiftStartMs()
+      );
     }
     syncEfficiencyCardDom();
+    syncOperatorDashboardChrome();
     return;
   }
 
