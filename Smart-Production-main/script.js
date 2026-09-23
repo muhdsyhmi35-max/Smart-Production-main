@@ -1022,7 +1022,34 @@ function getActiveDowntimeDayKey() {
   return getActiveHistoryDayKey();
 }
 
-function parseDisplayDateToIsoKey(dateText) {
+function parseSheetDateTime(raw) {
+  if (raw instanceof Date && Number.isFinite(raw.getTime())) return raw;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    if (raw > 20000 && raw < 80000) {
+      return new Date(Math.round((raw - 25569) * 86400 * 1000));
+    }
+    if (raw > 1e11) return new Date(raw);
+  }
+  const t = String(raw || "").trim();
+  if (!t) return null;
+  const dm = t.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (dm) {
+    let y = parseInt(dm[3], 10);
+    if (y < 100) y += 2000;
+    const d = new Date(
+      y,
+      parseInt(dm[2], 10) - 1,
+      parseInt(dm[1], 10),
+      parseInt(dm[4] || "0", 10),
+      parseInt(dm[5] || "0", 10),
+      parseInt(dm[6] || "0", 10)
+    );
+    if (Number.isFinite(d.getTime())) return d;
+  }
+  const ms = Date.parse(t);
+  if (Number.isFinite(ms)) return new Date(ms);
+  return null;
+}
   const t = String(dateText || "").trim();
   if (!t) return null;
   const dm = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
@@ -3888,11 +3915,13 @@ function resetProduction(shouldSync = true) {
   isDowntime = false;
   duplicateLock = false;
   duplicateStatusText = "DUPLICATE SCAN";
+  lastTableData = "";
   document.getElementById("scanTable").innerHTML = "";
 
   setStatus("READY", "status-blue");
   updateDisplay();
   updateLiveStateOnly();
+  try { loadLiveData(); } catch (_) {}
 }
 
 /* ===== SCAN BOXES =====
@@ -6111,6 +6140,8 @@ function showGraphPage() {
     syncGraphRangePickerUi();
   }
   syncGraphPeriodButtonsUi();
+  document.body.classList.add("graph-mode");
+  try { loadLiveData(); } catch (_) {}
   try {
     renderGraphCharts();
   } catch (err) {
@@ -6124,7 +6155,6 @@ function showGraphPage() {
   if (summaryPage) summaryPage.classList.remove("open");
   const historyPanel = document.getElementById("historyPanel");
   if (historyPanel) historyPanel.classList.remove("open");
-  document.body.classList.add("graph-mode");
   syncGraphWtControl();
   graphPage.classList.add("open");
   triggerEnterAnimation(graphPage);
@@ -6696,8 +6726,9 @@ function loadLiveData() {
 
       // Convert to string for comparison
       const newTableData = JSON.stringify(scanRows);
+      const tableEmpty = !table.rows.length;
 
-      if (newTableData !== lastTableData) {
+      if (newTableData !== lastTableData || tableEmpty) {
         lastTableData = newTableData;
 
         table.innerHTML = "";
@@ -6711,7 +6742,7 @@ function loadLiveData() {
         scanRows.forEach(row => {
           const newRow = table.insertRow();
 
-          const fullDateTime = new Date(row[0]);
+          const fullDateTime = parseSheetDateTime(row[0]) || new Date(row[0]);
           newRow.insertCell(0).innerText = "";
           newRow.insertCell(1).innerText = fullDateTime.toLocaleDateString("en-GB");
           newRow.insertCell(2).innerText = fullDateTime.toLocaleTimeString("en-GB", {
