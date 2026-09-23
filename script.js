@@ -198,25 +198,26 @@ function canViewReports() {
 }
 
 function canOperateLine() {
-  return getAppRole() === "operator" || isMasterRole();
+  return !isMonitor && getAppRole() === "operator";
 }
 
-/** Monitor screens for Operator/Management only mirror live data — unless this PC is already running the line. */
+/** TVs only mirror live data. They never write production. */
 function isLiveDisplayOnly() {
-  return isMonitor && !isMasterRole() && !timer;
+  return isMonitor;
 }
 
-/** Master can drive Start/Stop/Reset on main or ?monitor; Operator only on the main PC. */
+/** Only Operator on the main PC drives Start/Stop/Reset and scans. */
 function canDriveProductionFromThisScreen() {
-  return isMasterRole() || (!isMonitor && canOperateLine());
+  return canOperateLine();
 }
 
 function canAdjustWorkingHour() {
-  return !isMonitor || isMasterRole();
+  if (isMonitor) return isMasterRole();
+  return getAppRole() === "operator";
 }
 
 function canEditLineSettings() {
-  return isMasterRole() || (!isMonitor && canOperateLine());
+  return canOperateLine();
 }
 
 function setAppRole(role) {
@@ -247,7 +248,7 @@ function applyMainPcEditLock() {
     el.classList.toggle("settings-locked", !canEditSettings);
   });
   document.querySelectorAll(".main-pc-actions button").forEach(btn => {
-    btn.disabled = isMonitor ? !master : !canOperate;
+    btn.disabled = isMonitor || !canOperate;
   });
   if (isMonitor || isNonProductionMode()) {
     setScanInputsEnabled(false);
@@ -321,6 +322,12 @@ function syncRoleDropdownAria() {
 }
 
 function applyAppRoleUi() {
+  if (!isMonitor && isMasterRole()) {
+    try {
+      sessionStorage.removeItem(APP_ADMIN_SESSION_KEY);
+      sessionStorage.setItem(APP_ROLE_STORAGE_KEY, "operator");
+    } catch (_) {}
+  }
   const role = getAppRole();
   const master = role === "master";
   const wasFullscreen = !!(
@@ -339,6 +346,9 @@ function applyAppRoleUi() {
     const sel = btnRole === role || (master && btnRole === "admin");
     btn.setAttribute("aria-selected", sel ? "true" : "false");
     btn.classList.toggle("selected", sel);
+    if (btnRole === "master" || btnRole === "admin") {
+      btn.hidden = !isMonitor;
+    }
   });
   if (role === "operator") {
     toggleMenuDropdown(false);
@@ -408,6 +418,10 @@ function onRoleOptionClick(event, role) {
   event.stopPropagation();
   toggleRoleDropdown(false);
   if (role === "master" || role === "admin") {
+    if (!isMonitor) {
+      setAppRole("operator");
+      return;
+    }
     if (isMasterRole()) return;
     showAdminLoginModal();
     return;
