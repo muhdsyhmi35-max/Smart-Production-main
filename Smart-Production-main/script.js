@@ -110,6 +110,7 @@ const GRAPH_WT_PRESET_MINS = {
   friday: 400
 };
 const GRAPH_WT_PRESET_STORAGE_KEY = "TF2_GRAPH_WT_PRESET";
+const DAILY_PLAN_STORAGE_KEY = "TF2_DAILY_PLAN";
 const NON_PRODUCTION_DAYS_KEY = "TF2_NON_PRODUCTION_DAYS";
 let duplicateLock = false;
 let duplicateStatusText = "DUPLICATE SCAN";
@@ -444,8 +445,52 @@ function isNonProductionLiveState(state, status) {
   return isNonProductionMode();
 }
 
+function loadPersistedDailyPlan() {
+  try {
+    const n = parseInt(localStorage.getItem(DAILY_PLAN_STORAGE_KEY) || "", 10);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch (_) {
+    return 0;
+  }
+}
+
+function persistDailyPlan(plan) {
+  if (!Number.isFinite(plan) || plan <= 0) return;
+  try {
+    localStorage.setItem(DAILY_PLAN_STORAGE_KEY, String(plan));
+  } catch (_) {}
+}
+
+function restoreDailyPlanFromHistory() {
+  if (isMonitor) return;
+  if (getConfiguredDailyPlan() > 0) return;
+  const today = toIsoDateLocal(new Date());
+  const rows = document.getElementById("scanTable")?.rows;
+  if (!rows) return;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const cells = row.cells;
+    const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells?.[1]?.innerText);
+    if (rowDay !== today) continue;
+    const p = parseInt(String(row.dataset.scanPlan || "").trim(), 10);
+    if (!Number.isFinite(p) || p <= 0) continue;
+    persistDailyPlan(p);
+    const planInput = document.getElementById("dailyPlanTarget");
+    if (planInput && document.activeElement !== planInput) planInput.value = String(p);
+    const planCard = document.getElementById("plan");
+    if (planCard) planCard.innerText = String(p);
+    if (hasLocalSession) {
+      updateDisplay();
+      updateLiveStateOnly();
+    }
+    return;
+  }
+}
+
 function getConfiguredDailyPlan() {
-  return parseInt(document.getElementById("dailyPlanTarget")?.value || "0", 10) || 0;
+  const fromInput = parseInt(document.getElementById("dailyPlanTarget")?.value || "0", 10) || 0;
+  if (fromInput > 0) return fromInput;
+  return loadPersistedDailyPlan();
 }
 
 /** Dashboard / live-card target. Non-production days have no output target. */
@@ -3419,17 +3464,28 @@ function publishSyncCommand(action) {
 function publishLiveStateToFirebase(state) {
   if (!firebaseLiveStateRef) return;
 
-  // Use update (merge) so other writers (e.g. scheduled tick) cannot wipe fields
-  // like dailyPlan / cycleTimeMin between publishes.
-  firebaseLiveStateRef.update({
+  const payload = {
     ...state,
-    settings: {
-      dailyPlan: state.dailyPlan ?? state.plan,
-      cycleTimeMin: state.cycleTimeMin
-    },
     sender: syncClientId,
     updatedAt: firebase.database.ServerValue.TIMESTAMP
-  }).catch(err => {
+  };
+  delete payload.settings;
+  const planVal = parseFirebaseInt(state.dailyPlan) ?? parseFirebaseInt(state.plan);
+  if (planVal != null && planVal > 0) {
+    persistDailyPlan(planVal);
+    payload.plan = planVal;
+    payload.dailyPlan = planVal;
+    payload["settings/dailyPlan"] = planVal;
+  } else {
+    // Refresh with an empty plan box must not wipe today's Daily Plan on TVs.
+    delete payload.plan;
+    delete payload.dailyPlan;
+  }
+  if (state.cycleTimeMin != null) {
+    payload["settings/cycleTimeMin"] = state.cycleTimeMin;
+  }
+
+  firebaseLiveStateRef.update(payload).catch(err => {
     console.log("Firebase live state publish error:", err);
   });
 }
@@ -3608,8 +3664,9 @@ function applyLiveState(state) {
     applyGraphSettingsFromRemote(state);
   }
 
+  const { daily: fbDaily, cycle: fbCycle } = readPlanAndCycleFromFirebase(state);
   const plan = parseInt(state.plan, 10) || 0;
-  const currentDailyPlan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || SETTINGS.defaultPlan;
+  const currentDailyPlan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || loadPersistedDailyPlan() || SETTINGS.defaultPlan;
   const currentCycleTime = parseFloat(document.getElementById("cycleTarget").value) || SETTINGS.defaultCycle;
   let status = state.status || "READY";
   const np = isNonProductionLiveState(state, status);
@@ -3618,13 +3675,13 @@ function applyLiveState(state) {
 
   if (isMonitor) {
     // Monitor: boxes mirror Firebase only (no local defaults masking stale reads).
-    const { daily, cycle } = readPlanAndCycleFromFirebase(state);
-    effectivePlan = daily != null && daily > 0 ? daily : 0;
-    cycleTimeMin = cycle != null && cycle > 0 ? cycle : SETTINGS.defaultCycle;
+    effectivePlan = fbDaily != null && fbDaily > 0 ? fbDaily : 0;
+    cycleTimeMin = fbCycle != null && fbCycle > 0 ? fbCycle : SETTINGS.defaultCycle;
   } else {
-    effectivePlan = resolvePositiveNumber(state.dailyPlan, plan, currentDailyPlan);
-    cycleTimeMin = resolvePositiveNumber(state.cycleTimeMin, state.cycleTarget, currentCycleTime);
+    effectivePlan = resolvePositiveNumber(fbDaily, plan, currentDailyPlan);
+    cycleTimeMin = resolvePositiveNumber(fbCycle, state.cycleTarget, currentCycleTime);
   }
+  if (effectivePlan > 0) persistDailyPlan(effectivePlan);
   const displayPlan = np ? 0 : effectivePlan;
   let actual = parseInt(state.actual, 10) || 0;
   let balance = parseInt(state.balance, 10) || 0;
@@ -3797,11 +3854,24 @@ function applyLiveState(state) {
   syncOperatorDashboardChrome();
 }
 
+function startMainLiveStatePublisher() {
+  if (isMonitor) return;
+  if (liveStatePollInterval) clearInterval(liveStatePollInterval);
+  liveStatePollInterval = setInterval(updateLiveStateOnly, 1000);
+}
+
 function loadInitialLiveState() {
-  if (!firebaseLiveStateRef) {
+  const afterHydrate = () => {
     initialLiveStateHydrated = true;
     maybeResetDashboardForNewCalendarDay();
-    if (!isMonitor) applyShiftScheduleTick();
+    if (!isMonitor) {
+      applyShiftScheduleTick();
+      startMainLiveStatePublisher();
+    }
+  };
+
+  if (!firebaseLiveStateRef) {
+    afterHydrate();
     return;
   }
 
@@ -3809,15 +3879,11 @@ function loadInitialLiveState() {
     .then(snapshot => {
       const liveState = snapshot.val();
       if (liveState) applyLiveState(liveState);
-      initialLiveStateHydrated = true;
-      maybeResetDashboardForNewCalendarDay();
-      if (!isMonitor) applyShiftScheduleTick();
+      afterHydrate();
     })
     .catch(err => {
       console.log("Firebase initial live state error:", err);
-      initialLiveStateHydrated = true;
-      maybeResetDashboardForNewCalendarDay();
-      if (!isMonitor) applyShiftScheduleTick();
+      afterHydrate();
     });
 }
 
@@ -6930,6 +6996,7 @@ function loadLiveData() {
         syncDowntimeSecondsFromTable();
         refreshDowntimeCardFromTable();
         maybeReconcileLocalActualFromSheet();
+        restoreDailyPlanFromHistory();
         reconcileNonProductionMarksFromSheet();
         if (document.body.classList.contains("graph-mode")) {
           renderGraphCharts();
@@ -6942,6 +7009,7 @@ function loadLiveData() {
       // even when table data payload is unchanged (e.g. timer stopped/target achieved).
       refreshDowntimeCardFromTable();
       maybeReconcileLocalActualFromSheet();
+      restoreDailyPlanFromHistory();
     })
     .catch(err => console.log("Monitor load error:", err));
 }
@@ -6949,7 +7017,10 @@ function loadLiveData() {
 /* ===== INITIALIZE SYSTEM ===== */
 
 document.getElementById("cycleTarget").value = SETTINGS.defaultCycle;
-document.getElementById("dailyPlanTarget").value = SETTINGS.defaultPlan > 0 ? String(SETTINGS.defaultPlan) : "";
+{
+  const startPlan = SETTINGS.defaultPlan > 0 ? SETTINGS.defaultPlan : loadPersistedDailyPlan();
+  document.getElementById("dailyPlanTarget").value = startPlan > 0 ? String(startPlan) : "";
+}
 
 document.getElementById("cycleTarget").addEventListener("input", () => {
   if (!canEditLineSettings()) return;
@@ -6965,6 +7036,7 @@ document.getElementById("cycleTarget").addEventListener("input", () => {
 document.getElementById("dailyPlanTarget").addEventListener("input", () => {
   if (!canEditLineSettings()) return;
   const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+  persistDailyPlan(plan);
   syncTodayScanPlanOnRows(plan);
   hasLocalSession = true;
   updateDisplay();
@@ -7056,9 +7128,6 @@ window.onload = async function() {
     loadLiveData();
     if (liveDataPollInterval) clearInterval(liveDataPollInterval);
     liveDataPollInterval = setInterval(loadLiveData, 3000);
-    if (liveStatePollInterval) clearInterval(liveStatePollInterval);
-    liveStatePollInterval = setInterval(updateLiveStateOnly, 1000);
-    applyShiftScheduleTick();
     if (shiftScheduleInterval) clearInterval(shiftScheduleInterval);
     shiftScheduleInterval = setInterval(applyShiftScheduleTick, 30000);
   }
