@@ -111,6 +111,7 @@ const GRAPH_WT_PRESET_MINS = {
 };
 const GRAPH_WT_PRESET_STORAGE_KEY = "TF2_GRAPH_WT_PRESET";
 const DAILY_PLAN_STORAGE_KEY = "TF2_DAILY_PLAN";
+const LOT_NO_STORAGE_KEY = "TF2_LOT_NO";
 const NON_PRODUCTION_DAYS_KEY = "TF2_NON_PRODUCTION_DAYS";
 let duplicateLock = false;
 let duplicateStatusText = "DUPLICATE SCAN";
@@ -461,6 +462,33 @@ function persistDailyPlan(plan) {
   } catch (_) {}
 }
 
+function normalizeLotNo(raw) {
+  const t = String(raw || "").trim();
+  if (!t || t === "-" || /^lot\s*no\.?$/i.test(t)) return "";
+  return t;
+}
+
+function loadPersistedLotNo() {
+  try {
+    return normalizeLotNo(localStorage.getItem(LOT_NO_STORAGE_KEY) || "");
+  } catch (_) {
+    return "";
+  }
+}
+
+function persistLotNo(lot) {
+  const t = normalizeLotNo(lot);
+  if (!t) return;
+  try {
+    localStorage.setItem(LOT_NO_STORAGE_KEY, t);
+  } catch (_) {}
+}
+
+function getConfiguredLotNo() {
+  const fromInput = normalizeLotNo(document.getElementById("lotInput")?.value || "");
+  return fromInput || loadPersistedLotNo();
+}
+
 function restoreDailyPlanFromHistory() {
   if (isMonitor) return;
   if (getConfiguredDailyPlan() > 0) return;
@@ -483,6 +511,27 @@ function restoreDailyPlanFromHistory() {
       updateDisplay();
       updateLiveStateOnly();
     }
+    return;
+  }
+}
+
+function restoreLotNoFromHistory() {
+  if (isMonitor) return;
+  if (getConfiguredLotNo()) return;
+  const today = toIsoDateLocal(new Date());
+  const rows = document.getElementById("scanTable")?.rows;
+  if (!rows) return;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const cells = row.cells;
+    const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells?.[1]?.innerText);
+    if (rowDay !== today) continue;
+    const lot = normalizeLotNo(cells?.[3]?.innerText || "");
+    if (!lot) continue;
+    persistLotNo(lot);
+    const lotInput = document.getElementById("lotInput");
+    if (lotInput && document.activeElement !== lotInput) lotInput.value = lot;
+    if (hasLocalSession) updateLiveStateOnly();
     return;
   }
 }
@@ -525,21 +574,21 @@ function publishMasterSettingsFromInputs() {
   masterSettingsPublishTimer = setTimeout(() => {
     const configuredPlan = parseInt(document.getElementById("dailyPlanTarget")?.value || "0", 10) || 0;
     const cycleTimeMin = parseFloat(document.getElementById("cycleTarget")?.value) || SETTINGS.defaultCycle;
-    const lotNo = document.getElementById("lotInput")?.value || "";
+    const lotNo = getConfiguredLotNo();
     const plan = getDashboardPlan();
     const payload = {
       plan,
       dailyPlan: configuredPlan,
       cycleTimeMin,
-      lotNo,
       ramadanMode,
-      settings: {
-        dailyPlan: configuredPlan,
-        cycleTimeMin
-      },
       sender: syncClientId,
       updatedAt: firebase.database.ServerValue.TIMESTAMP
     };
+    if (lotNo) payload.lotNo = lotNo;
+    if (configuredPlan > 0) {
+      payload["settings/dailyPlan"] = configuredPlan;
+    }
+    if (cycleTimeMin) payload["settings/cycleTimeMin"] = cycleTimeMin;
     if (canAdjustWorkingHour()) {
       payload.graphWtPreset = graphWtPreset;
       payload.nonProductionDays = getNonProductionDaysArray();
@@ -3484,6 +3533,13 @@ function publishLiveStateToFirebase(state) {
   if (state.cycleTimeMin != null) {
     payload["settings/cycleTimeMin"] = state.cycleTimeMin;
   }
+  const lotVal = normalizeLotNo(state.lotNo);
+  if (lotVal) {
+    persistLotNo(lotVal);
+    payload.lotNo = lotVal;
+  } else {
+    delete payload.lotNo;
+  }
 
   firebaseLiveStateRef.update(payload).catch(err => {
     console.log("Firebase live state publish error:", err);
@@ -3696,7 +3752,7 @@ function applyLiveState(state) {
     expected = 0;
     delay = actual;
   }
-  const lotNo = state.lotNo || "";
+  const lotNo = normalizeLotNo(state.lotNo) || normalizeLotNo(document.getElementById("lotInput")?.value) || loadPersistedLotNo();
   const firebaseTotalDowntime = parseInt(state.totalDowntime, 10);
   const hasFirebaseTotalDowntime = Number.isFinite(firebaseTotalDowntime) && firebaseTotalDowntime >= 0;
 
@@ -3738,7 +3794,13 @@ function applyLiveState(state) {
   }
   const lotInput = document.getElementById("lotInput");
   if (lotInput && document.activeElement !== lotInput) {
-    lotInput.value = lotNo;
+    if (lotNo) {
+      persistLotNo(lotNo);
+      lotInput.value = lotNo;
+    } else if (!normalizeLotNo(lotInput.value)) {
+      const kept = loadPersistedLotNo();
+      if (kept) lotInput.value = kept;
+    }
   }
   document.getElementById("actual").innerText = actual;
   refreshLivePaceCards();
@@ -3901,8 +3963,12 @@ function applyRemoteMasterSettings(state) {
     planEl.value = String(daily);
     if (daily > 0) syncTodayScanPlanOnRows(daily);
   }
-  if (lotEl && document.activeElement !== lotEl && typeof state.lotNo === "string") {
-    lotEl.value = state.lotNo;
+  if (lotEl && document.activeElement !== lotEl) {
+    const remoteLot = normalizeLotNo(state.lotNo);
+    if (remoteLot) {
+      persistLotNo(remoteLot);
+      lotEl.value = remoteLot;
+    }
   }
   if (typeof state.ramadanMode === "boolean" && state.ramadanMode !== ramadanMode) {
     ramadanMode = state.ramadanMode;
@@ -6550,7 +6616,7 @@ function updateLiveStateOnly() {
 
   const balance = actual - plan;
   const status = document.getElementById("status").innerText.trim();
-  const lotNo = document.getElementById("lotInput").value || "";
+  const lotNo = getConfiguredLotNo();
   const bookedDowntime = getBookedDowntimeSec();
 
   // Publish the same countdown the operator screen is showing (main drives all monitors).
@@ -6997,6 +7063,7 @@ function loadLiveData() {
         refreshDowntimeCardFromTable();
         maybeReconcileLocalActualFromSheet();
         restoreDailyPlanFromHistory();
+        restoreLotNoFromHistory();
         reconcileNonProductionMarksFromSheet();
         if (document.body.classList.contains("graph-mode")) {
           renderGraphCharts();
@@ -7010,6 +7077,7 @@ function loadLiveData() {
       refreshDowntimeCardFromTable();
       maybeReconcileLocalActualFromSheet();
       restoreDailyPlanFromHistory();
+      restoreLotNoFromHistory();
     })
     .catch(err => console.log("Monitor load error:", err));
 }
@@ -7020,6 +7088,9 @@ document.getElementById("cycleTarget").value = SETTINGS.defaultCycle;
 {
   const startPlan = SETTINGS.defaultPlan > 0 ? SETTINGS.defaultPlan : loadPersistedDailyPlan();
   document.getElementById("dailyPlanTarget").value = startPlan > 0 ? String(startPlan) : "";
+  const startLot = loadPersistedLotNo();
+  const lotEl = document.getElementById("lotInput");
+  if (lotEl && startLot) lotEl.value = startLot;
 }
 
 document.getElementById("cycleTarget").addEventListener("input", () => {
@@ -7047,6 +7118,7 @@ document.getElementById("dailyPlanTarget").addEventListener("input", () => {
 
 document.getElementById("lotInput").addEventListener("input", () => {
   if (!canEditLineSettings()) return;
+  persistLotNo(document.getElementById("lotInput").value);
   hasLocalSession = true;
   if (isMonitor) publishMasterSettingsFromInputs();
   else updateLiveStateOnly();
