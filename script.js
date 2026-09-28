@@ -6176,15 +6176,14 @@ function calcActualEffPct(planUnits, actualUnits, planWtMins, actualWtMins) {
   if (!Number.isFinite(planWtMins) || planWtMins <= 0) return null;
 
   const unitsRatio = Math.max(0, actualUnits / planUnits);
+  if (unitsRatio >= 1) return PLAN_EFF_PCT;
 
   if (actualWtMins > planWtMins) {
     const wtFactor = planWtMins / actualWtMins;
-    let eff = PLAN_EFF_PCT * wtFactor;
-    if (unitsRatio < 1) eff *= unitsRatio;
+    const eff = PLAN_EFF_PCT * wtFactor * unitsRatio;
     return Number(Math.max(0, eff).toFixed(1));
   }
 
-  if (unitsRatio >= 1) return PLAN_EFF_PCT;
   return Number(Math.max(0, unitsRatio * PLAN_EFF_PCT).toFixed(1));
 }
 
