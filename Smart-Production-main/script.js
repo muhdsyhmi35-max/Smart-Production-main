@@ -1942,7 +1942,13 @@ function getLocalMinuteOfDay(d = new Date()) {
   return (d.getHours() * 60) + d.getMinutes();
 }
 
+function isWeekendDate(d = new Date()) {
+  const day = d.getDay();
+  return day === 0 || day === 6;
+}
+
 function isWithinShiftWindow(d = new Date()) {
+  if (isWeekendDate(d)) return false;
   if (!SETTINGS.shiftSchedule.enableAutoWindow) return true;
   const minute = getLocalMinuteOfDay(d);
   return minute >= SETTINGS.shiftSchedule.startMinute && minute < SETTINGS.shiftSchedule.endMinute;
@@ -1989,7 +1995,7 @@ function computeLiveDowntimeState(nowMs = Date.now()) {
     1
   );
   const graceSec = Math.max(0, (SETTINGS.downtime?.graceMinutes ?? 2) * 60);
-  if (isNonProductionMode() || isBreakTime()) {
+  if (isNonProductionMode() || isBreakTime() || (isWeekendDate(new Date(nowMs)) && !isOvertimeActive(new Date(nowMs)))) {
     return { cycleTimeSec, graceSec, idleSec: 0, inDowntime: false, openSec: 0 };
   }
   const idleSec = getIdleSecExBreak(nowMs);
@@ -3333,6 +3339,7 @@ function isBreakTime() {
 
 function calculateExpectedOutput() {
   if (isNonProductionMode()) return 0;
+  if (isWeekendDate() && !isOvertimeActive()) return 0;
 
   const plan = getDashboardPlan();
   if (!(plan > 0)) return 0;
@@ -4401,7 +4408,7 @@ function completeKeyScan(key, el) {
     const graceSec = Math.max(0, (SETTINGS.downtime?.graceMinutes ?? 2) * 60);
     const stopThresholdSec = cycleTimeSec + graceSec;
     // Late scan inside the grace window = Delay only. Longer gap = auto downtime.
-    if (idleSecExBreak > stopThresholdSec) {
+    if (idleSecExBreak > stopThresholdSec && !(isWeekendDate(now) && !isOvertimeActive(now))) {
       const actualDowntime = idleSecExBreak - cycleTimeSec;
       if (plan === 0 || (actualCount + 1) <= plan) {
         downtimeEvent = format(actualDowntime);
