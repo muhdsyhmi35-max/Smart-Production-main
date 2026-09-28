@@ -47,7 +47,7 @@ const SETTINGS = {
    * Gap longer than cycle + grace = booked as Downtime (treat as line stop).
    */
   downtime: {
-    graceMinutes: 4
+    graceMinutes: 2
   }
 };
 
@@ -1982,13 +1982,13 @@ function getIdleSecExBreak(nowMs = Date.now()) {
   return Math.max(0, wallSec - scheduledBreakOverlapSec(t0, nowMs));
 }
 
-/** Open downtime starts after cycle + 4 min with no scan. Amount booked/shown is idle − cycle. */
+/** Open downtime starts after cycle + 2 min with no scan. Amount booked/shown is idle − cycle. */
 function computeLiveDowntimeState(nowMs = Date.now()) {
   const cycleTimeSec = Math.max(
     Math.floor((parseFloat(document.getElementById("cycleTarget")?.value) || SETTINGS.defaultCycle) * 60),
     1
   );
-  const graceSec = Math.max(0, (SETTINGS.downtime?.graceMinutes ?? 4) * 60);
+  const graceSec = Math.max(0, (SETTINGS.downtime?.graceMinutes ?? 2) * 60);
   if (isNonProductionMode() || isBreakTime()) {
     return { cycleTimeSec, graceSec, idleSec: 0, inDowntime: false, openSec: 0 };
   }
@@ -4398,7 +4398,7 @@ function completeKeyScan(key, el) {
     const wallSec = Math.floor((t1 - t0Ms) / 1000);
     const breakSec = scheduledBreakOverlapSec(t0Ms, t1);
     const idleSecExBreak = Math.max(0, wallSec - breakSec);
-    const graceSec = Math.max(0, (SETTINGS.downtime?.graceMinutes ?? 4) * 60);
+    const graceSec = Math.max(0, (SETTINGS.downtime?.graceMinutes ?? 2) * 60);
     const stopThresholdSec = cycleTimeSec + graceSec;
     // Late scan inside the grace window = Delay only. Longer gap = auto downtime.
     if (idleSecExBreak > stopThresholdSec) {
