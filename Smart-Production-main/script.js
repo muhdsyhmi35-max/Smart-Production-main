@@ -112,6 +112,7 @@ const GRAPH_WT_PRESET_MINS = {
 const GRAPH_WT_PRESET_STORAGE_KEY = "TF2_GRAPH_WT_PRESET";
 const DAILY_PLAN_STORAGE_KEY = "TF2_DAILY_PLAN";
 const LOT_NO_STORAGE_KEY = "TF2_LOT_NO";
+const LAST_SCAN_STORAGE_KEY = "TF2_LAST_SCAN_MS";
 const NON_PRODUCTION_DAYS_KEY = "TF2_NON_PRODUCTION_DAYS";
 let duplicateLock = false;
 let duplicateStatusText = "DUPLICATE SCAN";
@@ -482,6 +483,29 @@ function persistLotNo(lot) {
   try {
     localStorage.setItem(LOT_NO_STORAGE_KEY, t);
   } catch (_) {}
+}
+
+function persistLastScanMs(ms) {
+  if (!Number.isFinite(ms) || ms <= 0) return;
+  try {
+    localStorage.setItem(LAST_SCAN_STORAGE_KEY, JSON.stringify({
+      day: toIsoDateLocal(new Date(ms)),
+      ms
+    }));
+  } catch (_) {}
+}
+
+function loadPersistedLastScanMs() {
+  try {
+    const raw = localStorage.getItem(LAST_SCAN_STORAGE_KEY);
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    if (!o || o.day !== toIsoDateLocal(new Date())) return null;
+    const ms = Number(o.ms);
+    return Number.isFinite(ms) && ms > 0 ? ms : null;
+  } catch (_) {
+    return null;
+  }
 }
 
 function getConfiguredLotNo() {
@@ -1937,8 +1961,17 @@ function getPaceAnchorMs() {
   return null;
 }
 
+/** Downtime is idle since the last completed scan — not since 08:15 while last-scan is still loading. */
+function getDowntimeIdleAnchorMs() {
+  if (lastScanWallMs != null && Number.isFinite(lastScanWallMs)) return lastScanWallMs;
+  if (!initialLiveStateHydrated) return null;
+  if (actualCount > 0) return null;
+  if (startTime) return startTime.getTime();
+  return null;
+}
+
 function getIdleSecExBreak(nowMs = Date.now()) {
-  const t0 = getPaceAnchorMs();
+  const t0 = getDowntimeIdleAnchorMs();
   if (t0 == null) return 0;
   const wallSec = Math.max(0, Math.floor((nowMs - t0) / 1000));
   return Math.max(0, wallSec - scheduledBreakOverlapSec(t0, nowMs));
@@ -3633,6 +3666,7 @@ function restoreProductionTimerFromLiveState(status, countdown, expected, synced
   if (syncedLastScanAtMs) {
     lastScanWallMs = Number(syncedLastScanAtMs);
     lastScanTime = new Date(lastScanWallMs);
+    persistLastScanMs(lastScanWallMs);
   }
 
   if (status !== "RUNNING" && status !== "DOWN TIME") {
@@ -3829,6 +3863,7 @@ function applyLiveState(state) {
     anchorScanMs = Number(state.lastScanAtMs);
     lastScanTime = new Date(anchorScanMs);
     lastScanWallMs = anchorScanMs;
+    persistLastScanMs(lastScanWallMs);
   } else if (actual > 0 && lastScanWallMs) {
     anchorScanMs = lastScanWallMs;
   } else if (actual === 0) {
@@ -3846,7 +3881,6 @@ function applyLiveState(state) {
   }
 
   startLiveCountdownTicker(countdown, status, state.updatedAt, anchorScanMs);
-  applyLiveDowntimeUi();
   restoreProductionTimerFromLiveState(
     status,
     countdown,
@@ -3856,6 +3890,7 @@ function applyLiveState(state) {
     state.lastScanAtMs,
     state.startedAtMs
   );
+  applyLiveDowntimeUi();
 
   const balanceEl = document.getElementById("balance");
   if (balance < 0) {
@@ -4120,6 +4155,7 @@ function resetProduction(shouldSync = true) {
   downtimeSeconds = 0;
   lastScanTime = null;
   lastScanWallMs = null;
+  try { localStorage.removeItem(LAST_SCAN_STORAGE_KEY); } catch (_) {}
   startTime = null;
   firstScanAtMs = null;
   efficiencyPercent = 0;
@@ -4374,6 +4410,7 @@ function completeKeyScan(key, el) {
 
   lastScanTime = now;
   lastScanWallMs = now.getTime();
+  persistLastScanMs(lastScanWallMs);
   if (!firstScanAtMs) {
     firstScanAtMs = now.getTime();
   }
@@ -6870,6 +6907,7 @@ function reconcileActualCountFromSheet(dayKey) {
   if (Number.isFinite(stats.lastScanMs)) {
     lastScanWallMs = stats.lastScanMs;
     lastScanTime = new Date(lastScanWallMs);
+    persistLastScanMs(lastScanWallMs);
   }
   return true;
 }
@@ -7091,6 +7129,11 @@ document.getElementById("cycleTarget").value = SETTINGS.defaultCycle;
   const startLot = loadPersistedLotNo();
   const lotEl = document.getElementById("lotInput");
   if (lotEl && startLot) lotEl.value = startLot;
+  const savedScanMs = loadPersistedLastScanMs();
+  if (savedScanMs) {
+    lastScanWallMs = savedScanMs;
+    lastScanTime = new Date(savedScanMs);
+  }
 }
 
 document.getElementById("cycleTarget").addEventListener("input", () => {
