@@ -3278,7 +3278,7 @@ function getTodayActualEffPct() {
   const planUnits = getDashboardPlan();
   const planWtMins = getPlanWtMinsForDay(dayKey);
   const actualWtMins = calcActualWtMinsForDay(dayKey, planUnits);
-  return calcActualEffPct(planUnits, actualCount, planWtMins, actualWtMins);
+  return resolveActualEffPct(dayKey, planUnits, actualCount, planWtMins, actualWtMins);
 }
 
 function syncEfficiencyCardDom() {
@@ -5955,8 +5955,34 @@ function getPlanWtMinsForDay(dayKey) {
   return GRAPH_WT_PRESET_MINS[presetKey] || GRAPH_WT_PRESET_MINS.normal;
 }
 
-/** Plan EFF baseline; Actual EFF stays at 98% when on/above plan within plan W/T, drops only if actual W/T exceeds plan. */
+/** Plan EFF baseline. Live Actual EFF follows pace; after shift end it locks to the real day result. */
 const PLAN_EFF_PCT = 98;
+
+function isProductionDayClosed(dayKey) {
+  const today = toIsoDateLocal(new Date());
+  if (!dayKey || dayKey > today) return false;
+  if (dayKey < today) return true;
+  const endMin = Number(SETTINGS.shiftSchedule.endMinute);
+  if (!Number.isFinite(endMin)) return false;
+  return getLocalMinuteOfDay() >= endMin;
+}
+
+/** During the shift, score against Expected (pace). After 17:30 or Daily Plan hit, score the finished day. */
+function shouldUseLivePaceEff(dayKey, planUnits, actualUnits) {
+  const today = toIsoDateLocal(new Date());
+  if (dayKey !== today) return false;
+  if (!Number.isFinite(planUnits) || planUnits <= 0) return false;
+  if (Number.isFinite(actualUnits) && actualUnits >= planUnits) return false;
+  if (isProductionDayClosed(dayKey)) return false;
+  return true;
+}
+
+function calcLivePaceEffPct(actualUnits, expectedUnits) {
+  if (!Number.isFinite(expectedUnits) || expectedUnits <= 0) return PLAN_EFF_PCT;
+  const ratio = Math.max(0, (Number(actualUnits) || 0) / expectedUnits);
+  if (ratio >= 1) return PLAN_EFF_PCT;
+  return Number(Math.max(0, ratio * PLAN_EFF_PCT).toFixed(1));
+}
 
 function calcActualEffPct(planUnits, actualUnits, planWtMins, actualWtMins) {
   if (!Number.isFinite(planUnits) || planUnits <= 0) return null;
@@ -5976,6 +6002,13 @@ function calcActualEffPct(planUnits, actualUnits, planWtMins, actualWtMins) {
   return Number(Math.max(0, unitsRatio * PLAN_EFF_PCT).toFixed(1));
 }
 
+function resolveActualEffPct(dayKey, planUnits, actualUnits, planWtMins, actualWtMins) {
+  if (shouldUseLivePaceEff(dayKey, planUnits, actualUnits)) {
+    return calcLivePaceEffPct(actualUnits, calculateExpectedOutput());
+  }
+  return calcActualEffPct(planUnits, actualUnits, planWtMins, actualWtMins);
+}
+
 function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, rangeLabel, achievedMs) {
   const planEffPct = PLAN_EFF_PCT;
   const planWtMins = getPlanWtMinsForDay(dayKey);
@@ -5985,7 +6018,7 @@ function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, 
   const actualUnits = dayProduced?.[dayKey] || 0;
   const actualWtMins = nonProdDay ? 0 : calcActualWtMinsForDay(dayKey, planUnits, achievedMs);
 
-  const actualEffPct = nonProdDay ? 0 : calcActualEffPct(planUnits, actualUnits, planWtMins, actualWtMins);
+  const actualEffPct = nonProdDay ? 0 : resolveActualEffPct(dayKey, planUnits, actualUnits, planWtMins, actualWtMins);
   const actualEffClass = nonProdDay
     ? "neg"
     : actualEffPct == null
@@ -6122,7 +6155,7 @@ function renderGraphCharts() {
     const times = stats.dayScanTimes[k] || [];
     const achievedMs = getTargetAchievedMsFromTimes(times, target);
     const actualWtMins = calcActualWtMinsForDay(k, target, achievedMs);
-    return calcActualEffPct(target, produced, planWtMins, actualWtMins) ?? 0;
+    return resolveActualEffPct(k, target, produced, planWtMins, actualWtMins) ?? 0;
   });
   const planEffValues = periodKeys.map(k => {
     if (isReportNonProductionDay(k, dayProduced)) return 0;
