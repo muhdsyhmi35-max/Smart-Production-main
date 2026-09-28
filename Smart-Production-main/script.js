@@ -1699,6 +1699,11 @@ function parseMmSsToSeconds(text) {
   return 0;
 }
 
+function isScanWaitStatus(status) {
+  const s = String(status || "").replace(/\s+/g, " ").trim().toUpperCase();
+  return s === "WAITING MODEL" || s === "WAITING ENGINE" || s === "WAITING KEY";
+}
+
 function isRowStatusDownTime(raw) {
   const s = String(raw || "").replace(/\s+/g, " ").trim().toUpperCase();
   return s === "DOWN TIME" || s === "DOWNTIME";
@@ -3843,7 +3848,7 @@ function applyLiveState(state) {
     status = actual > 0 ? "PAUSED" : "READY";
   }
   const liveDt = computeLiveDowntimeState();
-  if (isMonitor && liveDt.inDowntime) {
+  if (isMonitor && liveDt.inDowntime && !isScanWaitStatus(status)) {
     status = "DOWN TIME";
   } else if (
     isMonitor &&
@@ -3852,7 +3857,8 @@ function applyLiveState(state) {
     status !== "PAUSED" &&
     status !== "BREAK TIME" &&
     status !== "TARGET ACHIEVED" &&
-    status !== "DOWN TIME"
+    status !== "DOWN TIME" &&
+    !isScanWaitStatus(status)
   ) {
     status = "RUNNING";
   }
@@ -3916,6 +3922,10 @@ function applyLiveState(state) {
     setStatus("DOWN TIME", "status-red blink");
   } else if (statusNow === "RUNNING") {
     setStatus("RUNNING", "status-green pulse");
+    downtimeCard.classList.remove("downtime-alert", "blink");
+    downtimeText.classList.remove("status-red", "blink");
+  } else if (isScanWaitStatus(statusNow)) {
+    setStatus(statusNow, "status-orange");
     downtimeCard.classList.remove("downtime-alert", "blink");
     downtimeText.classList.remove("status-red", "blink");
   } else if (status === "TARGET ACHIEVED") {
@@ -6936,7 +6946,10 @@ function applyReconciledActualToDashboard() {
     if (planOk) {
       setStatus("TARGET ACHIEVED", "status-green");
     } else if (isWithinShiftWindow() || isOvertimeActive()) {
-      setStatus("RUNNING", "status-green pulse");
+      const cur = document.getElementById("status")?.innerText?.trim() || "";
+      if (!isScanWaitStatus(cur) && cur !== "DOWN TIME" && cur !== "BREAK TIME" && cur !== "PAUSED") {
+        setStatus("RUNNING", "status-green pulse");
+      }
       startLiveCountdownTicker(
         countdownValue,
         "RUNNING",
