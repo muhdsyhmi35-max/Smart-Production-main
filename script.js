@@ -37,7 +37,7 @@ const SETTINGS = {
     zeroTargetOnInactiveWeekends: true
   },
   shiftSchedule: {
-    startMinute: (8 * 60) + 15, // 08:15 — daily reset + Expected/countdown start
+    startMinute: (8 * 60) + 20, // 08:20 — daily reset + Expected/countdown start
     endMinute: (17 * 60) + 30,  // 17:30
     enableAutoWindow: true
   },
@@ -1930,11 +1930,11 @@ function maybeResetDashboardForNewCalendarDay() {
   } catch (_) {}
 }
 
-const DEFAULT_SHIFT_START_MIN = (8 * 60) + 15; // 08:15
-const LEGACY_SHIFT_START_MIN = 8 * 60; // 08:00 — old default, treat as 08:15
+const DEFAULT_SHIFT_START_MIN = (8 * 60) + 20; // 08:20
+const LEGACY_SHIFT_STARTS = new Set([(8 * 60), (8 * 60) + 15]); // 08:00 and 08:15
 
 function coerceShiftStartMinute(start) {
-  if (start === LEGACY_SHIFT_START_MIN) return DEFAULT_SHIFT_START_MIN;
+  if (LEGACY_SHIFT_STARTS.has(start)) return DEFAULT_SHIFT_START_MIN;
   return start;
 }
 
@@ -2186,7 +2186,7 @@ function loadShiftScheduleFromStorage() {
     if (Number.isFinite(start) && start >= 0 && start < 1440) SETTINGS.shiftSchedule.startMinute = start;
     if (Number.isFinite(end) && end > 0 && end <= 1440) SETTINGS.shiftSchedule.endMinute = end;
     if (typeof cfg.enableAutoWindow === "boolean") SETTINGS.shiftSchedule.enableAutoWindow = cfg.enableAutoWindow;
-    if (parseInt(cfg.startMinute, 10) === LEGACY_SHIFT_START_MIN) saveShiftScheduleToStorage();
+    if (LEGACY_SHIFT_STARTS.has(parseInt(cfg.startMinute, 10))) saveShiftScheduleToStorage();
   } catch (_) {}
 }
 
@@ -2213,7 +2213,7 @@ function applyShiftScheduleFromRemote(payload) {
   SETTINGS.shiftSchedule.enableAutoWindow = enableAutoWindow;
   saveShiftScheduleToStorage();
   updateShiftMenuLabel();
-  if (parseInt(payload.startMinute, 10) === LEGACY_SHIFT_START_MIN && !isMonitor) {
+  if (LEGACY_SHIFT_STARTS.has(parseInt(payload.startMinute, 10)) && !isMonitor) {
     publishShiftScheduleToFirebase();
   }
   applyShiftScheduleTick();
