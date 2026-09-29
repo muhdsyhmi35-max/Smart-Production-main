@@ -104,6 +104,7 @@ function unitScanFingerprint(chassis, engine, key) {
     normalizeScanId(key)
   ].join("|");
 }
+/** Available operation minutes for the shift. Plan W/T is calculated from the daily plan, then capped here. */
 const GRAPH_WT_PRESET_MINS = {
   normal: 460,
   halfday: 300,
@@ -3415,7 +3416,7 @@ function getTodayActualEffPct() {
   if (isNonProductionMode() || statusText === "NON PRODUCTION") return null;
   if (isReportNonProductionDay(dayKey)) return null;
   const planUnits = getDashboardPlan();
-  const planWtMins = getPlanWtMinsForDay(dayKey);
+  const planWtMins = getPlanWtMinsForDay(dayKey, planUnits);
   const actualWtMins = calcActualWtMinsForDay(dayKey, planUnits);
   return resolveActualEffPct(dayKey, planUnits, actualCount, planWtMins, actualWtMins);
 }
@@ -6132,7 +6133,11 @@ function calcActualWtMinsForDay(dayKey, targetUnits = 0, achievedMsOpt) {
   return Math.max(0, (spanTodaySec - breakTodaySec) / 60);
 }
 
-function getPlanWtMinsForDay(dayKey) {
+/** Plan EFF baseline. 100% is the pure cycle time; the line plans and scores at 98%. */
+const PLAN_EFF_PCT = 98;
+
+/** Available minutes in the shift (Mon–Thu 460, Friday 400, half day 300). */
+function getOperationWtMinsForDay(dayKey) {
   const d = new Date(`${dayKey}T12:00:00`);
   if (Number.isFinite(d.getTime()) && d.getDay() === 5) {
     return GRAPH_WT_PRESET_MINS.friday;
@@ -6141,8 +6146,21 @@ function getPlanWtMinsForDay(dayKey) {
   return GRAPH_WT_PRESET_MINS[presetKey] || GRAPH_WT_PRESET_MINS.normal;
 }
 
-/** Plan EFF baseline. Live Actual EFF follows pace; after shift end it locks to the real day result. */
-const PLAN_EFF_PCT = 98;
+/**
+ * Plan W/T at 98%.
+ * 100% time = daily plan × cycle minutes.
+ * 98% time = that ÷ 0.98, because the same units take slightly longer.
+ * Capped at the day's operation time so the plan never exceeds the shift.
+ */
+function getPlanWtMinsForDay(dayKey, planUnits) {
+  const operationMins = getOperationWtMinsForDay(dayKey);
+  const units = Number(planUnits);
+  const cycleMin = parseFloat(document.getElementById("cycleTarget")?.value) || SETTINGS.defaultCycle;
+  if (!Number.isFinite(units) || units <= 0 || !Number.isFinite(cycleMin) || cycleMin <= 0) return 0;
+  const wtAt100 = units * cycleMin;
+  const wtAtPlanEff = wtAt100 / (PLAN_EFF_PCT / 100);
+  return Math.min(operationMins, Math.round(wtAtPlanEff));
+}
 
 function isProductionDayClosed(dayKey) {
   const today = toIsoDateLocal(new Date());
@@ -6196,10 +6214,10 @@ function resolveActualEffPct(dayKey, planUnits, actualUnits, planWtMins, actualW
 
 function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, rangeLabel, achievedMs) {
   const planEffPct = PLAN_EFF_PCT;
-  const planWtMins = getPlanWtMinsForDay(dayKey);
   const nonProdDay = dayKey && isReportNonProductionDay(dayKey, dayProduced);
 
   const planUnits = dayTarget?.[dayKey] || 0;
+  const planWtMins = nonProdDay ? 0 : getPlanWtMinsForDay(dayKey, planUnits);
   const actualUnits = dayProduced?.[dayKey] || 0;
   const actualWtMins = nonProdDay ? 0 : calcActualWtMinsForDay(dayKey, planUnits, achievedMs);
 
@@ -6226,7 +6244,7 @@ function buildEffWtCardsHtmlForDay(dayKey, dayProduced, dayTarget, periodLabel, 
       </div>
       <div class="report-eff-wt-card">
         <span>Plan W/T (MINS)</span>
-        <strong>${planWtMins.toFixed(1)}</strong>
+        <strong>${planWtMins > 0 ? planWtMins.toFixed(1) : "—"}</strong>
       </div>
       <div class="report-eff-wt-card">
         <span>Actual W/T (MINS)</span>
@@ -6336,7 +6354,7 @@ function renderGraphCharts() {
     if (isReportNonProductionDay(k, dayProduced)) return 0;
     const target = dayTarget[k] || 0;
     const produced = dayProduced[k] || 0;
-    const planWtMins = getPlanWtMinsForDay(k);
+    const planWtMins = getPlanWtMinsForDay(k, target);
     const times = stats.dayScanTimes[k] || [];
     const achievedMs = getTargetAchievedMsFromTimes(times, target);
     const actualWtMins = calcActualWtMinsForDay(k, target, achievedMs);
