@@ -37,7 +37,7 @@ const SETTINGS = {
     zeroTargetOnInactiveWeekends: true
   },
   shiftSchedule: {
-    startMinute: (8 * 60) + 20, // 08:20 — daily reset + Expected/countdown start
+    startMinute: (8 * 60) + 15, // 08:15 — countdown, Expected, and actual working time
     endMinute: (17 * 60) + 30,  // 17:30
     enableAutoWindow: true
   },
@@ -1931,8 +1931,8 @@ function maybeResetDashboardForNewCalendarDay() {
   } catch (_) {}
 }
 
-const DEFAULT_SHIFT_START_MIN = (8 * 60) + 20; // 08:20
-const LEGACY_SHIFT_STARTS = new Set([(8 * 60), (8 * 60) + 15]); // 08:00 and 08:15
+const DEFAULT_SHIFT_START_MIN = (8 * 60) + 15; // 08:15
+const LEGACY_SHIFT_STARTS = new Set([(8 * 60), (8 * 60) + 20]); // 08:00 and 08:20
 
 function coerceShiftStartMinute(start) {
   if (LEGACY_SHIFT_STARTS.has(start)) return DEFAULT_SHIFT_START_MIN;
@@ -1948,11 +1948,14 @@ function isWeekendDate(d = new Date()) {
   return day === 0 || day === 6;
 }
 
+const COUNTDOWN_START_MIN = (8 * 60) + 15; // 08:15 — first cycle countdown
+
 function isWithinShiftWindow(d = new Date()) {
   if (isWeekendDate(d)) return false;
   if (!SETTINGS.shiftSchedule.enableAutoWindow) return true;
   const minute = getLocalMinuteOfDay(d);
-  return minute >= SETTINGS.shiftSchedule.startMinute && minute < SETTINGS.shiftSchedule.endMinute;
+  const openMin = Math.min(COUNTDOWN_START_MIN, SETTINGS.shiftSchedule.startMinute);
+  return minute >= openMin && minute < SETTINGS.shiftSchedule.endMinute;
 }
 
 /** Local wall time (ms) when the configured shift starts on the same calendar day as `d`. */
@@ -1961,6 +1964,15 @@ function getTodayShiftStartMs(d = new Date()) {
   const hh = Math.floor(startMin / 60) % 24;
   const mm = startMin % 60;
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), hh, mm, 0, 0).getTime();
+}
+
+/** First cycle countdown. 08:15, or the shift start if that is earlier. */
+function getTodayCountdownStartMs(d = new Date()) {
+  const shiftStartMs = getTodayShiftStartMs(d);
+  const hh = Math.floor(COUNTDOWN_START_MIN / 60) % 24;
+  const mm = COUNTDOWN_START_MIN % 60;
+  const countdownStartMs = new Date(d.getFullYear(), d.getMonth(), d.getDate(), hh, mm, 0, 0).getTime();
+  return Math.min(shiftStartMs, countdownStartMs);
 }
 
 function getPaceAnchorMs() {
@@ -2128,11 +2140,11 @@ function applyShiftScheduleTick() {
   const statusNow = document.getElementById("status")?.innerText?.trim() || "";
   if (timer || statusNow === "PAUSED") return;
 
-  // 08:15 (or first open after that): count from shift start, not from whenever the PC woke up.
+  // 08:15 (or first open after that): countdown starts at 08:15, not when the PC woke up.
   if (enteredNewShift || statusNow === "READY" || statusNow === "OFF SHIFT") {
     if (!startTime) {
-      const shiftStartMs = getTodayShiftStartMs(now);
-      startTime = new Date(now.getTime() >= shiftStartMs ? shiftStartMs : now.getTime());
+      const countdownStartMs = getTodayCountdownStartMs(now);
+      startTime = new Date(now.getTime() >= countdownStartMs ? countdownStartMs : now.getTime());
     }
     startProduction(false);
   }
@@ -3889,9 +3901,9 @@ function applyLiveState(state) {
     if (Number.isFinite(started) && started > 0) startTime = new Date(started);
   }
   if (!anchorScanMs && (isWithinShiftWindow() || isOvertimeActive())) {
-    const shiftStartMs = getTodayShiftStartMs();
-    if (!startTime) startTime = new Date(shiftStartMs);
-    anchorScanMs = lastScanWallMs || shiftStartMs;
+    const countdownStartMs = getTodayCountdownStartMs();
+    if (!startTime) startTime = new Date(countdownStartMs);
+    anchorScanMs = lastScanWallMs || countdownStartMs;
   }
 
   startLiveCountdownTicker(countdown, status, state.updatedAt, anchorScanMs);
@@ -4109,13 +4121,13 @@ function startProduction(shouldSync = true, opts = {}) {
     publishSyncCommand("start");
   }
 
-  // First start of the day counts from 08:15, even if the PC opened later.
+  // First cycle of the day counts from 08:15, even if the PC opened later.
   if (!startTime) {
     const nowMs = Date.now();
-    const shiftStartMs = SETTINGS.shiftSchedule.enableAutoWindow
-      ? getTodayShiftStartMs(new Date(nowMs))
+    const countdownStartMs = SETTINGS.shiftSchedule.enableAutoWindow
+      ? getTodayCountdownStartMs(new Date(nowMs))
       : nowMs;
-    startTime = new Date(nowMs >= shiftStartMs ? shiftStartMs : nowMs);
+    startTime = new Date(nowMs >= countdownStartMs ? countdownStartMs : nowMs);
   }
 
   // Fresh Start only. After refresh, keep remaining time / downtime at 00:00.
@@ -4392,9 +4404,9 @@ function completeKeyScan(key, el) {
   if (!firstUnit && lastScanWallMs != null) {
     t0Ms = lastScanWallMs;
   } else if (firstUnit && SETTINGS.shiftSchedule.enableAutoWindow) {
-    const shiftStartMs = getTodayShiftStartMs(now);
-    const lineMs = startTime ? startTime.getTime() : shiftStartMs;
-    t0Ms = Math.max(shiftStartMs, lineMs);
+    const countdownStartMs = getTodayCountdownStartMs(now);
+    const lineMs = startTime ? startTime.getTime() : countdownStartMs;
+    t0Ms = Math.max(countdownStartMs, lineMs);
     if (now.getTime() <= t0Ms) t0Ms = null;
   } else if (firstUnit && startTime) {
     t0Ms = startTime.getTime();
@@ -6978,7 +6990,7 @@ function applyReconciledActualToDashboard() {
         countdownValue,
         "RUNNING",
         Date.now(),
-        lastScanWallMs || getTodayShiftStartMs()
+        lastScanWallMs || getTodayCountdownStartMs()
       );
     }
     syncEfficiencyCardDom();
