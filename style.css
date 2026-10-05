@@ -1424,68 +1424,46 @@ body.role-operator.monitor-mode .card-expected .big-number.status-red{
   color:#ef4444 !important;
 }
 
-body.role-operator.monitor-mode .card-balance{
-  background:#160507;
-  border:1px solid #e11d2e;
-  box-shadow:inset 0 0 0 1px rgba(239,68,68,.22), 0 8px 18px rgba(2,6,23,.45);
-}
-
-body.role-operator.monitor-mode .card-balance.is-ahead{
-  background:#04140c;
-  border-color:#16a34a;
-  box-shadow:inset 0 0 0 1px rgba(34,197,94,.16), 0 8px 18px rgba(2,6,23,.45);
-}
-
+body.role-operator.monitor-mode .card-balance,
+body.role-operator.monitor-mode .card-balance.is-behind,
+body.role-operator.monitor-mode .card-balance.is-ahead,
 body.role-operator.monitor-mode .card-balance.is-even{
-  background:linear-gradient(180deg, rgba(8,13,25,0.96), rgba(6,10,20,0.98));
-  border-color:rgba(71,85,105,.45);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,0.03), 0 8px 18px rgba(2,6,23,0.45);
+  background:#070b14;
+  border:1px solid #f8fafc;
+  box-shadow:inset 0 0 0 1px rgba(248,250,252,.18), 0 8px 18px rgba(2,6,23,.45);
 }
 
-body.role-operator.monitor-mode .card-balance .op-kpi-icon{
-  color:#ef4444;
-}
-
-body.role-operator.monitor-mode .card-balance.is-ahead .op-kpi-icon{
-  color:#22c55e;
-}
-
+body.role-operator.monitor-mode .card-balance .op-kpi-icon,
+body.role-operator.monitor-mode .card-balance.is-behind .op-kpi-icon,
+body.role-operator.monitor-mode .card-balance.is-ahead .op-kpi-icon,
 body.role-operator.monitor-mode .card-balance.is-even .op-kpi-icon{
-  color:#e2e8f0;
+  color:#f8fafc;
 }
 
-body.role-operator.monitor-mode .card-balance h3{
+body.role-operator.monitor-mode .card-balance h3,
+body.role-operator.monitor-mode .card-balance.is-behind h3,
+body.role-operator.monitor-mode .card-balance.is-ahead h3,
+body.role-operator.monitor-mode .card-balance.is-even h3{
   margin:0;
-  color:#ef4444;
+  color:#f8fafc;
   letter-spacing:.12em;
   font-size:clamp(20px, 3.2vh, 32px);
   font-weight:800;
   text-align:center;
 }
 
-body.role-operator.monitor-mode .card-balance.is-ahead h3{
-  color:#22c55e;
-}
-
-body.role-operator.monitor-mode .card-balance.is-even h3{
-  color:#cbd5e1;
-}
-
-body.role-operator.monitor-mode .card-balance .big-number{
+body.role-operator.monitor-mode .card-balance .big-number,
+body.role-operator.monitor-mode .card-balance.is-behind .big-number,
+body.role-operator.monitor-mode .card-balance.is-ahead .big-number,
+body.role-operator.monitor-mode .card-balance.is-even .big-number,
+body.role-operator.monitor-mode .card-balance .big-number.status-red,
+body.role-operator.monitor-mode .card-balance .big-number.status-green,
+body.role-operator.monitor-mode .card-balance .big-number.status-blue{
+  color:#f8fafc !important;
   text-align:center;
   font-size:clamp(40px, 52cqh, 160px);
   font-weight:800;
   line-height:.92;
-}
-
-body.role-operator.monitor-mode .card-balance.is-behind .big-number,
-body.role-operator.monitor-mode .card-balance .big-number.status-red{
-  color:#ef4444 !important;
-}
-
-body.role-operator.monitor-mode .card-balance.is-even .big-number,
-body.role-operator.monitor-mode .card-balance.is-even .big-number.status-blue{
-  color:#f8fafc !important;
 }
 
 body.role-operator.monitor-mode .card-countdown:hover,
