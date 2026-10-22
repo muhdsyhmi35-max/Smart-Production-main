@@ -1121,7 +1121,7 @@ body.monitor-layout-active .dashboard.monitor-dashboard-relayout .monitor-mini-c
   z-index:0;
 }
 
-/* Operator: only Countdown, Expected, Actual, Balance — one screen */
+/* Operator: only Countdown, Plan, Actual, Remain — one screen */
 body.role-operator.monitor-mode:not(.summary-mode):not(.graph-mode):not(.history-mode):not(.appearance-mode){
   display:flex;
   flex-direction:column;
@@ -1201,7 +1201,7 @@ body.role-operator.monitor-mode .dashboard > .card:nth-child(1) .big-number{
   font-weight:800;
 }
 
-body:not(.role-operator.monitor-mode) .card-title-operator,
+body:not(.role-operator.monitor-mode):not(.role-management) .card-title-operator,
 body:not(.role-operator.monitor-mode) .op-countdown-svg,
 body:not(.role-operator.monitor-mode) .op-timer-icon,
 body:not(.role-operator.monitor-mode) .op-cycle-meta,
@@ -1213,7 +1213,15 @@ body:not(.role-operator.monitor-mode) .op-kpi-copy{
   display:contents;
 }
 
-body.role-operator.monitor-mode .card-title-default{
+body.role-operator.monitor-mode .card-title-default,
+body.role-management .card-title-default{
+  display:none !important;
+}
+
+body.role-operator.monitor-mode .card-expected #expected,
+body.role-operator.monitor-mode .card-balance #balance,
+body.role-management #opPlanFigure,
+body.role-management #opRemainFigure{
   display:none !important;
 }
 

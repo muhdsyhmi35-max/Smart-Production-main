@@ -45,9 +45,10 @@ const SETTINGS = {
    * Auto downtime (no operator tap).
    * Late scan within cycle + grace = Delay only (conveyor still running).
    * Gap longer than cycle + grace = booked as Downtime (treat as line stop).
+   * Booked minutes are only the gap after cycle + grace.
    */
   downtime: {
-    graceMinutes: 2
+    graceMinutes: 6
   }
 };
 
@@ -2001,13 +2002,13 @@ function getIdleSecExBreak(nowMs = Date.now()) {
   return Math.max(0, wallSec - scheduledBreakOverlapSec(t0, nowMs));
 }
 
-/** Open downtime starts after cycle + 2 min with no scan. Amount booked/shown is idle − cycle. */
+/** Open downtime starts after cycle + grace with no scan. Amount booked/shown is idle − cycle − grace. */
 function computeLiveDowntimeState(nowMs = Date.now()) {
   const cycleTimeSec = Math.max(
     Math.floor((parseFloat(document.getElementById("cycleTarget")?.value) || SETTINGS.defaultCycle) * 60),
     1
   );
-  const graceSec = Math.max(0, (SETTINGS.downtime?.graceMinutes ?? 2) * 60);
+  const graceSec = Math.max(0, (SETTINGS.downtime?.graceMinutes ?? 6) * 60);
   if (isNonProductionMode() || isBreakTime() || (isWeekendDate(new Date(nowMs)) && !isOvertimeActive(new Date(nowMs)))) {
     return { cycleTimeSec, graceSec, idleSec: 0, inDowntime: false, openSec: 0 };
   }
@@ -2018,7 +2019,7 @@ function computeLiveDowntimeState(nowMs = Date.now()) {
     graceSec,
     idleSec,
     inDowntime,
-    openSec: inDowntime ? idleSec - cycleTimeSec : 0
+    openSec: inDowntime ? Math.max(0, idleSec - cycleTimeSec - graceSec) : 0
   };
 }
 
@@ -4418,11 +4419,12 @@ function completeKeyScan(key, el) {
     const wallSec = Math.floor((t1 - t0Ms) / 1000);
     const breakSec = scheduledBreakOverlapSec(t0Ms, t1);
     const idleSecExBreak = Math.max(0, wallSec - breakSec);
-    const graceSec = Math.max(0, (SETTINGS.downtime?.graceMinutes ?? 2) * 60);
+    const graceSec = Math.max(0, (SETTINGS.downtime?.graceMinutes ?? 6) * 60);
     const stopThresholdSec = cycleTimeSec + graceSec;
     // Late scan inside the grace window = Delay only. Longer gap = auto downtime.
+    // Booked amount excludes both the cycle and the grace.
     if (idleSecExBreak > stopThresholdSec && !(isWeekendDate(now) && !isOvertimeActive(now))) {
-      const actualDowntime = idleSecExBreak - cycleTimeSec;
+      const actualDowntime = Math.max(0, idleSecExBreak - cycleTimeSec - graceSec);
       if (plan === 0 || (actualCount + 1) <= plan) {
         downtimeEvent = format(actualDowntime);
         downtimeSeconds += actualDowntime;
@@ -4559,22 +4561,19 @@ function syncOperatorDashboardChrome() {
     balCard.classList.toggle("is-even", v === 0);
   }
 
-  const expEl = document.getElementById("expected");
   const actEl = document.getElementById("actual");
   const expCard = document.querySelector(".card-expected");
-  if (expEl && actEl) {
-    const exp = parseInt(String(expEl.innerText).replace(/[^\-0-9]/g, ""), 10);
-    const act = parseInt(String(actEl.innerText).replace(/[^\-0-9]/g, ""), 10);
-    const expectedN = Number.isFinite(exp) ? exp : 0;
-    const actualN = Number.isFinite(act) ? act : 0;
-    const behindCycle = expectedN > 0 && actualN < expectedN;
-    if (expCard) {
-      expCard.classList.toggle("is-behind", behindCycle);
-      expCard.classList.toggle("is-on-pace", !behindCycle);
-    }
-    if (document.body.classList.contains("role-operator") && document.body.classList.contains("monitor-mode")) {
-      expEl.className = behindCycle ? "big-number status-red" : "big-number status-green";
-    }
+  const planRaw = parseInt(String(document.getElementById("plan")?.innerText || "").replace(/[^\-0-9]/g, ""), 10);
+  const actualRaw = parseInt(String(actEl?.innerText || "").replace(/[^\-0-9]/g, ""), 10);
+  const planN = Number.isFinite(planRaw) ? planRaw : 0;
+  const actualN = Number.isFinite(actualRaw) ? actualRaw : 0;
+  const opPlan = document.getElementById("opPlanFigure");
+  const opRemain = document.getElementById("opRemainFigure");
+  if (opPlan) opPlan.textContent = String(planN);
+  if (opRemain) opRemain.textContent = String(planN - actualN);
+  if (expCard) {
+    expCard.classList.remove("is-behind");
+    expCard.classList.add("is-on-pace");
   }
 }
 
