@@ -2012,6 +2012,19 @@ function getIdleSecExBreak(nowMs = Date.now()) {
   return Math.max(0, wallSec - scheduledBreakOverlapSec(t0, nowMs));
 }
 
+/** Open downtime stops at shift end (or overtime end). It does not keep growing after the line is closed. */
+function getProductionCountUntilMs(nowMs = Date.now()) {
+  if (!SETTINGS.shiftSchedule.enableAutoWindow) return nowMs;
+  const now = new Date(nowMs);
+  if (canRunProductionNow(now)) return nowMs;
+  const endMin = Number(SETTINGS.shiftSchedule.endMinute) || 0;
+  if (getLocalMinuteOfDay(now) < endMin && !isWeekendDate(now)) return nowMs;
+  const shiftEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), Math.floor(endMin / 60), endMin % 60, 0, 0);
+  let cap = shiftEnd.getTime();
+  if (Number.isFinite(overtimeUntilMs) && overtimeUntilMs > cap && overtimeUntilMs <= nowMs) cap = overtimeUntilMs;
+  return Math.min(cap, nowMs);
+}
+
 /** Open downtime starts after cycle + grace with no scan. Amount booked/shown is idle − cycle − grace. */
 function computeLiveDowntimeState(nowMs = Date.now()) {
   const cycleTimeSec = Math.max(
@@ -2022,7 +2035,8 @@ function computeLiveDowntimeState(nowMs = Date.now()) {
   if (isNonProductionMode() || isBreakTime() || (isWeekendDate(new Date(nowMs)) && !isOvertimeActive(new Date(nowMs)))) {
     return { cycleTimeSec, graceSec, idleSec: 0, inDowntime: false, openSec: 0 };
   }
-  const idleSec = getIdleSecExBreak(nowMs);
+  const countUntilMs = getProductionCountUntilMs(nowMs);
+  const idleSec = getIdleSecExBreak(countUntilMs);
   const inDowntime = idleSec > cycleTimeSec + graceSec;
   return {
     cycleTimeSec,
@@ -3684,6 +3698,7 @@ function startLiveCountdownTicker(baseCountdown, status, updatedAt, anchorScanMs
       countdownValue = 0;
       countdownEl.innerText = format(0);
       setOffShiftStatus();
+      applyLiveDowntimeUi();
       refreshLivePaceCards();
       syncOperatorDashboardChrome();
       return;
