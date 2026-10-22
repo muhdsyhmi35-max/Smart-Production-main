@@ -4551,26 +4551,23 @@ function syncOperatorDashboardChrome() {
   const lit = ticks.length ? Math.round((remain / cycleSec) * ticks.length) : 0;
   ticks.forEach((tick, i) => tick.classList.toggle("is-lit", i < lit));
 
+  const delayText = String(document.getElementById("delay")?.innerText || "0").trim();
+  const delayRaw = parseInt(delayText.replace(/[^\-0-9]/g, ""), 10);
+  const delayN = Number.isFinite(delayRaw) ? delayRaw : 0;
   const balCard = document.querySelector(".card-balance");
-  const balEl = document.getElementById("balance");
-  if (balCard && balEl) {
-    const n = parseInt(String(balEl.innerText).replace(/[^\-0-9]/g, ""), 10);
-    const v = Number.isFinite(n) ? n : 0;
-    balCard.classList.toggle("is-behind", v < 0);
-    balCard.classList.toggle("is-ahead", v > 0);
-    balCard.classList.toggle("is-even", v === 0);
+  if (balCard) {
+    balCard.classList.toggle("is-behind", delayN < 0);
+    balCard.classList.toggle("is-ahead", delayN > 0);
+    balCard.classList.toggle("is-even", delayN === 0);
   }
 
-  const actEl = document.getElementById("actual");
   const expCard = document.querySelector(".card-expected");
-  const planRaw = parseInt(String(document.getElementById("plan")?.innerText || "").replace(/[^\-0-9]/g, ""), 10);
-  const actualRaw = parseInt(String(actEl?.innerText || "").replace(/[^\-0-9]/g, ""), 10);
-  const planN = Number.isFinite(planRaw) ? planRaw : 0;
-  const actualN = Number.isFinite(actualRaw) ? actualRaw : 0;
+  const expectedRaw = parseInt(String(document.getElementById("expected")?.innerText || "").replace(/[^\-0-9]/g, ""), 10);
+  const expectedN = Number.isFinite(expectedRaw) ? expectedRaw : 0;
   const opPlan = document.getElementById("opPlanFigure");
   const opRemain = document.getElementById("opRemainFigure");
-  if (opPlan) opPlan.textContent = String(planN);
-  if (opRemain) opRemain.textContent = String(planN - actualN);
+  if (opPlan) opPlan.textContent = String(expectedN);
+  if (opRemain) opRemain.textContent = delayN > 0 ? ("+" + delayN) : String(delayN);
   if (expCard) {
     expCard.classList.remove("is-behind");
     expCard.classList.add("is-on-pace");

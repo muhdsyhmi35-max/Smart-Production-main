@@ -1414,6 +1414,12 @@ body.role-operator.monitor-mode .card-actual h3{
   text-align:center;
 }
 
+body.role-operator.monitor-mode .card-expected h3,
+body.role-operator.monitor-mode .card-actual h3{
+  letter-spacing:.06em;
+  white-space:nowrap;
+}
+
 body.role-operator.monitor-mode .card-expected.is-behind h3{
   color:#ef4444;
 }
