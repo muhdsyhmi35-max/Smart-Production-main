@@ -48,7 +48,7 @@ const SETTINGS = {
    * Booked minutes are only the gap after cycle + grace.
    */
   downtime: {
-    graceMinutes: 6
+    graceMinutes: 9
   }
 };
 
@@ -2008,7 +2008,7 @@ function computeLiveDowntimeState(nowMs = Date.now()) {
     Math.floor((parseFloat(document.getElementById("cycleTarget")?.value) || SETTINGS.defaultCycle) * 60),
     1
   );
-  const graceSec = Math.max(0, (SETTINGS.downtime?.graceMinutes ?? 6) * 60);
+  const graceSec = Math.max(0, (SETTINGS.downtime?.graceMinutes ?? 9) * 60);
   if (isNonProductionMode() || isBreakTime() || (isWeekendDate(new Date(nowMs)) && !isOvertimeActive(new Date(nowMs)))) {
     return { cycleTimeSec, graceSec, idleSec: 0, inDowntime: false, openSec: 0 };
   }
@@ -4419,7 +4419,7 @@ function completeKeyScan(key, el) {
     const wallSec = Math.floor((t1 - t0Ms) / 1000);
     const breakSec = scheduledBreakOverlapSec(t0Ms, t1);
     const idleSecExBreak = Math.max(0, wallSec - breakSec);
-    const graceSec = Math.max(0, (SETTINGS.downtime?.graceMinutes ?? 6) * 60);
+    const graceSec = Math.max(0, (SETTINGS.downtime?.graceMinutes ?? 9) * 60);
     const stopThresholdSec = cycleTimeSec + graceSec;
     // Late scan inside the grace window = Delay only. Longer gap = auto downtime.
     // Booked amount excludes both the cycle and the grace.

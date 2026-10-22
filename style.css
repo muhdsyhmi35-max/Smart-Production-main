@@ -1412,11 +1412,6 @@ body.role-operator.monitor-mode .card-actual h3{
   font-size:clamp(20px, 3.2vh, 32px);
   font-weight:800;
   text-align:center;
-}
-
-body.role-operator.monitor-mode .card-expected h3,
-body.role-operator.monitor-mode .card-actual h3{
-  letter-spacing:.06em;
   white-space:nowrap;
 }
 
