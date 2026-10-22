@@ -225,6 +225,11 @@ function canEditLineSettings() {
   return canOperateLine();
 }
 
+/** Operator on the main PC, and Master Control on the monitor, can set plan and lot. */
+function canEditPlanAndLot() {
+  return canOperateLine() || isMasterRole();
+}
+
 function setAppRole(role) {
   if (role === "master" || role === "admin") return;
   try {
@@ -243,14 +248,19 @@ function grantAdminAfterLogin() {
 }
 
 function applyMainPcEditLock() {
-  const master = isMasterRole();
   const canOperate = canOperateLine();
   const canEditSettings = canEditLineSettings();
-  ["cycleTarget", "dailyPlanTarget", "lotInput"].forEach(id => {
+  const canEditPlanLot = canEditPlanAndLot();
+  const cycleEl = document.getElementById("cycleTarget");
+  if (cycleEl) {
+    cycleEl.readOnly = !canEditSettings;
+    cycleEl.classList.toggle("settings-locked", !canEditSettings);
+  }
+  ["dailyPlanTarget", "lotInput"].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
-    el.readOnly = !canEditSettings;
-    el.classList.toggle("settings-locked", !canEditSettings);
+    el.readOnly = !canEditPlanLot;
+    el.classList.toggle("settings-locked", !canEditPlanLot);
   });
   document.querySelectorAll(".main-pc-actions button").forEach(btn => {
     btn.disabled = isMonitor || !canOperate;
@@ -2041,9 +2051,10 @@ function applyLiveDowntimeUi() {
   downtimeSeconds = booked + live.openSec;
   const textEl = document.getElementById("downtime");
   if (textEl) textEl.innerText = format(downtimeSeconds);
-  const alertOn = live.inDowntime && downtimeSeconds > 0 && !isBreakTime();
+  const alertOn = !isShiftClosed() && live.inDowntime && downtimeSeconds > 0 && !isBreakTime();
   setDowntimeAlertUi(alertOn);
-  if (alertOn) setStatus("DOWN TIME", "status-red blink");
+  if (isShiftClosed()) setOffShiftStatus();
+  else if (alertOn) setStatus("DOWN TIME", "status-red blink");
   syncDowntimeAccumulatedHighlight();
 }
 
@@ -2053,6 +2064,10 @@ function isOvertimeActive(d = new Date()) {
 
 function canRunProductionNow(d = new Date()) {
   return isWithinShiftWindow(d) || isOvertimeActive(d);
+}
+
+function isShiftClosed(d = new Date()) {
+  return !!SETTINGS.shiftSchedule.enableAutoWindow && !canRunProductionNow(d);
 }
 
 function setOffShiftStatus() {
@@ -3649,8 +3664,14 @@ function startLiveCountdownTicker(baseCountdown, status, updatedAt, anchorScanMs
     (inShift && status !== "PAUSED" && status !== "BREAK TIME");
 
   if (!tickPace) {
-    countdownValue = baseCountdown;
-    countdownEl.innerText = format(baseCountdown);
+    if (isShiftClosed()) {
+      countdownValue = 0;
+      countdownEl.innerText = format(0);
+      setOffShiftStatus();
+    } else {
+      countdownValue = baseCountdown;
+      countdownEl.innerText = format(baseCountdown);
+    }
     refreshLivePaceCards();
     syncOperatorDashboardChrome();
     return;
@@ -3659,6 +3680,14 @@ function startLiveCountdownTicker(baseCountdown, status, updatedAt, anchorScanMs
   const snapshotUpdatedAt = Number(updatedAt) || syncedNowMs();
 
   const render = () => {
+    if (isShiftClosed()) {
+      countdownValue = 0;
+      countdownEl.innerText = format(0);
+      setOffShiftStatus();
+      refreshLivePaceCards();
+      syncOperatorDashboardChrome();
+      return;
+    }
     const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget")?.value) || SETTINGS.defaultCycle) * 60;
     const adjusted = computeRunningCountdownSec(
       cycleTimeSec,
@@ -3869,7 +3898,10 @@ function applyLiveState(state) {
     status = actual > 0 ? "PAUSED" : "READY";
   }
   const liveDt = computeLiveDowntimeState();
-  if (isMonitor && liveDt.inDowntime && !isScanWaitStatus(status)) {
+  const shiftClosed = isShiftClosed();
+  if (shiftClosed) {
+    status = "OFF SHIFT";
+  } else if (isMonitor && liveDt.inDowntime && !isScanWaitStatus(status)) {
     status = "DOWN TIME";
   } else if (
     isMonitor &&
@@ -3936,10 +3968,16 @@ function applyLiveState(state) {
 
   const downtimeCard = document.getElementById("downtimeCard");
   const downtimeText = document.getElementById("downtime");
-  const statusNow = computeLiveDowntimeState().inDowntime ? "DOWN TIME" : status;
+  const statusNow = isShiftClosed()
+    ? "OFF SHIFT"
+    : (computeLiveDowntimeState().inDowntime ? "DOWN TIME" : status);
 
   const alertOn = statusNow === "DOWN TIME" && !isBreakTime() && computeLiveDowntimeState().inDowntime && downtimeSeconds > 0;
-  if (statusNow === "DOWN TIME" && !isBreakTime()) {
+  if (statusNow === "OFF SHIFT") {
+    setOffShiftStatus();
+    downtimeCard.classList.remove("downtime-alert", "blink");
+    downtimeText.classList.remove("status-red", "blink");
+  } else if (statusNow === "DOWN TIME" && !isBreakTime()) {
     setStatus("DOWN TIME", "status-red blink");
   } else if (statusNow === "RUNNING") {
     setStatus("RUNNING", "status-green pulse");
@@ -4650,6 +4688,13 @@ function updateDisplay() {
 
   // Display Expected
   document.getElementById("plan").innerText = plan;
+  if (isShiftClosed()) {
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+    }
+    countdownValue = 0;
+  }
   document.getElementById("countdown").innerText = format(countdownValue);
   refreshDowntimeCardFromTable();
 
@@ -4665,6 +4710,8 @@ function updateDisplay() {
   /* ================= LOGIK STATUS BARU ================= */
   if (isNonProductionMode()) {
     setStatus("NON PRODUCTION", "status-blue");
+  } else if (isShiftClosed()) {
+    setOffShiftStatus();
   } else if (isBreakTime()) {
     setStatus("BREAK TIME", "status-orange");
   } else if (duplicateLock) {
@@ -6974,20 +7021,24 @@ function applyReconciledActualToDashboard() {
   refreshLivePaceCards();
 
   if (isMonitor) {
-    const planOk = plan > 0 && actualCount >= plan;
-    if (planOk) {
-      setStatus("TARGET ACHIEVED", "status-green");
-    } else if (isWithinShiftWindow() || isOvertimeActive()) {
-      const cur = document.getElementById("status")?.innerText?.trim() || "";
-      if (!isScanWaitStatus(cur) && cur !== "DOWN TIME" && cur !== "BREAK TIME" && cur !== "PAUSED") {
-        setStatus("RUNNING", "status-green pulse");
+    if (isShiftClosed()) {
+      setOffShiftStatus();
+    } else {
+      const planOk = plan > 0 && actualCount >= plan;
+      if (planOk) {
+        setStatus("TARGET ACHIEVED", "status-green");
+      } else if (isWithinShiftWindow() || isOvertimeActive()) {
+        const cur = document.getElementById("status")?.innerText?.trim() || "";
+        if (!isScanWaitStatus(cur) && cur !== "DOWN TIME" && cur !== "BREAK TIME" && cur !== "PAUSED") {
+          setStatus("RUNNING", "status-green pulse");
+        }
+        startLiveCountdownTicker(
+          countdownValue,
+          "RUNNING",
+          Date.now(),
+          lastScanWallMs || getTodayCountdownStartMs()
+        );
       }
-      startLiveCountdownTicker(
-        countdownValue,
-        "RUNNING",
-        Date.now(),
-        lastScanWallMs || getTodayCountdownStartMs()
-      );
     }
     syncEfficiencyCardDom();
     syncOperatorDashboardChrome();
@@ -7193,7 +7244,7 @@ document.getElementById("cycleTarget").addEventListener("input", () => {
 });
 
 document.getElementById("dailyPlanTarget").addEventListener("input", () => {
-  if (!canEditLineSettings()) return;
+  if (!canEditPlanAndLot()) return;
   const plan = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
   persistDailyPlan(plan);
   syncTodayScanPlanOnRows(plan);
@@ -7205,7 +7256,7 @@ document.getElementById("dailyPlanTarget").addEventListener("input", () => {
 });
 
 document.getElementById("lotInput").addEventListener("input", () => {
-  if (!canEditLineSettings()) return;
+  if (!canEditPlanAndLot()) return;
   persistLotNo(document.getElementById("lotInput").value);
   hasLocalSession = true;
   if (isMonitor) publishMasterSettingsFromInputs();
