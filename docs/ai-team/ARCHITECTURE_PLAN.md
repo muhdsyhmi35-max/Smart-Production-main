@@ -1,9 +1,10 @@
 # Autonomous Multi-AI Development Team — Architecture Plan
 
-**Status:** Phase 1–2 (Discovery + Architecture). No orchestration runtime shipped yet.  
+**Status:** Phase 3 MVP scaffolding in progress (Cursor + GitHub only).  
 **Repo inspected:** `muhdsyhmi35-max/Smart-Production-main`  
 **Plan date:** 2026-10-29 (Asia/Kuala_Lumpur)  
-**Author of this plan:** Cursor Cloud Agent (this run)
+**Author of this plan:** Cursor Cloud Agent (this run)  
+**Budget lock:** User pays **ChatGPT Go only**; Claude/Gemini free apps. See `BUDGET_DECISION.md`. **No paid model API orchestration.**
 
 ---
 
@@ -17,10 +18,10 @@
 
 1. **GitHub** as the shared source of truth (code, docs, issues, PRs).
 2. **Cursor Cloud Agents** as the coding, testing, and PR implementation layer (already verified in this environment).
-3. A thin **Orchestrator** (GitHub Actions + optional small Node service) that routes tasks to **model APIs** (OpenAI / Anthropic / Google) by role — not to the ChatGPT/Claude/Gemini websites.
-4. **You** as the approval gate for plans, merges, and production deploys.
+3. **For your budget:** skip paid model APIs. Cursor runs sequential role passes (plan → research → design → implement → review → fix → report) and writes results into GitHub.
+4. **You** as the approval gate for merges and production deploys. ChatGPT Go stays optional for your own brainstorming (paste into Issues if it should persist).
 
-That delivers the same loop (plan → research → design → implement → review → fix → report) without manual message ferrying.
+That delivers the collaboration loop without manual ferrying between four AI apps, at **~$0 extra API cost**.
 
 ---
 
@@ -40,12 +41,12 @@ That delivers the same loop (plan → research → design → implement → revi
 | Cursor subscription tier / API quotas | **Not verified** from this agent |
 | Firebase / Netlify credentials for deploy | Present in project docs as config guidance; production secrets **not verified** in this agent |
 
-### Assumptions that must be checked before build
+### Assumptions / defaults after budget reply
 
-- You can create API keys for at least one provider (Anthropic recommended for reviewer; OpenAI or Gemini for research/PM).
-- You accept GitHub Issues + PR comments as the agent communication bus (not chat UIs).
-- Budget for API usage is acceptable (see cost section).
-- Production deploy stays human-approved (recommended default).
+- **Resolved:** No paid OpenAI / Anthropic / Gemini API keys for orchestration.
+- You accept GitHub Issues + PR comments + `docs/` as the agent communication bus.
+- Production deploy stays human-approved (default: yes).
+- Remaining defaults listed in `OPEN_QUESTIONS.md`.
 
 ---
 
@@ -170,7 +171,7 @@ Agents exchange information by **writing/reading GitHub artifacts** (issue comme
 | **D. Consumer ChatGPT/Claude/Gemini apps + glue** | Zapier/browser/copy | Familiar UIs | Fragile; ToS/API gaps; manual risk remains | **Not recommended** |
 | **E. MCP-only mesh** | MCP servers between tools | Good for tool access | Not a multi-agent scheduler by itself | Support layer only |
 
-**Recommendation:** Ship **A** immediately on this repo, design for **B**, skip **D**.
+**Recommendation (locked by budget):** Ship **A** only. Do not build **B** until the user chooses to pay for API usage. Skip **D**.
 
 ---
 
@@ -259,12 +260,12 @@ Done for this repo: GitHub + Cursor confirmed; consumer AI bridges not present.
 
 Adopt GCRR; roles mapped to APIs/Cursor; memory docs defined below.
 
-### Phase 3 — Minimum Viable System (next build, after your answers)
+### Phase 3 — Minimum Viable System (in this PR)
 
-1. Add `docs/` memory files (templates).
-2. Add `AGENTS.md` with role rules and approval gates.
-3. Define a single workflow: open Issue with label `ai-task` → you (or Cursor) run the task → report posted back.
-4. Validate with a **tiny non-destructive** task (e.g. add a docs typo fix + report).
+1. Add `docs/` memory files — done.
+2. Add `AGENTS.md` + `TASK_PROTOCOL.md` + completion template — done.
+3. Budget locked to Cursor + GitHub — done (`BUDGET_DECISION.md`).
+4. Next after merge: run one tiny validation task and fill a completion report (`T-002`).
 
 ### Phase 4 — Coding integration
 
@@ -316,24 +317,21 @@ Only then add Gemini research automation, Slack alerts, deploy hooks.
 
 ---
 
-## 11. Questions that must be answered before implementation
+## 11. Questions
 
-1. **Budget:** Are you willing to add OpenAI / Anthropic / Gemini **API** keys (paid usage), or stay Cursor + GitHub only for now?
-2. **Which providers do you already pay for?** (ChatGPT Plus ≠ OpenAI API access.)
-3. **Approval style:** Approve the plan before every code change, or auto-implement “safe” doc/test changes?
-4. **Correction loop limit:** Prefer 2 or 3 iterations?
-5. **First pilot task:** What small non-destructive task should validate the MVP?
-6. **Deploy:** Keep Netlify/Firebase deploy always human-only? (Recommended: yes.)
-7. **Repo scope:** Build the AI-team system **in this Smart-Production repo**, or a new dedicated `ai-dev-team` repo that can serve multiple projects?
-8. **Notification channel:** GitHub only, or also email/Slack?
+See `OPEN_QUESTIONS.md`. Budget items **resolved**. Defaults applied for the rest.
 
 ---
 
-## 12. Proposed next action (after you answer)
+## 12. Next action
 
-**If you choose “make it happen cheaply”:** implement Phase 3 MVP in this repo — memory docs + `AGENTS.md` + one Cursor-driven task protocol + sample completion report template. No third-party API required.
+Phase 3 scaffolding is in this branch. After you merge:
 
-**If you choose “true multi-model”:** same MVP, then add a GitHub Action that calls Anthropic for independent PR review once a key is in Secrets.
+1. Give Cursor any small task using `TASK_PROTOCOL.md`.
+2. Merge the resulting PR.
+3. Deploy yourself only when needed.
+
+Do **not** buy API keys unless you later want true multi-vendor automated review.
 
 ---
 
