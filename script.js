@@ -2025,6 +2025,11 @@ function getProductionCountUntilMs(nowMs = Date.now()) {
   return Math.min(cap, nowMs);
 }
 
+function isDailyTargetAchieved() {
+  const plan = getDashboardPlan();
+  return plan > 0 && actualCount >= plan;
+}
+
 /** Open downtime starts after cycle + grace with no scan. Amount booked/shown is idle − cycle − grace. */
 function computeLiveDowntimeState(nowMs = Date.now()) {
   const cycleTimeSec = Math.max(
@@ -2032,7 +2037,12 @@ function computeLiveDowntimeState(nowMs = Date.now()) {
     1
   );
   const graceSec = Math.max(0, (SETTINGS.downtime?.graceMinutes ?? 9) * 60);
-  if (isNonProductionMode() || isBreakTime() || (isWeekendDate(new Date(nowMs)) && !isOvertimeActive(new Date(nowMs)))) {
+  if (
+    isNonProductionMode() ||
+    isBreakTime() ||
+    isDailyTargetAchieved() ||
+    (isWeekendDate(new Date(nowMs)) && !isOvertimeActive(new Date(nowMs)))
+  ) {
     return { cycleTimeSec, graceSec, idleSec: 0, inDowntime: false, openSec: 0 };
   }
   const countUntilMs = getProductionCountUntilMs(nowMs);
@@ -3909,13 +3919,18 @@ function applyLiveState(state) {
   document.getElementById("actual").innerText = actual;
   refreshLivePaceCards();
 
+  const targetMet = !np && effectivePlan > 0 && actual >= effectivePlan;
   if (isMonitor && !np && effectivePlan > 0 && actual < effectivePlan && status === "TARGET ACHIEVED") {
     status = actual > 0 ? "PAUSED" : "READY";
+  } else if (targetMet) {
+    status = "TARGET ACHIEVED";
   }
   const liveDt = computeLiveDowntimeState();
   const shiftClosed = isShiftClosed();
   if (shiftClosed) {
     status = "OFF SHIFT";
+  } else if (targetMet) {
+    status = "TARGET ACHIEVED";
   } else if (isMonitor && liveDt.inDowntime && !isScanWaitStatus(status)) {
     status = "DOWN TIME";
   } else if (
@@ -3985,7 +4000,9 @@ function applyLiveState(state) {
   const downtimeText = document.getElementById("downtime");
   const statusNow = isShiftClosed()
     ? "OFF SHIFT"
-    : (computeLiveDowntimeState().inDowntime ? "DOWN TIME" : status);
+    : (isDailyTargetAchieved()
+      ? "TARGET ACHIEVED"
+      : (computeLiveDowntimeState().inDowntime ? "DOWN TIME" : status));
 
   const alertOn = statusNow === "DOWN TIME" && !isBreakTime() && computeLiveDowntimeState().inDowntime && downtimeSeconds > 0;
   if (statusNow === "OFF SHIFT") {
@@ -4729,13 +4746,13 @@ function updateDisplay() {
     setOffShiftStatus();
   } else if (isBreakTime()) {
     setStatus("BREAK TIME", "status-orange");
+  } else if (actualCount >= plan && plan > 0) {
+    clearInterval(timer); timer = null; countdownValue = 0; isDowntime = false;
+    setStatus("TARGET ACHIEVED", "status-green");
   } else if (duplicateLock) {
     setStatus(duplicateStatusText || "DUPLICATE SCAN", "status-red blink");
   } else if (isDowntime) {
     setStatus("DOWN TIME", "status-red blink");
-  } else if (actualCount >= plan && plan > 0) {
-    clearInterval(timer); timer = null; countdownValue = 0; isDowntime = false;
-    setStatus("TARGET ACHIEVED", "status-green");
   } else if (pendingChassis !== "" && pendingModel === "") {
     setStatus("WAITING MODEL", "status-orange");
   } else if (pendingModel !== "" && pendingEngine === "") {
