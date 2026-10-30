@@ -1560,12 +1560,14 @@ function applyHistoryDateFilter() {
   const table = document.getElementById("scanTable");
   if (!table) return;
   const dayKey = getActiveHistoryDayKey();
-  const chassisQ = historyChassisQuery;
+  const chassisQ = String(historyChassisQuery || "").trim();
   let visibleNo = 1;
   Array.from(table.rows).forEach(tr => {
     const rowDay = tr.dataset.scanDate || parseDisplayDateToIsoKey(tr.cells[1]?.innerText);
     const onDay = !!rowDay && rowDay === dayKey;
-    const show = onDay && chassisSearchMatches(tr.cells[5]?.innerText, chassisQ);
+    const show = chassisQ
+      ? chassisSearchMatches(tr.cells[5]?.innerText, chassisQ)
+      : onDay;
     tr.style.display = show ? "" : "none";
     if (show) {
       const noCell = tr.cells[0];
@@ -6613,7 +6615,7 @@ function applySummaryChassisFilter() {
 function onSummaryChassisSearchInput() {
   const el = document.getElementById("summaryChassisSearch");
   summaryChassisQuery = el ? el.value : "";
-  applySummaryChassisFilter();
+  showSummaryPage();
 }
 
 function showSummaryPage() {
@@ -6638,19 +6640,28 @@ function showSummaryPage() {
   const expected = plan > 0 ? plan : 0;
 
   const rows = document.querySelectorAll("#scanTable tr");
+  const searchingChassis = String(summaryChassisQuery || "").trim() !== "";
   let tableRows = "";
   let rowNo = 1;
   rows.forEach(row => {
     const cells = row.querySelectorAll("td");
     if (cells.length > 0) {
       const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
-      if (!rowDay || rowDay !== activeDay) return;
+      if (!rowDay) return;
+      const chassisHit = chassisSearchMatches(cells[5]?.innerText, summaryChassisQuery);
+      if (searchingChassis) {
+        if (!chassisHit) return;
+      } else if (rowDay !== activeDay) {
+        return;
+      }
       const statusText = (cells[8]?.innerText || "").trim().toUpperCase();
       const isDowntime = statusText === "DOWN TIME";
       const statusClass = isDowntime ? "summary-status-downtime" : "summary-status-scanned";
       const downtimeClass = isDowntime ? "summary-downtime-red" : "";
-      actual += 1;
-      if (isDowntime) downtimeSec += parseMmSsToSeconds(cells[9]?.innerText || "");
+      if (rowDay === activeDay) {
+        actual += 1;
+        if (isDowntime) downtimeSec += parseMmSsToSeconds(cells[9]?.innerText || "");
+      }
       tableRows += `<tr>
         <td>${rowNo++}</td>
         <td>${cells[1].innerText}</td>
@@ -6686,7 +6697,7 @@ function showSummaryPage() {
         <input type="text" class="app-date-input" id="summaryDayFilter" title="Select date for daily summary" placeholder="dd/mm/yyyy" readonly>
         <button type="button" id="summaryDayTodayBtn" class="summary-today-btn">Today</button>
         <label for="summaryChassisSearch">Chassis</label>
-        <input type="search" id="summaryChassisSearch" class="chassis-search-input" placeholder="Search chassis" autocomplete="off" spellcheck="false" value="${escapeHtmlText(summaryChassisQuery)}">
+        <input type="search" id="summaryChassisSearch" class="chassis-search-input" placeholder="Search all history" title="Search this chassis across every day" autocomplete="off" spellcheck="false" value="${escapeHtmlText(summaryChassisQuery)}">
       </div>
     </div>
     <div class="summary-grid">
