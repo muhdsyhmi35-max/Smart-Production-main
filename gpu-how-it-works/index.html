@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>How a GPU Works</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  <meta name="description" content="An interactive 3D walkthrough of how a GPU processes data in parallel." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <canvas id="gpu-canvas"></canvas>
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div>
+          <div class="brand-title">How a GPU works</div>
+          <div class="brand-sub">Parallel compute, made visible</div>
+        </div>
+      </div>
+      <div class="topbar-meta">
+        <span class="chip" id="stepChip">Step 1 / 7</span>
+        <button type="button" class="ghost-btn" id="autoOrbitBtn" aria-pressed="true" title="Toggle auto orbit">Orbit</button>
+        <button type="button" class="ghost-btn" id="fullscreenBtn" title="Fullscreen">Fullscreen</button>
+      </div>
+    </header>
+
+    <aside class="panel panel-left" id="lessonPanel">
+      <div class="panel-kicker" id="lessonKicker">Step 1</div>
+      <h1 class="panel-title" id="lessonTitle">Input Data</h1>
+      <p class="panel-body" id="lessonBody">
+        A program on the CPU sends work to the GPU. Batches of numbers land in VRAM first —
+        video memory that sits close to thousands of tiny cores.
+      </p>
+      <ul class="panel-points" id="lessonPoints"></ul>
+      <div class="panel-nav">
+        <button type="button" class="nav-btn" id="prevBtn">Back</button>
+        <button type="button" class="nav-btn primary" id="nextBtn">Next</button>
+      </div>
+    </aside>
+
+    <aside class="panel panel-right">
+      <section class="stat-block">
+        <h2>GPU Stats</h2>
+        <label class="meter">
+          <span>Memory Bandwidth</span>
+          <div class="meter-track"><div class="meter-fill" id="meterBandwidth"></div></div>
+          <span class="meter-val" id="meterBandwidthVal">42%</span>
+        </label>
+        <label class="meter">
+          <span>Core Usage</span>
+          <div class="meter-track"><div class="meter-fill" id="meterCores"></div></div>
+          <span class="meter-val" id="meterCoresVal">18%</span>
+        </label>
+        <label class="meter">
+          <span>Efficiency</span>
+          <div class="meter-track"><div class="meter-fill" id="meterEfficiency"></div></div>
+          <span class="meter-val" id="meterEfficiencyVal">61%</span>
+        </label>
+      </section>
+
+      <section class="stat-block">
+        <h2>Thread Grid</h2>
+        <p class="stat-hint">Each cell is a lane executing the same instruction.</p>
+        <div class="thread-grid" id="threadGrid" aria-hidden="true"></div>
+      </section>
+
+      <section class="stat-block component-info">
+        <h2>Focus</h2>
+        <div class="focus-name" id="focusName">VRAM</div>
+        <p class="focus-desc" id="focusDesc">High-bandwidth memory feeding the shader cores.</p>
+      </section>
+    </aside>
+
+    <div class="hud-labels" id="hudLabels" aria-hidden="true"></div>
+
+    <footer class="transport">
+      <button type="button" class="transport-btn" id="rewindBtn" title="Restart step">⟲</button>
+      <button type="button" class="transport-btn play" id="playBtn" title="Play / Pause" aria-pressed="true">❚❚</button>
+      <div class="timeline">
+        <input type="range" id="timeline" min="0" max="1000" value="0" aria-label="Timeline" />
+        <div class="timeline-fill" id="timelineFill"></div>
+      </div>
+      <button type="button" class="transport-btn" id="speedBtn" title="Playback speed">1×</button>
+      <div class="transport-step" id="transportStep">01 — Input Data</div>
+    </footer>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
