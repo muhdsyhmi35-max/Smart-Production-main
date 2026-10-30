@@ -1547,20 +1547,37 @@ function syncHistoryDayPickerUi() {
   setDatePickerValue(el, getActiveHistoryDayKey());
 }
 
+let historyChassisQuery = "";
+let summaryChassisQuery = "";
+
+function chassisSearchMatches(chassisText, query) {
+  const q = String(query || "").trim().toLowerCase();
+  if (!q) return true;
+  return String(chassisText || "").trim().toLowerCase().includes(q);
+}
+
 function applyHistoryDateFilter() {
   const table = document.getElementById("scanTable");
   if (!table) return;
   const dayKey = getActiveHistoryDayKey();
+  const chassisQ = historyChassisQuery;
   let visibleNo = 1;
   Array.from(table.rows).forEach(tr => {
     const rowDay = tr.dataset.scanDate || parseDisplayDateToIsoKey(tr.cells[1]?.innerText);
-    const show = !!rowDay && rowDay === dayKey;
+    const onDay = !!rowDay && rowDay === dayKey;
+    const show = onDay && chassisSearchMatches(tr.cells[5]?.innerText, chassisQ);
     tr.style.display = show ? "" : "none";
     if (show) {
       const noCell = tr.cells[0];
       if (noCell) noCell.innerText = String(visibleNo++);
     }
   });
+}
+
+function onHistoryChassisSearchInput() {
+  const el = document.getElementById("historyChassisSearch");
+  historyChassisQuery = el ? el.value : "";
+  applyHistoryDateFilter();
 }
 
 function onHistoryDayFilterChange() {
@@ -6571,11 +6588,43 @@ function showGraphPage() {
   updateViewToggleMenuItem();
 }
 
+function escapeHtmlText(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function applySummaryChassisFilter() {
+  const table = document.querySelector("#summaryPage .summary-table-wrap tbody");
+  if (!table) return;
+  let visibleNo = 1;
+  Array.from(table.rows).forEach(tr => {
+    const show = chassisSearchMatches(tr.cells[5]?.innerText, summaryChassisQuery);
+    tr.style.display = show ? "" : "none";
+    if (show) {
+      const noCell = tr.cells[0];
+      if (noCell) noCell.innerText = String(visibleNo++);
+    }
+  });
+}
+
+function onSummaryChassisSearchInput() {
+  const el = document.getElementById("summaryChassisSearch");
+  summaryChassisQuery = el ? el.value : "";
+  applySummaryChassisFilter();
+}
+
 function showSummaryPage() {
   if (!canViewReports()) {
     showMainPage();
     return;
   }
+  const previousSearch = document.getElementById("summaryChassisSearch");
+  const restoreSearchFocus = document.activeElement === previousSearch;
+  const searchCaret = restoreSearchFocus && previousSearch ? previousSearch.selectionStart : null;
+  if (previousSearch) summaryChassisQuery = previousSearch.value;
   toggleMenuDropdown(false);
   const activeDay = getActiveSummaryDayKey();
   const planCard = parseInt(document.getElementById("plan").innerText, 10) || 0;
@@ -6636,6 +6685,8 @@ function showSummaryPage() {
         <label for="summaryDayFilter">Date</label>
         <input type="text" class="app-date-input" id="summaryDayFilter" title="Select date for daily summary" placeholder="dd/mm/yyyy" readonly>
         <button type="button" id="summaryDayTodayBtn" class="summary-today-btn">Today</button>
+        <label for="summaryChassisSearch">Chassis</label>
+        <input type="search" id="summaryChassisSearch" class="chassis-search-input" placeholder="Search chassis" autocomplete="off" spellcheck="false" value="${escapeHtmlText(summaryChassisQuery)}">
       </div>
     </div>
     <div class="summary-grid">
@@ -6661,8 +6712,16 @@ function showSummaryPage() {
   syncSummaryDayPickerUi();
   const summaryDayFilter = document.getElementById("summaryDayFilter");
   const summaryDayTodayBtn = document.getElementById("summaryDayTodayBtn");
+  const summaryChassisSearch = document.getElementById("summaryChassisSearch");
   if (summaryDayFilter) initSingleDayDatePicker(summaryDayFilter, onSummaryDayFilterChange);
   if (summaryDayTodayBtn) summaryDayTodayBtn.addEventListener("click", onSummaryDayTodayClick);
+  if (summaryChassisSearch) summaryChassisSearch.addEventListener("input", onSummaryChassisSearchInput);
+  applySummaryChassisFilter();
+  if (restoreSearchFocus && summaryChassisSearch) {
+    summaryChassisSearch.focus();
+    const pos = searchCaret == null ? summaryChassisSearch.value.length : searchCaret;
+    summaryChassisSearch.setSelectionRange(pos, pos);
+  }
 
   document.body.classList.add("summary-mode");
   document.body.classList.remove("graph-mode");
@@ -7297,9 +7356,13 @@ document.getElementById("lotInput").addEventListener("input", () => {
 
 const historyDayFilterEl = document.getElementById("historyDayFilter");
 const historyDayTodayBtn = document.getElementById("historyDayTodayBtn");
+const historyChassisSearchEl = document.getElementById("historyChassisSearch");
 if (historyDayFilterEl) initSingleDayDatePicker(historyDayFilterEl, onHistoryDayFilterChange);
 if (historyDayTodayBtn) {
   historyDayTodayBtn.addEventListener("click", onHistoryDayTodayClick);
+}
+if (historyChassisSearchEl) {
+  historyChassisSearchEl.addEventListener("input", onHistoryChassisSearchInput);
 }
 
 loadAppearanceFromStorage();

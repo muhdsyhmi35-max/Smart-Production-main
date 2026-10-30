@@ -2398,6 +2398,31 @@ span.flatpickr-weekday{
   color:#94a3b8;
   font-size:13px;
   font-weight:600;
+  flex-wrap:wrap;
+}
+
+.chassis-search-input{
+  width:168px;
+  min-width:140px;
+  max-width:220px;
+  padding:5px 10px;
+  border-radius:6px;
+  border:1px solid rgba(71,85,105,.65);
+  background:rgba(2,6,23,.85);
+  color:#e2e8f0;
+  font-size:12px;
+  font-weight:600;
+}
+
+.chassis-search-input:focus{
+  outline:none;
+  border-color:rgba(56,189,248,.55);
+  box-shadow:0 0 0 2px rgba(56,189,248,.18);
+}
+
+.chassis-search-input::placeholder{
+  color:#64748b;
+  font-weight:600;
 }
 
 
