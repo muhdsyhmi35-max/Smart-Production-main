@@ -1,0 +1,15 @@
+{
+  "name": "tf2-production-monitoring",
+  "productName": "TF 2 Production Monitoring",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Desktop window for the TF 2 production monitoring system. Opens full screen.",
+  "author": "m01400",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^33.4.11"
+  }
+}

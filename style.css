@@ -2401,6 +2401,18 @@ span.flatpickr-weekday{
   flex-wrap:wrap;
 }
 
+.chassis-search-note{
+  flex-basis:100%;
+  min-height:16px;
+  font-size:12px;
+  font-weight:600;
+  color:#94a3b8;
+  text-align:right;
+}
+.chassis-search-note:empty{
+  display:none;
+}
+
 .chassis-search-input{
   width:168px;
   min-width:140px;

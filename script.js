@@ -211,9 +211,9 @@ function isLiveDisplayOnly() {
   return isMonitor;
 }
 
-/** Only Operator on the main PC drives Start/Stop/Reset and scans. */
+/** Operator on the main PC, and Master Control, can Start, Stop, and Reset. */
 function canDriveProductionFromThisScreen() {
-  return canOperateLine();
+  return canOperateLine() || isMasterRole();
 }
 
 function canAdjustWorkingHour() {
@@ -263,7 +263,7 @@ function applyMainPcEditLock() {
     el.classList.toggle("settings-locked", !canEditPlanLot);
   });
   document.querySelectorAll(".main-pc-actions button").forEach(btn => {
-    btn.disabled = isMonitor || !canOperate;
+    btn.disabled = !canDriveProductionFromThisScreen();
   });
   if (isMonitor || isNonProductionMode()) {
     setScanInputsEnabled(false);
@@ -1547,8 +1547,18 @@ function syncHistoryDayPickerUi() {
   setDatePickerValue(el, getActiveHistoryDayKey());
 }
 
+let productionPaused = false;
+let masterControlHoldStatus = "";
+let masterControlHoldUntil = 0;
+let masterLineLock = "";
+let masterStopResendTimer = 0;
+let masterStopResendCount = 0;
 let historyChassisQuery = "";
 let summaryChassisQuery = "";
+let scanRowCache = null;
+let summaryRenderTimer = 0;
+let historyFilterTimer = 0;
+const CHASSIS_SEARCH_RENDER_CAP = 100;
 
 function chassisSearchMatches(chassisText, query) {
   const q = String(query || "").trim().toLowerCase();
@@ -1556,30 +1566,98 @@ function chassisSearchMatches(chassisText, query) {
   return String(chassisText || "").trim().toLowerCase().includes(q);
 }
 
+function invalidateScanRowCache() {
+  scanRowCache = null;
+}
+
+function getScanRowCache() {
+  if (scanRowCache) return scanRowCache;
+  const out = [];
+  const table = document.getElementById("scanTable");
+  if (!table) return out;
+  const list = table.rows;
+  for (let i = 0; i < list.length; i++) {
+    const row = list[i];
+    const cells = row.cells;
+    if (!cells || cells.length < 10) continue;
+    const day = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1].innerText);
+    if (!day) continue;
+    const chassis = cells[5].innerText || "";
+    const statusText = (cells[8].innerText || "").trim();
+    const isDown = statusText.toUpperCase() === "DOWN TIME";
+    out.push({
+      day,
+      date: cells[1].innerText,
+      time: cells[2].innerText,
+      lot: cells[3].innerText,
+      model: cells[4].innerText,
+      chassis,
+      chassisKey: chassis.trim().toLowerCase(),
+      engine: cells[6].innerText,
+      keyNo: cells[7].innerText,
+      status: statusText,
+      statusClass: isDown ? "summary-status-downtime" : "summary-status-scanned",
+      downtime: cells[9].innerText,
+      downtimeClass: isDown ? "summary-downtime-red" : "",
+      isDown,
+      downtimeSec: isDown ? parseMmSsToSeconds(cells[9].innerText || "") : 0
+    });
+  }
+  scanRowCache = out;
+  return out;
+}
+
+function setChassisSearchNote(id, matched, capped) {
+  const note = document.getElementById(id);
+  if (!note) return;
+  note.textContent = capped
+    ? `Showing ${CHASSIS_SEARCH_RENDER_CAP} of ${matched}. Type more of the chassis number.`
+    : "";
+}
+
 function applyHistoryDateFilter() {
   const table = document.getElementById("scanTable");
   if (!table) return;
   const dayKey = getActiveHistoryDayKey();
-  const chassisQ = String(historyChassisQuery || "").trim();
+  const chassisQ = String(historyChassisQuery || "").trim().toLowerCase();
+  const searching = chassisQ !== "";
   let visibleNo = 1;
-  Array.from(table.rows).forEach(tr => {
+  let matched = 0;
+  const list = table.rows;
+  for (let i = 0; i < list.length; i++) {
+    const tr = list[i];
     const rowDay = tr.dataset.scanDate || parseDisplayDateToIsoKey(tr.cells[1]?.innerText);
     const onDay = !!rowDay && rowDay === dayKey;
-    const show = chassisQ
-      ? chassisSearchMatches(tr.cells[5]?.innerText, chassisQ)
-      : onDay;
-    tr.style.display = show ? "" : "none";
+    let show = onDay;
+    if (searching) {
+      let chassisKey = tr.dataset.chassisKey;
+      if (!chassisKey) {
+        chassisKey = String(tr.cells[5]?.innerText || "").trim().toLowerCase();
+        tr.dataset.chassisKey = chassisKey;
+      }
+      if (chassisKey.includes(chassisQ)) {
+        matched += 1;
+        show = matched <= CHASSIS_SEARCH_RENDER_CAP;
+      } else {
+        show = false;
+      }
+    }
+    const nextDisplay = show ? "" : "none";
+    if (tr.style.display !== nextDisplay) tr.style.display = nextDisplay;
     if (show) {
       const noCell = tr.cells[0];
-      if (noCell) noCell.innerText = String(visibleNo++);
+      const label = String(visibleNo++);
+      if (noCell && noCell.textContent !== label) noCell.textContent = label;
     }
-  });
+  }
+  setChassisSearchNote("historyChassisSearchNote", matched, searching && matched > CHASSIS_SEARCH_RENDER_CAP);
 }
 
 function onHistoryChassisSearchInput() {
   const el = document.getElementById("historyChassisSearch");
   historyChassisQuery = el ? el.value : "";
-  applyHistoryDateFilter();
+  clearTimeout(historyFilterTimer);
+  historyFilterTimer = setTimeout(applyHistoryDateFilter, 80);
 }
 
 function onHistoryDayFilterChange() {
@@ -2089,14 +2167,26 @@ function setDowntimeAlertUi(on) {
 
 function applyLiveDowntimeUi() {
   const live = computeLiveDowntimeState();
-  isDowntime = live.inDowntime;
+  isDowntime = !productionPaused && live.inDowntime;
   const booked = getBookedDowntimeSec();
-  downtimeSeconds = booked + live.openSec;
+  downtimeSeconds = booked + (productionPaused ? 0 : live.openSec);
   const textEl = document.getElementById("downtime");
   if (textEl) textEl.innerText = format(downtimeSeconds);
-  const alertOn = !isShiftClosed() && live.inDowntime && downtimeSeconds > 0 && !isBreakTime();
+  const alertOn = !productionPaused && !isShiftClosed() && live.inDowntime && downtimeSeconds > 0 && !isBreakTime();
   setDowntimeAlertUi(alertOn);
-  if (isShiftClosed()) setOffShiftStatus();
+  if (masterLineLock === "stop" || productionPaused || (masterControlHoldStatus === "PAUSED" && Date.now() < masterControlHoldUntil)) {
+    setStatus("PAUSED", "status-orange");
+    syncDowntimeAccumulatedHighlight();
+    return;
+  }
+  if (masterControlHoldStatus && Date.now() < masterControlHoldUntil) {
+    if (masterControlHoldStatus === "READY") setStatus("READY", "status-blue");
+    else if (masterControlHoldStatus === "RUNNING") setStatus("RUNNING", "status-green pulse");
+    syncDowntimeAccumulatedHighlight();
+    return;
+  }
+  if (productionPaused) setStatus("PAUSED", "status-orange");
+  else if (isShiftClosed()) setOffShiftStatus();
   else if (alertOn) setStatus("DOWN TIME", "status-red blink");
   syncDowntimeAccumulatedHighlight();
 }
@@ -2197,7 +2287,7 @@ function applyShiftScheduleTick() {
   }
 
   const statusNow = document.getElementById("status")?.innerText?.trim() || "";
-  if (timer || statusNow === "PAUSED") return;
+  if (timer || productionPaused || statusNow === "PAUSED") return;
 
   // 08:15 (or first open after that): countdown starts at 08:15, not when the PC woke up.
   if (enteredNewShift || statusNow === "READY" || statusNow === "OFF SHIFT") {
@@ -3575,6 +3665,9 @@ function initFirebaseSync() {
     const command = snapshot.val();
     if (!command || !command.action) return;
     if (command.sender === syncClientId) return;
+    const at = Number(command.controlAt) || 0;
+    if (!at || at === lastAppliedControlAt || Date.now() - at > 20000) return;
+    lastAppliedControlAt = at;
     applyRemoteCommand(command.action);
   });
 
@@ -3615,11 +3708,29 @@ function initFirebaseSync() {
   return true;
 }
 
+let lastAppliedControlAt = 0;
+
 function publishSyncCommand(action) {
-  if (!firebaseCommandRef || isApplyingRemoteCommand) return;
+  if (isApplyingRemoteCommand) return;
+  const controlAt = Date.now();
+  const status = action === "stop" ? "PAUSED" : action === "reset" ? "READY" : "RUNNING";
+  if (firebaseLiveStateRef) {
+    firebaseLiveStateRef.update({
+      controlAction: action,
+      controlAt: controlAt,
+      paused: action === "stop",
+      status: status,
+      sender: syncClientId,
+      updatedAt: firebase.database.ServerValue.TIMESTAMP
+    }).catch(err => {
+      console.log("Firebase control publish error:", err);
+    });
+  }
+  if (!firebaseCommandRef) return;
 
   firebaseCommandRef.set({
     action: action,
+    controlAt: controlAt,
     sender: syncClientId,
     sentAt: firebase.database.ServerValue.TIMESTAMP
   }).catch(err => {
@@ -3700,11 +3811,7 @@ function startLiveCountdownTicker(baseCountdown, status, updatedAt, anchorScanMs
     return;
   }
 
-  const inShift = isWithinShiftWindow() || isOvertimeActive();
-  const tickPace =
-    status === "RUNNING" ||
-    status === "DOWN TIME" ||
-    (inShift && status !== "PAUSED" && status !== "BREAK TIME");
+  const tickPace = !productionPaused && masterLineLock !== "stop" && (status === "RUNNING" || status === "DOWN TIME");
 
   if (!tickPace) {
     if (isShiftClosed()) {
@@ -3946,23 +4053,33 @@ function applyLiveState(state) {
   }
   const liveDt = computeLiveDowntimeState();
   const shiftClosed = isShiftClosed();
+  const remoteStatus = status;
+  const remoteFromOther = !!(state.sender && state.sender !== syncClientId);
+  if (remoteFromOther) {
+    if (masterLineLock === "stop" && remoteStatus === "PAUSED") masterLineLock = "";
+    else if (masterLineLock === "start" && (remoteStatus === "RUNNING" || remoteStatus === "DOWN TIME" || remoteStatus === "TARGET ACHIEVED")) masterLineLock = "";
+    else if (masterLineLock === "reset" && (remoteStatus === "READY" || remoteStatus === "TARGET ACHIEVED")) masterLineLock = "";
+  }
+  if (masterLineLock === "stop") productionPaused = true;
+  else if (masterLineLock === "start" || masterLineLock === "reset") productionPaused = false;
+  else if (status === "PAUSED") productionPaused = true;
+  else if (status === "RUNNING" || status === "READY" || status === "TARGET ACHIEVED") productionPaused = false;
   if (shiftClosed) {
     status = "OFF SHIFT";
   } else if (targetMet) {
     status = "TARGET ACHIEVED";
+  } else if (status === "PAUSED" || productionPaused || masterLineLock === "stop") {
+    status = "PAUSED";
+    productionPaused = true;
   } else if (isMonitor && liveDt.inDowntime && !isScanWaitStatus(status)) {
     status = "DOWN TIME";
-  } else if (
-    isMonitor &&
-    !np &&
-    (isWithinShiftWindow() || isOvertimeActive()) &&
-    status !== "PAUSED" &&
-    status !== "BREAK TIME" &&
-    status !== "TARGET ACHIEVED" &&
-    status !== "DOWN TIME" &&
-    !isScanWaitStatus(status)
-  ) {
-    status = "RUNNING";
+  }
+  if (masterLineLock === "stop" || productionPaused) {
+    status = "PAUSED";
+    productionPaused = true;
+    if (remoteFromOther && (remoteStatus === "RUNNING" || remoteStatus === "READY")) scheduleMasterStopResend();
+  } else if (masterLineLock === "reset") {
+    status = "READY";
   }
 
   // Set last-scan / session-start anchors before countdown ticker.
@@ -4017,14 +4134,20 @@ function applyLiveState(state) {
 
   const downtimeCard = document.getElementById("downtimeCard");
   const downtimeText = document.getElementById("downtime");
-  const statusNow = isShiftClosed()
-    ? "OFF SHIFT"
-    : (isDailyTargetAchieved()
-      ? "TARGET ACHIEVED"
-      : (computeLiveDowntimeState().inDowntime ? "DOWN TIME" : status));
+  const statusNow = productionPaused
+    ? "PAUSED"
+    : (isShiftClosed()
+      ? "OFF SHIFT"
+      : (isDailyTargetAchieved()
+        ? "TARGET ACHIEVED"
+        : (computeLiveDowntimeState().inDowntime ? "DOWN TIME" : status)));
 
   const alertOn = statusNow === "DOWN TIME" && !isBreakTime() && computeLiveDowntimeState().inDowntime && downtimeSeconds > 0;
-  if (statusNow === "OFF SHIFT") {
+  if (statusNow === "PAUSED") {
+    setStatus("PAUSED", "status-orange");
+    downtimeCard.classList.remove("downtime-alert", "blink");
+    downtimeText.classList.remove("status-red", "blink");
+  } else if (statusNow === "OFF SHIFT") {
     setOffShiftStatus();
     downtimeCard.classList.remove("downtime-alert", "blink");
     downtimeText.classList.remove("status-red", "blink");
@@ -4153,6 +4276,16 @@ function applyRemoteMasterSettings(state) {
       if (document.body.classList.contains("graph-mode")) renderGraphCharts();
     }
   }
+  const remoteControlAt = Number(state.controlAt) || 0;
+  if (
+    state.controlAction &&
+    remoteControlAt &&
+    remoteControlAt !== lastAppliedControlAt &&
+    Date.now() - remoteControlAt < 20000
+  ) {
+    lastAppliedControlAt = remoteControlAt;
+    applyRemoteCommand(state.controlAction);
+  }
   updateDisplay();
 }
 
@@ -4190,20 +4323,66 @@ function applyRemoteCommand(action) {
 
 /* ===== START ===== */
 
+function clearMasterStopResend() {
+  if (masterStopResendTimer) {
+    clearTimeout(masterStopResendTimer);
+    masterStopResendTimer = 0;
+  }
+}
+
+function scheduleMasterStopResend() {
+  if (masterLineLock !== "stop" || masterStopResendTimer || masterStopResendCount >= 5) return;
+  masterStopResendTimer = setTimeout(() => {
+    masterStopResendTimer = 0;
+    if (masterLineLock !== "stop") return;
+    masterStopResendCount += 1;
+    publishSyncCommand("stop");
+  }, 1500);
+}
+
+function applyMasterControlLocally(action) {
+  clearMasterStopResend();
+  masterLineLock = action;
+  if (action === "stop") {
+    masterStopResendCount = 0;
+    productionPaused = true;
+    masterControlHoldStatus = "PAUSED";
+    setStatus("PAUSED", "status-orange");
+  } else if (action === "reset") {
+    productionPaused = false;
+    masterControlHoldStatus = "READY";
+    countdownValue = 0;
+    const countdownEl = document.getElementById("countdown");
+    if (countdownEl) countdownEl.innerText = format(0);
+    setStatus("READY", "status-blue");
+  } else {
+    productionPaused = false;
+    masterControlHoldStatus = "RUNNING";
+    setStatus("RUNNING", "status-green pulse");
+  }
+  masterControlHoldUntil = Date.now() + 8000;
+  stopLiveCountdownTicker();
+  publishSyncCommand(action);
+}
+
 function startProduction(shouldSync = true, opts = {}) {
-  if (!canDriveProductionFromThisScreen()) return;
-  if (isMonitor && isApplyingRemoteCommand) return;
+  if (isMonitor) {
+    if (!isApplyingRemoteCommand && isMasterRole() && shouldSync) applyMasterControlLocally("start");
+    return;
+  }
+  if (!canDriveProductionFromThisScreen() && !isApplyingRemoteCommand) return;
   if (isNonProductionMode()) {
     setStatus("NON PRODUCTION", "status-blue");
     return;
   }
   if (timer) return;
-  if (!canRunProductionNow(new Date()) && !isAdminRole()) {
+  if (!canRunProductionNow(new Date()) && !isAdminRole() && !isApplyingRemoteCommand) {
     setOffShiftStatus();
     return;
   }
 
   const restoring = !!(opts && opts.restore);
+  productionPaused = false;
   hasLocalSession = true;
   stopLiveCountdownTicker();
 
@@ -4240,9 +4419,13 @@ function startProduction(shouldSync = true, opts = {}) {
 
 /* STOP */
 function stopProduction(shouldSync = true) {
-  if (!canDriveProductionFromThisScreen()) return;
-  if (isMonitor && isApplyingRemoteCommand) return;
+  if (isMonitor) {
+    if (!isApplyingRemoteCommand && isMasterRole() && shouldSync) applyMasterControlLocally("stop");
+    return;
+  }
+  if (!canDriveProductionFromThisScreen() && !isApplyingRemoteCommand) return;
 
+  productionPaused = true;
   hasLocalSession = true;
 
   if (shouldSync) {
@@ -4258,10 +4441,14 @@ function stopProduction(shouldSync = true) {
 
 /* RESET */
 function resetProduction(shouldSync = true) {
-  if (!canDriveProductionFromThisScreen()) return;
-  if (isMonitor && isApplyingRemoteCommand) return;
+  if (isMonitor) {
+    if (!isApplyingRemoteCommand && isMasterRole() && shouldSync) applyMasterControlLocally("reset");
+    return;
+  }
+  if (!canDriveProductionFromThisScreen() && !isApplyingRemoteCommand) return;
   if (isNonProductionMode()) return;
 
+  productionPaused = false;
   hasLocalSession = true;
 
   if (shouldSync) {
@@ -4291,6 +4478,7 @@ function resetProduction(shouldSync = true) {
   duplicateLock = false;
   duplicateStatusText = "DUPLICATE SCAN";
   lastTableData = "";
+  invalidateScanRowCache();
   document.getElementById("scanTable").innerHTML = "";
 
   setStatus("READY", "status-blue");
@@ -4768,6 +4956,8 @@ function updateDisplay() {
   } else if (actualCount >= plan && plan > 0) {
     clearInterval(timer); timer = null; countdownValue = 0; isDowntime = false;
     setStatus("TARGET ACHIEVED", "status-green");
+  } else if (productionPaused) {
+    setStatus("PAUSED", "status-orange");
   } else if (duplicateLock) {
     setStatus(duplicateStatusText || "DUPLICATE SCAN", "status-red blink");
   } else if (isDowntime) {
@@ -6598,89 +6788,14 @@ function escapeHtmlText(value) {
     .replace(/"/g, "&quot;");
 }
 
-function applySummaryChassisFilter() {
-  const table = document.querySelector("#summaryPage .summary-table-wrap tbody");
-  if (!table) return;
-  let visibleNo = 1;
-  Array.from(table.rows).forEach(tr => {
-    const show = chassisSearchMatches(tr.cells[5]?.innerText, summaryChassisQuery);
-    tr.style.display = show ? "" : "none";
-    if (show) {
-      const noCell = tr.cells[0];
-      if (noCell) noCell.innerText = String(visibleNo++);
-    }
-  });
-}
-
 function onSummaryChassisSearchInput() {
   const el = document.getElementById("summaryChassisSearch");
   summaryChassisQuery = el ? el.value : "";
-  showSummaryPage();
+  clearTimeout(summaryRenderTimer);
+  summaryRenderTimer = setTimeout(renderSummaryView, 80);
 }
 
-function showSummaryPage() {
-  if (!canViewReports()) {
-    showMainPage();
-    return;
-  }
-  const previousSearch = document.getElementById("summaryChassisSearch");
-  const restoreSearchFocus = document.activeElement === previousSearch;
-  const searchCaret = restoreSearchFocus && previousSearch ? previousSearch.selectionStart : null;
-  if (previousSearch) summaryChassisQuery = previousSearch.value;
-  toggleMenuDropdown(false);
-  const activeDay = getActiveSummaryDayKey();
-  const planCard = parseInt(document.getElementById("plan").innerText, 10) || 0;
-  const planInput = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
-  const fallbackDayPlan = planCard > 0 ? planCard : planInput;
-  let plan = resolveReportPlanForDay(activeDay, fallbackDayPlan);
-  if (!Number.isFinite(plan) || plan < 0) plan = fallbackDayPlan;
-
-  let actual = 0;
-  let downtimeSec = 0;
-  const expected = plan > 0 ? plan : 0;
-
-  const rows = document.querySelectorAll("#scanTable tr");
-  const searchingChassis = String(summaryChassisQuery || "").trim() !== "";
-  let tableRows = "";
-  let rowNo = 1;
-  rows.forEach(row => {
-    const cells = row.querySelectorAll("td");
-    if (cells.length > 0) {
-      const rowDay = row.dataset.scanDate || parseDisplayDateToIsoKey(cells[1]?.innerText);
-      if (!rowDay) return;
-      const chassisHit = chassisSearchMatches(cells[5]?.innerText, summaryChassisQuery);
-      if (searchingChassis) {
-        if (!chassisHit) return;
-      } else if (rowDay !== activeDay) {
-        return;
-      }
-      const statusText = (cells[8]?.innerText || "").trim().toUpperCase();
-      const isDowntime = statusText === "DOWN TIME";
-      const statusClass = isDowntime ? "summary-status-downtime" : "summary-status-scanned";
-      const downtimeClass = isDowntime ? "summary-downtime-red" : "";
-      if (rowDay === activeDay) {
-        actual += 1;
-        if (isDowntime) downtimeSec += parseMmSsToSeconds(cells[9]?.innerText || "");
-      }
-      tableRows += `<tr>
-        <td>${rowNo++}</td>
-        <td>${cells[1].innerText}</td>
-        <td>${cells[2].innerText}</td>
-        <td>${cells[3].innerText}</td>
-        <td>${cells[4].innerText}</td>
-        <td>${cells[5].innerText}</td>
-        <td>${cells[6].innerText}</td>
-        <td>${cells[7].innerText}</td>
-        <td class="${statusClass}">${cells[8].innerText}</td>
-        <td class="${downtimeClass}">${cells[9].innerText}</td>
-      </tr>`;
-    }
-  });
-  const downtime = format(downtimeSec);
-  const diff = actual - plan;
-  const diffDisplaySafe = diff > 0 ? ("+" + diff) : String(diff);
-  const efficiency = plan > 0 ? `${Math.min(100, Math.max(0, Math.round((actual / plan) * 100)))}%` : "—";
-
+function ensureSummaryShell() {
   let summaryPage = document.getElementById("summaryPage");
   if (!summaryPage) {
     summaryPage = document.createElement("div");
@@ -6688,6 +6803,7 @@ function showSummaryPage() {
     summaryPage.className = "summary-page";
     document.body.appendChild(summaryPage);
   }
+  if (summaryPage.dataset.shell === "1") return summaryPage;
 
   summaryPage.innerHTML = `
     <div class="summary-title-row">
@@ -6697,17 +6813,18 @@ function showSummaryPage() {
         <input type="text" class="app-date-input" id="summaryDayFilter" title="Select date for daily summary" placeholder="dd/mm/yyyy" readonly>
         <button type="button" id="summaryDayTodayBtn" class="summary-today-btn">Today</button>
         <label for="summaryChassisSearch">Chassis</label>
-        <input type="search" id="summaryChassisSearch" class="chassis-search-input" placeholder="Search all history" title="Search this chassis across every day" autocomplete="off" spellcheck="false" value="${escapeHtmlText(summaryChassisQuery)}">
+        <input type="search" id="summaryChassisSearch" class="chassis-search-input" placeholder="Search all history" title="Search this chassis across every day" autocomplete="off" spellcheck="false">
+        <span id="summaryChassisSearchNote" class="chassis-search-note"></span>
       </div>
     </div>
     <div class="summary-grid">
-      <div class="summary-tile"><span>Date</span><strong>${formatIsoDateAsDmy(activeDay)}</strong></div>
-      <div class="summary-tile"><span>Plan</span><strong>${plan}</strong></div>
-      <div class="summary-tile"><span>Actual</span><strong>${actual}</strong></div>
-      <div class="summary-tile"><span>Expected</span><strong>${expected}</strong></div>
-      <div class="summary-tile"><span>Difference</span><strong>${diffDisplaySafe}</strong></div>
-      <div class="summary-tile"><span>Downtime</span><strong>${downtime}</strong></div>
-      <div class="summary-tile"><span>Efficiency</span><strong>${efficiency}</strong></div>
+      <div class="summary-tile"><span>Date</span><strong id="summaryTileDate"></strong></div>
+      <div class="summary-tile"><span>Plan</span><strong id="summaryTilePlan"></strong></div>
+      <div class="summary-tile"><span>Actual</span><strong id="summaryTileActual"></strong></div>
+      <div class="summary-tile"><span>Expected</span><strong id="summaryTileExpected"></strong></div>
+      <div class="summary-tile"><span>Difference</span><strong id="summaryTileDiff"></strong></div>
+      <div class="summary-tile"><span>Downtime</span><strong id="summaryTileDowntime"></strong></div>
+      <div class="summary-tile"><span>Efficiency</span><strong id="summaryTileEfficiency"></strong></div>
     </div>
     <div class="summary-table-wrap">
       <table>
@@ -6716,23 +6833,87 @@ function showSummaryPage() {
             <th>No</th><th>Date</th><th>Time</th><th>Lot</th><th>Model</th><th>Chassis</th><th>Engine No</th><th>Key No</th><th>Status</th><th>Downtime</th>
           </tr>
         </thead>
-        <tbody>${tableRows}</tbody>
+        <tbody id="summaryTableBody"></tbody>
       </table>
     </div>
   `;
-  syncSummaryDayPickerUi();
+  summaryPage.dataset.shell = "1";
   const summaryDayFilter = document.getElementById("summaryDayFilter");
   const summaryDayTodayBtn = document.getElementById("summaryDayTodayBtn");
   const summaryChassisSearch = document.getElementById("summaryChassisSearch");
   if (summaryDayFilter) initSingleDayDatePicker(summaryDayFilter, onSummaryDayFilterChange);
   if (summaryDayTodayBtn) summaryDayTodayBtn.addEventListener("click", onSummaryDayTodayClick);
-  if (summaryChassisSearch) summaryChassisSearch.addEventListener("input", onSummaryChassisSearchInput);
-  applySummaryChassisFilter();
-  if (restoreSearchFocus && summaryChassisSearch) {
-    summaryChassisSearch.focus();
-    const pos = searchCaret == null ? summaryChassisSearch.value.length : searchCaret;
-    summaryChassisSearch.setSelectionRange(pos, pos);
+  if (summaryChassisSearch) {
+    summaryChassisSearch.value = summaryChassisQuery;
+    summaryChassisSearch.addEventListener("input", onSummaryChassisSearchInput);
   }
+  return summaryPage;
+}
+
+function setSummaryTile(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
+function renderSummaryView() {
+  const activeDay = getActiveSummaryDayKey();
+  const planCard = parseInt(document.getElementById("plan").innerText, 10) || 0;
+  const planInput = parseInt(document.getElementById("dailyPlanTarget").value, 10) || 0;
+  const fallbackDayPlan = planCard > 0 ? planCard : planInput;
+  let plan = resolveReportPlanForDay(activeDay, fallbackDayPlan);
+  if (!Number.isFinite(plan) || plan < 0) plan = fallbackDayPlan;
+
+  const query = String(summaryChassisQuery || "").trim().toLowerCase();
+  const searching = query !== "";
+  const rows = getScanRowCache();
+  let actual = 0;
+  let downtimeSec = 0;
+  const matched = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (row.day === activeDay) {
+      actual += 1;
+      if (row.isDown) downtimeSec += row.downtimeSec;
+    }
+    if (searching) {
+      if (row.chassisKey.includes(query)) matched.push(row);
+    } else if (row.day === activeDay) {
+      matched.push(row);
+    }
+  }
+
+  const capped = searching && matched.length > CHASSIS_SEARCH_RENDER_CAP;
+  const visible = capped ? matched.slice(0, CHASSIS_SEARCH_RENDER_CAP) : matched;
+  let tableRows = "";
+  for (let i = 0; i < visible.length; i++) {
+    const row = visible[i];
+    tableRows += `<tr><td>${i + 1}</td><td>${escapeHtmlText(row.date)}</td><td>${escapeHtmlText(row.time)}</td><td>${escapeHtmlText(row.lot)}</td><td>${escapeHtmlText(row.model)}</td><td>${escapeHtmlText(row.chassis)}</td><td>${escapeHtmlText(row.engine)}</td><td>${escapeHtmlText(row.keyNo)}</td><td class="${row.statusClass}">${escapeHtmlText(row.status)}</td><td class="${row.downtimeClass}">${escapeHtmlText(row.downtime)}</td></tr>`;
+  }
+  const body = document.getElementById("summaryTableBody");
+  if (body) body.innerHTML = tableRows;
+  setChassisSearchNote("summaryChassisSearchNote", matched.length, capped);
+
+  const expected = plan > 0 ? plan : 0;
+  const diff = actual - plan;
+  setSummaryTile("summaryTileDate", formatIsoDateAsDmy(activeDay));
+  setSummaryTile("summaryTilePlan", String(plan));
+  setSummaryTile("summaryTileActual", String(actual));
+  setSummaryTile("summaryTileExpected", String(expected));
+  setSummaryTile("summaryTileDiff", diff > 0 ? ("+" + diff) : String(diff));
+  setSummaryTile("summaryTileDowntime", format(downtimeSec));
+  setSummaryTile("summaryTileEfficiency", plan > 0 ? `${Math.min(100, Math.max(0, Math.round((actual / plan) * 100)))}%` : "—");
+  syncSummaryDayPickerUi();
+}
+
+function showSummaryPage() {
+  if (!canViewReports()) {
+    showMainPage();
+    return;
+  }
+  const summaryPage = ensureSummaryShell();
+  const wasOpen = summaryPage.classList.contains("open");
+  toggleMenuDropdown(false);
+  renderSummaryView();
 
   document.body.classList.add("summary-mode");
   document.body.classList.remove("graph-mode");
@@ -6743,7 +6924,7 @@ function showSummaryPage() {
   const historyPanel = document.getElementById("historyPanel");
   if (historyPanel) historyPanel.classList.remove("open");
   summaryPage.classList.add("open");
-  triggerEnterAnimation(summaryPage);
+  if (!wasOpen) triggerEnterAnimation(summaryPage);
   updateViewToggleMenuItem();
 }
 
@@ -6843,7 +7024,8 @@ function updateLiveStateOnly() {
   const efficiency = efficiencyPercent;
 
   const balance = actual - plan;
-  const status = document.getElementById("status").innerText.trim();
+  let status = document.getElementById("status").innerText.trim();
+  if (productionPaused) status = "PAUSED";
   const lotNo = getConfiguredLotNo();
   const bookedDowntime = getBookedDowntimeSec();
 
@@ -7220,6 +7402,7 @@ function loadLiveData() {
       if (newTableData !== lastTableData || tableEmpty) {
         lastTableData = newTableData;
 
+        invalidateScanRowCache();
         table.innerHTML = "";
 
         scanRows.sort((a, b) => {

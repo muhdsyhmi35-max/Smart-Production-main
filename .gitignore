@@ -1,2 +1,5 @@
 # Nested copy left on disk; not a git submodule (breaks GitHub Pages checkout)
 Smart-Production/
+
+# Installed packages stay on each PC. Electron alone is too large for GitHub.
+node_modules/
