@@ -1548,6 +1548,8 @@ function syncHistoryDayPickerUi() {
 }
 
 let productionPaused = false;
+let expectedPauseAccumSec = 0;
+let expectedPauseStartedAt = 0;
 let masterControlHoldStatus = "";
 let masterControlHoldUntil = 0;
 let masterLineLock = "";
@@ -3499,6 +3501,53 @@ function isBreakTime() {
   return false;
 }
 
+function openExpectedPauseInterval(nowMs = Date.now()) {
+  if (!(expectedPauseStartedAt > 0)) expectedPauseStartedAt = nowMs;
+}
+
+function closeExpectedPauseInterval(nowMs = Date.now()) {
+  if (!(expectedPauseStartedAt > 0)) return;
+  const raw = Math.max(0, Math.floor((nowMs - expectedPauseStartedAt) / 1000));
+  const breakSec = scheduledBreakOverlapSec(expectedPauseStartedAt, nowMs);
+  expectedPauseAccumSec += Math.max(0, raw - breakSec);
+  expectedPauseStartedAt = 0;
+}
+
+function syncExpectedPauseForAction(action, nowMs = Date.now()) {
+  if (action === "stop") openExpectedPauseInterval(nowMs);
+  else if (action === "start") closeExpectedPauseInterval(nowMs);
+  else if (action === "reset") {
+    expectedPauseAccumSec = 0;
+    expectedPauseStartedAt = 0;
+  }
+}
+
+function getExcludedPauseSec(nowMs) {
+  let sec = Math.max(0, Math.floor(Number(expectedPauseAccumSec) || 0));
+  if (expectedPauseStartedAt > 0) {
+    const raw = Math.max(0, Math.floor((nowMs - expectedPauseStartedAt) / 1000));
+    const breakSec = scheduledBreakOverlapSec(expectedPauseStartedAt, nowMs);
+    sec += Math.max(0, raw - breakSec);
+  }
+  return sec;
+}
+
+function applyExpectedPauseFromLiveState(state, status) {
+  if (!state) return;
+  if (state.expectedPauseAccumSec != null && state.expectedPauseAccumSec !== "") {
+    const n = Number(state.expectedPauseAccumSec);
+    if (Number.isFinite(n) && n >= 0) expectedPauseAccumSec = Math.floor(n);
+  }
+  if (state.expectedPauseStartedAt != null && state.expectedPauseStartedAt !== "") {
+    const started = Number(state.expectedPauseStartedAt) || 0;
+    if (started > 0) expectedPauseStartedAt = started;
+    else if (masterLineLock !== "stop") expectedPauseStartedAt = 0;
+  }
+  if ((status === "PAUSED" || state.paused === true) && !(expectedPauseStartedAt > 0) && masterLineLock !== "start") {
+    openExpectedPauseInterval();
+  }
+}
+
 function calculateExpectedOutput() {
   if (isNonProductionMode()) return 0;
   if (isWeekendDate() && !isOvertimeActive()) return 0;
@@ -3532,7 +3581,8 @@ function calculateExpectedOutput() {
   const cycleTimeSec = (parseFloat(document.getElementById("cycleTarget").value) || 1) * 60;
 
   const breakSec = scheduledBreakOverlapSec(timelineStartMs, nowMs);
-  const netTime = Math.max(0, elapsedSec - breakSec);
+  const pauseSec = getExcludedPauseSec(nowMs);
+  const netTime = Math.max(0, elapsedSec - breakSec - pauseSec);
 
   let expected = Math.floor(netTime / cycleTimeSec);
   if (plan > 0) {
@@ -3712,6 +3762,7 @@ let lastAppliedControlAt = 0;
 
 function publishSyncCommand(action) {
   if (isApplyingRemoteCommand) return;
+  syncExpectedPauseForAction(action);
   const controlAt = Date.now();
   const status = action === "stop" ? "PAUSED" : action === "reset" ? "READY" : "RUNNING";
   if (firebaseLiveStateRef) {
@@ -3720,6 +3771,8 @@ function publishSyncCommand(action) {
       controlAt: controlAt,
       paused: action === "stop",
       status: status,
+      expectedPauseAccumSec: expectedPauseAccumSec,
+      expectedPauseStartedAt: expectedPauseStartedAt || 0,
       sender: syncClientId,
       updatedAt: firebase.database.ServerValue.TIMESTAMP
     }).catch(err => {
@@ -4043,6 +4096,7 @@ function applyLiveState(state) {
     }
   }
   document.getElementById("actual").innerText = actual;
+  applyExpectedPauseFromLiveState(state, status);
   refreshLivePaceCards();
 
   const targetMet = !np && effectivePlan > 0 && actual >= effectivePlan;
@@ -4363,6 +4417,8 @@ function applyMasterControlLocally(action) {
   masterControlHoldUntil = Date.now() + 8000;
   stopLiveCountdownTicker();
   publishSyncCommand(action);
+  refreshLivePaceCards();
+  syncOperatorDashboardChrome();
 }
 
 function startProduction(shouldSync = true, opts = {}) {
@@ -4382,6 +4438,7 @@ function startProduction(shouldSync = true, opts = {}) {
   }
 
   const restoring = !!(opts && opts.restore);
+  syncExpectedPauseForAction("start");
   productionPaused = false;
   hasLocalSession = true;
   stopLiveCountdownTicker();
@@ -4427,6 +4484,7 @@ function stopProduction(shouldSync = true) {
 
   productionPaused = true;
   hasLocalSession = true;
+  syncExpectedPauseForAction("stop");
 
   if (shouldSync) {
     publishSyncCommand("stop");
@@ -4450,6 +4508,7 @@ function resetProduction(shouldSync = true) {
 
   productionPaused = false;
   hasLocalSession = true;
+  syncExpectedPauseForAction("reset");
 
   if (shouldSync) {
     publishSyncCommand("reset");
@@ -7071,6 +7130,8 @@ function updateLiveStateOnly() {
     expected: expected,
     delay: delay,
     efficiency: efficiency,
+    expectedPauseAccumSec: expectedPauseAccumSec,
+    expectedPauseStartedAt: expectedPauseStartedAt || 0,
     firstScanAtMs: firstScanAtMs,
     lastScanAtMs: lastScanWallMs != null ? lastScanWallMs : null,
     startedAtMs: startTime ? startTime.getTime() : null
