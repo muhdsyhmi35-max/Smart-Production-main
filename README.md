@@ -12,6 +12,7 @@ TF2 production dashboard with:
 - `index.html` - UI layout
 - `style.css` - styles
 - `script.js` - dashboard logic
+- `gpu-how-it-works/` - interactive 3D “How a GPU works” explainer (Three.js)
 - `netlify.toml` - Netlify static hosting config
 - `firebase.json` - Firebase Functions config
 - `functions/` - Cloud Functions backend worker

@@ -2,6 +2,12 @@
   publish = "."
   command = "echo \"No build step required\""
 
+# Existing files (including /gpu-how-it-works/*) are served before this SPA fallback.
+[[redirects]]
+  from = "/gpu-how-it-works"
+  to = "/gpu-how-it-works/"
+  status = 301
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
