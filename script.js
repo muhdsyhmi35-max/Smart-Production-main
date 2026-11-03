@@ -37,7 +37,7 @@ const SETTINGS = {
     zeroTargetOnInactiveWeekends: true
   },
   shiftSchedule: {
-    startMinute: (8 * 60) + 15, // 08:15 — countdown, Expected, and actual working time
+    startMinute: (8 * 60) + 15, // 08:15 — countdown, Expected, and actual working time. The 1st of a month, on a weekday, starts at 08:50.
     endMinute: (17 * 60) + 30,  // 17:30
     enableAutoWindow: true
   },
@@ -2059,30 +2059,39 @@ function isWeekendDate(d = new Date()) {
 }
 
 const COUNTDOWN_START_MIN = (8 * 60) + 15; // 08:15 — first cycle countdown
+const SAFETY_MEETING_START_MIN = (8 * 60) + 50; // 08:50 — safety meeting on the 1st
+
+/** The 1st of the month, when that day is Monday–Friday. Weekends stay on the normal start. */
+function isMonthlySafetyMeetingDay(d = new Date()) {
+  return d.getDate() === 1 && !isWeekendDate(d);
+}
+
+function getShiftStartMinuteForDate(d = new Date()) {
+  const normal = Number(SETTINGS.shiftSchedule.startMinute);
+  const base = Number.isFinite(normal) ? normal : COUNTDOWN_START_MIN;
+  if (!isMonthlySafetyMeetingDay(d)) return base;
+  return Math.max(base, SAFETY_MEETING_START_MIN);
+}
 
 function isWithinShiftWindow(d = new Date()) {
   if (isWeekendDate(d)) return false;
   if (!SETTINGS.shiftSchedule.enableAutoWindow) return true;
   const minute = getLocalMinuteOfDay(d);
-  const openMin = Math.min(COUNTDOWN_START_MIN, SETTINGS.shiftSchedule.startMinute);
+  const openMin = getShiftStartMinuteForDate(d);
   return minute >= openMin && minute < SETTINGS.shiftSchedule.endMinute;
 }
 
-/** Local wall time (ms) when the configured shift starts on the same calendar day as `d`. */
+/** Local wall time (ms) when the shift starts on the same calendar day as `d`. */
 function getTodayShiftStartMs(d = new Date()) {
-  const startMin = SETTINGS.shiftSchedule.startMinute;
+  const startMin = getShiftStartMinuteForDate(d);
   const hh = Math.floor(startMin / 60) % 24;
   const mm = startMin % 60;
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), hh, mm, 0, 0).getTime();
 }
 
-/** First cycle countdown. 08:15, or the shift start if that is earlier. */
+/** First cycle countdown. Same moment the shift opens, including a late safety-meeting start. */
 function getTodayCountdownStartMs(d = new Date()) {
-  const shiftStartMs = getTodayShiftStartMs(d);
-  const hh = Math.floor(COUNTDOWN_START_MIN / 60) % 24;
-  const mm = COUNTDOWN_START_MIN % 60;
-  const countdownStartMs = new Date(d.getFullYear(), d.getMonth(), d.getDate(), hh, mm, 0, 0).getTime();
-  return Math.min(shiftStartMs, countdownStartMs);
+  return getTodayShiftStartMs(d);
 }
 
 function getPaceAnchorMs() {
@@ -2403,7 +2412,7 @@ function updateShiftMenuLabel() {
   if (!btn) return;
   const on = SETTINGS.shiftSchedule.enableAutoWindow;
   const text = on
-    ? `${minuteToTimeString(SETTINGS.shiftSchedule.startMinute)}-${minuteToTimeString(SETTINGS.shiftSchedule.endMinute)}`
+    ? `${minuteToTimeString(getShiftStartMinuteForDate(new Date()))}-${minuteToTimeString(SETTINGS.shiftSchedule.endMinute)}`
     : "MANUAL";
   btn.innerHTML = `<span class="menu-icon">🕘</span><span>Shift: ${text}</span>`;
 }
@@ -2437,6 +2446,7 @@ function ensureShiftScheduleModal() {
   overlay.innerHTML = `
     <div class="admin-login-dialog" role="dialog" aria-modal="true" aria-labelledby="shiftScheduleTitle" onclick="event.stopPropagation()">
       <h2 id="shiftScheduleTitle" class="admin-login-title">Production Shift Settings</h2>
+      <p class="admin-login-error" style="color:#94a3b8;display:block;">On the 1st of each month, when that day is Monday to Friday, production starts at 08:50 for the safety meeting.</p>
       <p id="shiftScheduleError" class="admin-login-error" hidden></p>
       <form class="admin-login-form" onsubmit="event.preventDefault(); submitShiftScheduleModal();">
         <label class="admin-login-label">
@@ -6455,7 +6465,11 @@ function getTargetAchievedMsForDay(dayKey, targetUnits) {
 }
 
 function calcActualWtMinsForDay(dayKey, targetUnits = 0, achievedMsOpt) {
-  const shiftStartMin = Number(SETTINGS.shiftSchedule.startMinute);
+  const [yy0, mm0, dd0] = String(dayKey).split("-").map(v => parseInt(v, 10));
+  const shiftDay = Number.isFinite(yy0) && Number.isFinite(mm0) && Number.isFinite(dd0)
+    ? new Date(yy0, mm0 - 1, dd0, 12, 0, 0, 0)
+    : new Date();
+  const shiftStartMin = getShiftStartMinuteForDate(shiftDay);
   const shiftEndMin = Number(SETTINGS.shiftSchedule.endMinute);
   if (!Number.isFinite(shiftStartMin) || !Number.isFinite(shiftEndMin) || shiftEndMin <= shiftStartMin) return null;
 
